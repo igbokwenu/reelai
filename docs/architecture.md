@@ -83,4 +83,3 @@ Function Compute is a later deployment option. ECS is the MVP default because vi
 - Polling is app-driven and suitable for hackathon/demo scale.
 - Long-running high-volume rendering is not supported in MVP.
 - Generated 60-second reels are stretch; the reliable target is 15 to 30 seconds.
-

@@ -26,11 +26,15 @@ function safeFileName(fileName: string) {
 }
 
 function hasOssConfig() {
-  return Boolean(
-    process.env.OSS_REGION &&
-    process.env.OSS_BUCKET &&
-    process.env.OSS_ACCESS_KEY_ID &&
+  const values = [
+    process.env.OSS_REGION,
+    process.env.OSS_BUCKET,
+    process.env.OSS_ACCESS_KEY_ID,
     process.env.OSS_ACCESS_KEY_SECRET,
+  ];
+
+  return values.every(
+    (value) => value && !value.toLowerCase().includes("placeholder"),
   );
 }
 

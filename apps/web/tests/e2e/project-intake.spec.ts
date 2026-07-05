@@ -16,7 +16,9 @@ test("creates a project and registers a source", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/projects\/.+/);
   await expect(page.getByText("Project Sources")).toBeVisible();
-  await expect(page.locator("header").getByText("Signal Loom Studio")).toBeVisible();
+  await expect(
+    page.locator("header").getByText("Signal Loom Studio"),
+  ).toBeVisible();
 
   await page
     .getByPlaceholder("https://brand.example/about")
@@ -38,5 +40,10 @@ test("creates a project and registers a source", async ({ page }) => {
   });
   await page.getByRole("button", { name: "Store source" }).click();
 
+  await expect(page.getByText("image/png")).toBeVisible();
+
+  await page.reload();
+
+  await expect(page.getByText("https://example.com/about")).toBeVisible();
   await expect(page.getByText("image/png")).toBeVisible();
 });

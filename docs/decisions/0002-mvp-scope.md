@@ -47,4 +47,3 @@ Tradeoffs:
 
 - Some impressive features become stretch work.
 - The first public version is optimized for short reliable reels, not every possible content workflow.
-

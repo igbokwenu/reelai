@@ -46,4 +46,3 @@ After the hackathon, revisit:
 - Tair/Redis queue.
 - Function Compute or Container Service deployment.
 - Multi-format render pipeline.
-

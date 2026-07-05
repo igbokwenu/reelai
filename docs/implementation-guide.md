@@ -382,22 +382,22 @@ All route handlers must:
 
 Required endpoints:
 
-| Endpoint | Method | Purpose | Sync/async |
-| --- | --- | --- | --- |
-| `/api/projects` | `POST` | Create project | sync |
-| `/api/projects/[projectId]` | `GET` | Fetch full project graph | sync |
-| `/api/projects/[projectId]/sources` | `POST` | Upload/register sources | sync for metadata, async extraction if needed |
-| `/api/projects/[projectId]/brand-kit` | `POST` | Generate Brand Kit | async |
-| `/api/projects/[projectId]/concepts` | `POST` | Generate three concepts and preview frames | async |
-| `/api/projects/[projectId]/concepts/[conceptId]/select` | `POST` | Select concept | sync |
-| `/api/projects/[projectId]/storyboard` | `POST` | Generate storyboard from selected concept | async |
-| `/api/storyboards/[storyboardId]` | `PATCH` | Edit storyboard/scenes | sync |
-| `/api/projects/[projectId]/keyframes` | `POST` | Generate scene keyframes | async |
-| `/api/projects/[projectId]/videos` | `POST` | Generate scene videos | async |
-| `/api/projects/[projectId]/tts` | `POST` | Generate narration | async |
-| `/api/projects/[projectId]/render` | `POST` | Render final MP4 | async |
-| `/api/jobs/[jobId]` | `GET` | Poll job status | sync |
-| `/api/artifacts/[artifactId]` | `GET` | Resolve artifact metadata/download URL | sync |
+| Endpoint                                                | Method  | Purpose                                    | Sync/async                                    |
+| ------------------------------------------------------- | ------- | ------------------------------------------ | --------------------------------------------- |
+| `/api/projects`                                         | `POST`  | Create project                             | sync                                          |
+| `/api/projects/[projectId]`                             | `GET`   | Fetch full project graph                   | sync                                          |
+| `/api/projects/[projectId]/sources`                     | `POST`  | Upload/register sources                    | sync for metadata, async extraction if needed |
+| `/api/projects/[projectId]/brand-kit`                   | `POST`  | Generate Brand Kit                         | async                                         |
+| `/api/projects/[projectId]/concepts`                    | `POST`  | Generate three concepts and preview frames | async                                         |
+| `/api/projects/[projectId]/concepts/[conceptId]/select` | `POST`  | Select concept                             | sync                                          |
+| `/api/projects/[projectId]/storyboard`                  | `POST`  | Generate storyboard from selected concept  | async                                         |
+| `/api/storyboards/[storyboardId]`                       | `PATCH` | Edit storyboard/scenes                     | sync                                          |
+| `/api/projects/[projectId]/keyframes`                   | `POST`  | Generate scene keyframes                   | async                                         |
+| `/api/projects/[projectId]/videos`                      | `POST`  | Generate scene videos                      | async                                         |
+| `/api/projects/[projectId]/tts`                         | `POST`  | Generate narration                         | async                                         |
+| `/api/projects/[projectId]/render`                      | `POST`  | Render final MP4                           | async                                         |
+| `/api/jobs/[jobId]`                                     | `GET`   | Poll job status                            | sync                                          |
+| `/api/artifacts/[artifactId]`                           | `GET`   | Resolve artifact metadata/download URL     | sync                                          |
 
 Use typed response helpers in `apps/web/lib/http/responses.ts`.
 
@@ -408,12 +408,21 @@ Create `apps/web/lib/qwen/client.ts`.
 It must export:
 
 ```ts
-export const QWEN_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
+export const QWEN_BASE_URL =
+  "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
 
-export async function generateStructuredText<T>(input: StructuredTextInput<T>): Promise<T>;
-export async function analyzeBrandAssets(input: VisionAnalysisInput): Promise<VisionAnalysisResult>;
-export async function generateImage(input: ImageGenerationInput): Promise<ImageGenerationResult>;
-export async function submitVideoTask(input: VideoGenerationInput): Promise<VideoTaskSubmission>;
+export async function generateStructuredText<T>(
+  input: StructuredTextInput<T>,
+): Promise<T>;
+export async function analyzeBrandAssets(
+  input: VisionAnalysisInput,
+): Promise<VisionAnalysisResult>;
+export async function generateImage(
+  input: ImageGenerationInput,
+): Promise<ImageGenerationResult>;
+export async function submitVideoTask(
+  input: VideoGenerationInput,
+): Promise<VideoTaskSubmission>;
 export async function pollVideoTask(taskId: string): Promise<VideoTaskStatus>;
 export async function generateTts(input: TtsInput): Promise<TtsResult>;
 ```
@@ -441,19 +450,25 @@ export const BrandKitSchema = z.object({
   tone: z.string(),
   palette: z.array(z.object({ hex: z.string(), label: z.string() })).max(8),
   visualMotifs: z.array(z.string()).max(10),
-  claims: z.array(z.object({
-    claim: z.string(),
-    evidence: z.string().nullable(),
-    source: z.string().nullable(),
-    risk: z.enum(["low", "medium", "high"]),
-  })),
-  policyRisks: z.array(z.object({
-    category: z.string(),
-    reason: z.string(),
-    severity: z.enum(["info", "warning", "blocker"]),
-  })),
+  claims: z.array(
+    z.object({
+      claim: z.string(),
+      evidence: z.string().nullable(),
+      source: z.string().nullable(),
+      risk: z.enum(["low", "medium", "high"]),
+    }),
+  ),
+  policyRisks: z.array(
+    z.object({
+      category: z.string(),
+      reason: z.string(),
+      severity: z.enum(["info", "warning", "blocker"]),
+    }),
+  ),
   lockedStyleLanguage: z.string(),
-  sourceCitations: z.array(z.object({ label: z.string(), url: z.string().nullable() })),
+  sourceCitations: z.array(
+    z.object({ label: z.string(), url: z.string().nullable() }),
+  ),
 });
 ```
 
@@ -463,17 +478,21 @@ Exactly three concepts:
 
 ```ts
 export const CreativeConceptsSchema = z.object({
-  concepts: z.array(z.object({
-    title: z.string(),
-    hook: z.string(),
-    strategy: z.string(),
-    narrativeArc: z.string(),
-    visualStyle: z.string(),
-    estimatedScenes: z.number().int().min(2).max(4),
-    estimatedDurationSec: z.number().int().min(15).max(30),
-    previewPrompt: z.string(),
-    rationale: z.string(),
-  })).length(3),
+  concepts: z
+    .array(
+      z.object({
+        title: z.string(),
+        hook: z.string(),
+        strategy: z.string(),
+        narrativeArc: z.string(),
+        visualStyle: z.string(),
+        estimatedScenes: z.number().int().min(2).max(4),
+        estimatedDurationSec: z.number().int().min(15).max(30),
+        previewPrompt: z.string(),
+        rationale: z.string(),
+      }),
+    )
+    .length(3),
 });
 ```
 
@@ -488,16 +507,21 @@ export const StoryboardSchema = z.object({
     preset: z.string(),
     prompt: z.string(),
   }),
-  scenes: z.array(z.object({
-    index: z.number().int(),
-    durationSec: z.number().int().min(4).max(15),
-    captionText: z.string(),
-    voiceoverText: z.string().max(600),
-    startFramePrompt: z.string(),
-    endFramePrompt: z.string(),
-    videoMotionPrompt: z.string(),
-    continuityNotes: z.string(),
-  })).min(2).max(4),
+  scenes: z
+    .array(
+      z.object({
+        index: z.number().int(),
+        durationSec: z.number().int().min(4).max(15),
+        captionText: z.string(),
+        voiceoverText: z.string().max(600),
+        startFramePrompt: z.string(),
+        endFramePrompt: z.string(),
+        videoMotionPrompt: z.string(),
+        continuityNotes: z.string(),
+      }),
+    )
+    .min(2)
+    .max(4),
 });
 ```
 
