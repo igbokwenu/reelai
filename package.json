@@ -1,0 +1,24 @@
+{
+  "name": "reelai",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "postinstall": "prisma generate",
+    "build": "pnpm --filter web build",
+    "lint": "pnpm --filter web lint",
+    "typecheck": "pnpm --filter web typecheck",
+    "test": "pnpm --filter web test",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed"
+  },
+  "devDependencies": {
+    "@prisma/client": "^7.8.0",
+    "prettier": "^3.7.4",
+    "prisma": "^7.8.0"
+  }
+}

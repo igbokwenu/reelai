@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../apps/web/node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Project {
+  id             String        @id @default(cuid())
+  name           String
+  businessName   String
+  websiteUrl     String?
+  targetAudience String?
+  offer          String?
+  videoLengthSec Int           @default(30)
+  style          VideoStyle
+  status         ProjectStatus @default(DRAFT)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+enum VideoStyle {
+  REALISTIC
+  THREE_D_ANIMATION
+}
+
+enum ProjectStatus {
+  DRAFT
+  RESEARCHING
+  CONCEPTING
+  STORYBOARDING
+  GENERATING
+  RENDERING
+  COMPLETE
+  FAILED
+}
