@@ -57,6 +57,7 @@ Completion rules:
   - Which checklist items passed.
   - Which commands/tests passed.
   - What still needs human testing.
+  - Human reviewer instructions: where to go in the app/project, what to click or inspect, what data to use, and what success looks like.
   - Whether the phase tracker was updated.
 
 Human sign-off wording:
@@ -72,6 +73,34 @@ Use this when you want an agent to continue from the current project state witho
 ```text
 Read docs/phase-agent-prompts.md and follow the Universal Agent Instructions. Inspect the phase tracker and codebase, identify the next phase whose Implementation done checkbox is not checked, verify earlier phases have human sign-off or ask before proceeding, then execute only that next phase faithfully. Use docs/implementation-guide.md as the build contract, use the installed QwenCloud skills and CLI where relevant, run the phase exit checks, update the Implementation done checkbox only if the phase passes, and do not mark Human tested and signed off unless I explicitly tell you I have tested and approved it.
 ```
+
+## Required Final Summary Format
+
+Every phase execution must end with this structure:
+
+```text
+Implemented
+- ...
+
+Checks Run
+- ...
+
+Phase Tracker
+- Phase N Implementation done: updated/not updated
+- Human sign-off: still required
+
+Human Review Instructions
+- Where to go:
+- What to test:
+- Test data to use:
+- What success looks like:
+- What failure looks like:
+
+Known Gaps / Risks
+- ...
+```
+
+The `Human Review Instructions` section is mandatory. It should be specific enough that a non-implementing reviewer can open the app or repo and verify the phase without reading the code.
 
 ## Phase 1 Prompt: Foundation And Open-Source Repo
 
@@ -110,7 +139,7 @@ Exit only when all Phase 1 checklist items pass:
 - `docs/architecture.md` renders a Mermaid architecture diagram.
 - App starts locally and shows the studio shell.
 
-If all exit checklist items pass, update Phase 1 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Report what you changed, which commands passed, any known gaps, and what needs human testing.
+If all exit checklist items pass, update Phase 1 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Use the Required Final Summary Format. Human review instructions must explain how to start the app, where the studio shell is, what repo hygiene files to inspect, and what success looks like.
 
 ## Phase 2 Prompt: Data Model, Project Intake, And Artifact Storage
 
@@ -150,7 +179,7 @@ Exit only when all Phase 2 checklist items pass:
 - Project page reloads from persisted database state.
 - Playwright smoke test creates or opens a project page.
 
-If all exit checklist items pass, update Phase 2 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run lint/typecheck/tests. Report commands, changed files, remaining risks, and what needs human testing.
+If all exit checklist items pass, update Phase 2 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run lint/typecheck/tests and use the Required Final Summary Format. Human review instructions must explain how to create a project, upload/register a source, refresh the page, and confirm persistence/artifact behavior.
 
 ## Phase 3 Prompt: QwenCloud Client And Brand Kit Agent
 
@@ -189,7 +218,7 @@ Exit only when all Phase 3 checklist items pass:
 - Sanitized errors appear in UI when generation fails.
 - No prompts, API keys, or uploaded private content are logged in production mode.
 
-If all exit checklist items pass, update Phase 3 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run lint/typecheck/tests and a safe smoke test. Report what worked, what was mocked if anything, how to verify with a real QwenCloud key, and what needs human testing.
+If all exit checklist items pass, update Phase 3 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run lint/typecheck/tests and a safe smoke test, then use the Required Final Summary Format. Human review instructions must explain where to trigger Brand Kit generation, what Brand Kit fields should appear, how to recognize sanitized errors, and what success looks like with a real QwenCloud key.
 
 ## Phase 4 Prompt: Creative Concepts And Storyboard Editor
 
@@ -238,7 +267,7 @@ Exit only when all Phase 4 checklist items pass:
 - Storyboard edits persist after refresh.
 - Policy/claims warnings are visible before generation.
 
-If all exit checklist items pass, update Phase 4 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run checks and include a concise demo path, remaining risks, and what needs human testing in your report.
+If all exit checklist items pass, update Phase 4 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run checks and use the Required Final Summary Format. Human review instructions must explain how to generate three concepts, select one, generate/edit the storyboard, verify persistence, and identify policy/claims warnings.
 
 ## Phase 5 Prompt: Keyframes, Video Generation, And Take Compare
 
@@ -288,7 +317,7 @@ Exit only when all Phase 5 checklist items pass:
 - Failed scene generation can be retried.
 - Generation console shows model, status, task ID, and artifact links.
 
-If all exit checklist items pass, update Phase 5 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run lint/typecheck/tests. Include one manual verification path, what needs human testing, and any QwenCloud quota/latency risks without inventing pricing.
+If all exit checklist items pass, update Phase 5 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run lint/typecheck/tests and use the Required Final Summary Format. Human review instructions must explain how to generate keyframes, regenerate a take, select a take, start video generation, refresh while polling, and confirm artifacts are durable.
 
 ## Phase 6 Prompt: Narration, Composition, And Final Export
 
@@ -346,7 +375,7 @@ Exit only when all Phase 6 checklist items pass:
 - User can play and download the final reel.
 - Manual demo path works end to end for a 15 to 30 second reel.
 
-If all exit checklist items pass, update Phase 6 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run checks and report the final demo path, render output, remaining risks, and what needs human testing clearly.
+If all exit checklist items pass, update Phase 6 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run checks and use the Required Final Summary Format. Human review instructions must explain how to generate narration, inspect waveform/audio status, render the final reel, verify captions/safe zones/disclosure/BGM, and play/download the MP4.
 
 ## Phase 7 Prompt: Deployment, Documentation, And Judging Package
 
@@ -398,7 +427,7 @@ Exit only when all Phase 7 checklist items pass:
 - 1 to 3 minute demo video is recorded.
 - Project can be reused for a second brand without code changes.
 
-If all exit checklist items pass, update Phase 7 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run local and deployed smoke checks. Report deployed URL, proof artifact path, any manual steps, and what needs human testing.
+If all exit checklist items pass, update Phase 7 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run local and deployed smoke checks and use the Required Final Summary Format. Human review instructions must explain how to open the deployed URL, run the end-to-end demo, inspect deployment proof, verify README/judging package, and confirm no secrets are committed.
 
 ## Phase 8 Prompt: Post-MVP Polish And Reusability
 
@@ -441,4 +470,4 @@ Exit checklist:
 - Public docs explain the feature and limitations.
 - Deployment remains reproducible.
 
-If all exit checklist items pass, update Phase 8 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run the full acceptance test suite before reporting completion, and include what needs human testing.
+If all exit checklist items pass, update Phase 8 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run the full acceptance test suite and use the Required Final Summary Format. Human review instructions must explain how to test the specific polish feature, how to verify it can be disabled if applicable, and how to confirm the original MVP demo still works.
