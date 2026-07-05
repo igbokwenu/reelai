@@ -4,9 +4,78 @@ Updated: July 5, 2026
 
 Use one prompt per implementation phase. Give the agent only the phase you want it to execute, unless you explicitly want it to continue across phases. Each prompt tells the agent to treat `docs/implementation-guide.md` as the build contract, preserve the hackathon spirit, use QwenCloud skills/docs where relevant, and stop at the phase exit checklist.
 
+## Phase Status Tracker
+
+Agents must update this tracker at the end of each phase. A phase is not truly complete until both implementation completion and human sign-off are checked.
+
+| Phase | Name | Implementation done | Human tested and signed off | Notes |
+| --- | --- | --- | --- | --- |
+| 1 | Foundation And Open-Source Repo | [ ] | [ ] | |
+| 2 | Data Model, Project Intake, And Artifact Storage | [ ] | [ ] | |
+| 3 | QwenCloud Client And Brand Kit Agent | [ ] | [ ] | |
+| 4 | Creative Concepts And Storyboard Editor | [ ] | [ ] | |
+| 5 | Keyframes, Video Generation, And Take Compare | [ ] | [ ] | |
+| 6 | Narration, Composition, And Final Export | [ ] | [ ] | |
+| 7 | Deployment, Documentation, And Judging Package | [ ] | [ ] | |
+| 8 | Post-MVP Polish And Reusability | [ ] | [ ] | |
+
+## Universal Agent Instructions
+
+Use this instruction block with every phase prompt.
+
+Before making changes:
+
+1. Read `docs/phase-agent-prompts.md`, `docs/implementation-guide.md`, `docs/reel-ai-blueprint.md`, `docs/architecture.md`, and `docs/qwencloud-reference-links.md`.
+2. Inspect the codebase to determine what is already implemented. Do not assume the tracker is perfect if code says otherwise; reconcile mismatches in your final report.
+3. Find the next phase where `Implementation done` is unchecked.
+4. If an earlier phase has `Implementation done` checked but `Human tested and signed off` unchecked, do not start a later phase. Ask the human to test/sign off or explicitly authorize continuing.
+5. Execute only the next incomplete phase unless the human explicitly asks for multiple phases.
+
+QwenCloud context:
+
+- QwenCloud skills are installed in this repo under `.agents/skills`.
+- QwenCloud CLI is installed.
+- The project’s QwenCloud account is expected to be authenticated.
+- `DASHSCOPE_API_KEY` is expected to be available in local environment files but must never be printed, logged, or committed.
+- Use the installed QwenCloud skills for implementation guidance:
+  - `qwencloud-model-selector`
+  - `qwencloud-text`
+  - `qwencloud-vision`
+  - `qwencloud-image-generation`
+  - `qwencloud-video-generation`
+  - `qwencloud-audio-tts`
+- Use `docs/qwencloud-reference-links.md` for official docs and hackathon proof links.
+- If model availability, pricing, or exact API details matter, verify with QwenCloud CLI or official docs rather than guessing.
+
+Completion rules:
+
+- When all exit checklist items for the phase pass, update the phase row from `[ ]` to `[x]` under `Implementation done`.
+- Do not mark `Human tested and signed off` yourself. Leave it unchecked unless the human explicitly says they tested and approved that phase.
+- If the human explicitly signs off, update that phase’s `Human tested and signed off` checkbox to `[x]` and add a short dated note in the Notes column.
+- At the end of the phase, report:
+  - What was implemented.
+  - Which checklist items passed.
+  - Which commands/tests passed.
+  - What still needs human testing.
+  - Whether the phase tracker was updated.
+
+Human sign-off wording:
+
+```text
+I have tested Phase N and approve it. Mark human sign-off complete.
+```
+
+## Next Phase Auto-Executor Prompt
+
+Use this when you want an agent to continue from the current project state without manually selecting a phase:
+
+```text
+Read docs/phase-agent-prompts.md and follow the Universal Agent Instructions. Inspect the phase tracker and codebase, identify the next phase whose Implementation done checkbox is not checked, verify earlier phases have human sign-off or ask before proceeding, then execute only that next phase faithfully. Use docs/implementation-guide.md as the build contract, use the installed QwenCloud skills and CLI where relevant, run the phase exit checks, update the Implementation done checkbox only if the phase passes, and do not mark Human tested and signed off unless I explicitly tell you I have tested and approved it.
+```
+
 ## Phase 1 Prompt: Foundation And Open-Source Repo
 
-You are implementing Phase 1 of Reel AI. Read `docs/implementation-guide.md`, `docs/reel-ai-blueprint.md`, and `docs/architecture.md` before making changes. Treat `docs/implementation-guide.md` as the source of truth.
+You are implementing Phase 1 of Reel AI. First follow the Universal Agent Instructions above. Read `docs/implementation-guide.md`, `docs/reel-ai-blueprint.md`, and `docs/architecture.md` before making changes. Treat `docs/implementation-guide.md` as the source of truth.
 
 Goal: create a clean, secure, runnable open-source project foundation that is safe to make public.
 
@@ -41,11 +110,11 @@ Exit only when all Phase 1 checklist items pass:
 - `docs/architecture.md` renders a Mermaid architecture diagram.
 - App starts locally and shows the studio shell.
 
-Report what you changed, which commands passed, and any known gaps.
+If all exit checklist items pass, update Phase 1 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Report what you changed, which commands passed, any known gaps, and what needs human testing.
 
 ## Phase 2 Prompt: Data Model, Project Intake, And Artifact Storage
 
-You are implementing Phase 2 of Reel AI. Read `docs/implementation-guide.md`, especially the database schema, API contract, media pipeline, and Phase 2 checklist. Build on the current repo; do not restart or replace Phase 1.
+You are implementing Phase 2 of Reel AI. First follow the Universal Agent Instructions above. Read `docs/implementation-guide.md`, especially the database schema, API contract, media pipeline, and Phase 2 checklist. Build on the current repo; do not restart or replace Phase 1.
 
 Goal: make the app persist real projects, accept sources, and store durable artifacts.
 
@@ -81,11 +150,11 @@ Exit only when all Phase 2 checklist items pass:
 - Project page reloads from persisted database state.
 - Playwright smoke test creates or opens a project page.
 
-Run lint/typecheck/tests. Report commands, changed files, and remaining risks.
+If all exit checklist items pass, update Phase 2 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run lint/typecheck/tests. Report commands, changed files, remaining risks, and what needs human testing.
 
 ## Phase 3 Prompt: QwenCloud Client And Brand Kit Agent
 
-You are implementing Phase 3 of Reel AI. Read `docs/implementation-guide.md`, `docs/qwencloud-reference-links.md`, and the installed QwenCloud skills before changing code. Use the local skills for model/API guidance: qwencloud-text, qwencloud-vision, and qwencloud-model-selector. Do not expose secrets.
+You are implementing Phase 3 of Reel AI. First follow the Universal Agent Instructions above. Read `docs/implementation-guide.md`, `docs/qwencloud-reference-links.md`, and the installed QwenCloud skills before changing code. Use the local skills for model/API guidance: qwencloud-text, qwencloud-vision, and qwencloud-model-selector. Do not expose secrets.
 
 Goal: prove secure server-side QwenCloud integration and generate a useful Brand Kit.
 
@@ -120,11 +189,11 @@ Exit only when all Phase 3 checklist items pass:
 - Sanitized errors appear in UI when generation fails.
 - No prompts, API keys, or uploaded private content are logged in production mode.
 
-Run lint/typecheck/tests and a safe smoke test. Report what worked, what was mocked if anything, and how to verify with a real QwenCloud key.
+If all exit checklist items pass, update Phase 3 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run lint/typecheck/tests and a safe smoke test. Report what worked, what was mocked if anything, how to verify with a real QwenCloud key, and what needs human testing.
 
 ## Phase 4 Prompt: Creative Concepts And Storyboard Editor
 
-You are implementing Phase 4 of Reel AI. Read `docs/implementation-guide.md`, especially the Agent Output Schemas, Frontend Information Architecture, and Phase 4 checklist. Use the QwenCloud text and image generation skills/docs where relevant. Build on the existing Brand Kit workflow.
+You are implementing Phase 4 of Reel AI. First follow the Universal Agent Instructions above. Read `docs/implementation-guide.md`, especially the Agent Output Schemas, Frontend Information Architecture, and Phase 4 checklist. Use the QwenCloud text and image generation skills/docs where relevant. Build on the existing Brand Kit workflow.
 
 Goal: deliver Reel AI’s signature showrunner mechanic: three creative concepts, one selected direction, and an editable storyboard.
 
@@ -169,11 +238,11 @@ Exit only when all Phase 4 checklist items pass:
 - Storyboard edits persist after refresh.
 - Policy/claims warnings are visible before generation.
 
-Run checks and include a concise demo path in your report.
+If all exit checklist items pass, update Phase 4 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run checks and include a concise demo path, remaining risks, and what needs human testing in your report.
 
 ## Phase 5 Prompt: Keyframes, Video Generation, And Take Compare
 
-You are implementing Phase 5 of Reel AI. Read `docs/implementation-guide.md`, `docs/qwencloud-reference-links.md`, and the installed QwenCloud image/video generation skills before coding. This phase must make generation durable and additive, not destructive.
+You are implementing Phase 5 of Reel AI. First follow the Universal Agent Instructions above. Read `docs/implementation-guide.md`, `docs/qwencloud-reference-links.md`, and the installed QwenCloud image/video generation skills before coding. This phase must make generation durable and additive, not destructive.
 
 Goal: generate scene keyframes and i2v video clips, store them durably, and let users compare/select takes.
 
@@ -219,11 +288,11 @@ Exit only when all Phase 5 checklist items pass:
 - Failed scene generation can be retried.
 - Generation console shows model, status, task ID, and artifact links.
 
-Run lint/typecheck/tests. Include one manual verification path and note any QwenCloud quota/latency risks without inventing pricing.
+If all exit checklist items pass, update Phase 5 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run lint/typecheck/tests. Include one manual verification path, what needs human testing, and any QwenCloud quota/latency risks without inventing pricing.
 
 ## Phase 6 Prompt: Narration, Composition, And Final Export
 
-You are implementing Phase 6 of Reel AI. Read `docs/implementation-guide.md`, the Remotion media pipeline section, and the installed qwencloud-audio-tts skill. This phase must produce a complete downloadable reel.
+You are implementing Phase 6 of Reel AI. First follow the Universal Agent Instructions above. Read `docs/implementation-guide.md`, the Remotion media pipeline section, and the installed qwencloud-audio-tts skill. This phase must produce a complete downloadable reel.
 
 Goal: turn selected scene clips into one complete 9:16 MP4 with narration, captions, safe zones, optional BGM, and optional AI disclosure.
 
@@ -277,11 +346,11 @@ Exit only when all Phase 6 checklist items pass:
 - User can play and download the final reel.
 - Manual demo path works end to end for a 15 to 30 second reel.
 
-Run checks and report the final demo path clearly.
+If all exit checklist items pass, update Phase 6 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run checks and report the final demo path, render output, remaining risks, and what needs human testing clearly.
 
 ## Phase 7 Prompt: Deployment, Documentation, And Judging Package
 
-You are implementing Phase 7 of Reel AI. Read `docs/implementation-guide.md`, `docs/architecture.md`, `docs/qwencloud-reference-links.md`, and the hackathon proof requirements. This phase makes Reel AI live and reusable.
+You are implementing Phase 7 of Reel AI. First follow the Universal Agent Instructions above. Read `docs/implementation-guide.md`, `docs/architecture.md`, `docs/qwencloud-reference-links.md`, and the hackathon proof requirements. This phase makes Reel AI live and reusable.
 
 Goal: deploy the MVP to Alibaba Cloud, complete public repo documentation, and prepare the judging package.
 
@@ -329,11 +398,11 @@ Exit only when all Phase 7 checklist items pass:
 - 1 to 3 minute demo video is recorded.
 - Project can be reused for a second brand without code changes.
 
-Run local and deployed smoke checks. Report deployed URL, proof artifact path, and any manual steps.
+If all exit checklist items pass, update Phase 7 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run local and deployed smoke checks. Report deployed URL, proof artifact path, any manual steps, and what needs human testing.
 
 ## Phase 8 Prompt: Post-MVP Polish And Reusability
 
-You are implementing Phase 8 of Reel AI. Only start this after Phase 7 is complete and the deployed MVP works. Read `docs/implementation-guide.md` and add ADRs for meaningful feature additions.
+You are implementing Phase 8 of Reel AI. First follow the Universal Agent Instructions above. Only start this after Phase 7 is complete and the deployed MVP works. Read `docs/implementation-guide.md` and add ADRs for meaningful feature additions.
 
 Goal: improve Reel AI as a reusable open-source product without destabilizing the judged MVP.
 
@@ -372,5 +441,4 @@ Exit checklist:
 - Public docs explain the feature and limitations.
 - Deployment remains reproducible.
 
-Run the full acceptance test suite before reporting completion.
-
+If all exit checklist items pass, update Phase 8 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run the full acceptance test suite before reporting completion, and include what needs human testing.
