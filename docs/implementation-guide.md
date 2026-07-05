@@ -68,7 +68,7 @@ Use these choices. Do not swap frameworks without an explicit decision note in `
 
 ### AI
 
-- Text/structured planning: QwenCloud `qwen3.7-plus`.
+- Text/structured planning: QwenCloud `qwen3.6-plus`.
 - Final heavy reasoning pass only when needed: `qwen3.7-max`.
 - Vision/brand material understanding: QwenCloud vision models; verify current model IDs before implementation freeze.
 - Preview/keyframe image generation: `wan2.7-image-pro` by default; use `wan2.7-image` for faster drafts if available.

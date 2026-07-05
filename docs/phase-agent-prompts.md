@@ -12,7 +12,7 @@ Agents must update this tracker at the end of each phase. A phase is not truly c
 | ----- | ------------------------------------------------ | ------------------- | --------------------------- | ----------------------------------------------------------------------- |
 | 1     | Foundation And Open-Source Repo                  | [x]                 | [x]                         | Implemented and human-approved on 2026-07-05.                           |
 | 2     | Data Model, Project Intake, And Artifact Storage | [x]                 | [x]                         | Implemented, automated checks passed, and human-approved on 2026-07-05. |
-| 3     | QwenCloud Client And Brand Kit Agent             | [x]                 | [ ]                         | Implemented, automated checks passed, and awaiting human QwenCloud smoke test. |
+| 3     | QwenCloud Client And Brand Kit Agent             | [x]                 | [x]                         | Implemented, automated checks passed, and human-approved on 2026-07-05. |
 | 4     | Creative Concepts And Storyboard Editor          | [ ]                 | [ ]                         |                                                                         |
 | 5     | Keyframes, Video Generation, And Take Compare    | [ ]                 | [ ]                         |                                                                         |
 | 6     | Narration, Composition, And Final Export         | [ ]                 | [ ]                         |                                                                         |
@@ -201,7 +201,7 @@ QwenCloud requirements:
 
 - Use `DASHSCOPE_API_KEY` only server-side.
 - The code must visibly include `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`.
-- Use `qwen3.7-plus` for structured Brand Kit generation unless official docs or CLI show a better current default.
+- Use `qwen3.6-plus` for structured Brand Kit generation per installed QwenCloud skill guidance unless official docs or CLI show a better current default.
 - Use Qwen vision only for uploaded visual assets; website text should be extracted by the backend first and then sent as text context.
 - Validate model output with Zod before saving.
 - Log model, operation, elapsed time, provider/request id if available, and sanitized errors only.
@@ -250,7 +250,7 @@ Product requirements:
 
 QwenCloud requirements:
 
-- Use `qwen3.7-plus` for structured concept/storyboard JSON unless verified otherwise.
+- Use `qwen3.6-plus` for structured concept/storyboard JSON per installed QwenCloud skill guidance unless verified otherwise.
 - Use `wan2.7-image-pro` or current verified image model for concept preview frames.
 - Validate all model outputs with Zod before persistence.
 - Store generated preview frames as artifacts.

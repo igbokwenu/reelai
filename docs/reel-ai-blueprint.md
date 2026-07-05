@@ -192,7 +192,7 @@ The planned MVP is supported by the current QwenCloud platform, with a few scope
 
 | Platform need                                            | QwenCloud support                                                                                                                     | Reel AI implementation decision                                                                                                                                                              |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Brand research, scriptwriting, concepts, storyboard JSON | Text generation models such as `qwen3.7-plus` support 1M context, function calling, built-in tools, and structured output.            | Use `qwen3.7-plus` for Brand Kit, three concept pitches, storyboard JSON, claims review, and policy review.                                                                                  |
+| Brand research, scriptwriting, concepts, storyboard JSON | Text generation models such as `qwen3.6-plus` support long-context structured text and multimodal planning workflows.                 | Use `qwen3.6-plus` for Brand Kit, three concept pitches, storyboard JSON, claims review, and policy review.                                                                                  |
 | Website and brand material understanding                 | Visual understanding models support image/video analysis, OCR-style extraction, structured output, and long-context multimodal input. | Fetch website content in our backend, render/parse uploads, then send text/images to Qwen for structured Brand Kit extraction. Do not depend on opaque browsing as the only source of truth. |
 | Preview frames and storyboard keyframes                  | `wan2.7-image-pro` supports text rendering, brand color control, multi-image references, consistent image sets, and image editing.    | Generate one cheap preview frame per creative concept, then start/end keyframes for approved storyboard scenes.                                                                              |
 | Video generation                                         | HappyHorse/Wan support t2v, i2v, r2v, video editing, 720P/1080P, audio-capable clips, and 3 to 15 second segments depending on model. | Use image-to-video as the default continuity path. Generate 2 to 4 scenes for MVP and stitch into a 15 to 30 second reel first; 60 seconds is a final/stretch render path.                   |
@@ -280,7 +280,7 @@ Before submission, the repo and Devpost page should include:
 
 ### Text And Agent Reasoning
 
-Use `qwen3.7-plus` for scriptwriting, storyboard planning, structured JSON, and brand analysis. The current QwenCloud docs recommend it as a balanced model with 1M context, tool support, function calling, and structured output. Use `qwen3.7-max` only for the final “creative director pass” or complex reasoning.
+Use `qwen3.6-plus` for scriptwriting, storyboard planning, structured JSON, and brand analysis per the installed QwenCloud skill guidance. Use the strongest currently verified Qwen model only for a final creative director pass or complex reasoning.
 
 Source: https://docs.qwencloud.com/developer-guides/getting-started/text-generation-models
 
