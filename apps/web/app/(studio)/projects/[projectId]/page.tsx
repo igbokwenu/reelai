@@ -12,7 +12,9 @@ import { notFound } from "next/navigation";
 
 import { ArtifactPreview } from "@/components/studio/ArtifactPreview";
 import { BrandKitPanel } from "@/components/studio/BrandKitPanel";
+import { ConceptTable } from "@/components/studio/ConceptTable";
 import { ProjectList } from "@/components/studio/ProjectList";
+import { StoryboardTimeline } from "@/components/studio/StoryboardTimeline";
 import { SourceUploader } from "@/components/studio/SourceUploader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
@@ -39,6 +41,17 @@ export default async function ProjectPage({ params }: PageProps) {
   if (!project) {
     notFound();
   }
+
+  const latestBrandKitJob =
+    project.jobs.find((job) => job.type === "BRAND_KIT") ?? null;
+  const latestConceptJob =
+    project.jobs.find((job) => job.type === "CONCEPTS") ?? null;
+  const latestStoryboardJob =
+    project.jobs.find((job) => job.type === "STORYBOARD") ?? null;
+  const latestPolicyJob =
+    project.jobs.find((job) => job.type === "POLICY_REVIEW") ?? null;
+  const selectedConcept =
+    project.concepts.find((concept) => concept.selected) ?? null;
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -98,11 +111,43 @@ export default async function ProjectPage({ params }: PageProps) {
               <CardContent>
                 <BrandKitPanel
                   brandKit={project.brandKit}
-                  latestBrandKitJob={
-                    project.jobs.find((job) => job.type === "BRAND_KIT") ??
-                    null
-                  }
+                  latestBrandKitJob={latestBrandKitJob}
                   projectId={project.id}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Concepts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ConceptTable
+                  artifacts={project.artifacts}
+                  concepts={project.concepts}
+                  hasBrandKit={Boolean(project.brandKit)}
+                  latestConceptJob={latestConceptJob}
+                  projectId={project.id}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Storyboard</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StoryboardTimeline
+                  key={
+                    project.storyboard
+                      ? `${project.storyboard.id}-${project.storyboard.updatedAt.toISOString()}`
+                      : selectedConcept?.id ?? "no-storyboard"
+                  }
+                  latestPolicyJob={latestPolicyJob}
+                  latestStoryboardJob={latestStoryboardJob}
+                  projectId={project.id}
+                  selectedConcept={selectedConcept}
+                  storyboard={project.storyboard}
                 />
               </CardContent>
             </Card>
@@ -195,15 +240,32 @@ export default async function ProjectPage({ params }: PageProps) {
             <InspectorRow
               icon={FileVideo}
               label="Next phase"
-              value={project.brandKit ? "Creative Concepts" : "Brand Kit"}
+              value={
+                project.storyboard
+                  ? "Keyframes"
+                  : selectedConcept
+                    ? "Storyboard"
+                    : project.concepts.length === 3
+                      ? "Concept Selection"
+                      : project.brandKit
+                        ? "Creative Concepts"
+                        : "Brand Kit"
+              }
             />
             <InspectorRow
               icon={Clapperboard}
               label="Brand Kit job"
-              value={
-                project.jobs.find((job) => job.type === "BRAND_KIT")?.status ??
-                "Not started"
-              }
+              value={latestBrandKitJob?.status ?? "Not started"}
+            />
+            <InspectorRow
+              icon={Clapperboard}
+              label="Concept"
+              value={selectedConcept?.title ?? "Not selected"}
+            />
+            <InspectorRow
+              icon={Clapperboard}
+              label="Storyboard"
+              value={project.storyboard?.status ?? "Not started"}
             />
           </div>
           <div className="mt-5 rounded-md border border-dashed border-border p-3 text-sm">

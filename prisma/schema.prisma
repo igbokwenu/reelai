@@ -105,6 +105,7 @@ model Scene {
   startFramePrompt       String
   endFramePrompt         String
   videoMotionPrompt      String
+  continuityNotes        String         @default("")
   lockedStyleLanguage    String
   safeZonePreset         SafeZonePreset @default(TIKTOK_REELS)
   status                 SceneStatus    @default(DRAFT)
@@ -241,6 +242,7 @@ enum TakeStatus {
 enum JobType {
   BRAND_KIT
   CONCEPTS
+  STORYBOARD
   KEYFRAME
   VIDEO
   TTS
