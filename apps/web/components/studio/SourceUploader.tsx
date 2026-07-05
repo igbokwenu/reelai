@@ -2,7 +2,7 @@
 
 import { FileUp, Globe2, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -10,15 +10,17 @@ export function SourceUploader({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [urlError, setUrlError] = useState<string | null>(null);
+  const isHydrated = useHydrationStatus();
   const [isUploading, setIsUploading] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
 
   async function uploadFile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     setUploadError(null);
     setIsUploading(true);
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(form);
     const response = await fetch(`/api/projects/${projectId}/sources`, {
       method: "POST",
       body: formData,
@@ -33,16 +35,17 @@ export function SourceUploader({ projectId }: { projectId: string }) {
       return;
     }
 
-    event.currentTarget.reset();
+    form.reset();
     router.refresh();
   }
 
   async function registerUrl(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     setUrlError(null);
     setIsRegistering(true);
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(form);
     const response = await fetch(`/api/projects/${projectId}/sources`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -56,7 +59,7 @@ export function SourceUploader({ projectId }: { projectId: string }) {
       return;
     }
 
-    event.currentTarget.reset();
+    form.reset();
     router.refresh();
   }
 
@@ -93,7 +96,12 @@ export function SourceUploader({ projectId }: { projectId: string }) {
         {uploadError ? (
           <p className="mt-2 text-sm text-destructive">{uploadError}</p>
         ) : null}
-        <Button className="mt-3" disabled={isUploading} size="sm" type="submit">
+        <Button
+          className="mt-3"
+          disabled={!isHydrated || isUploading}
+          size="sm"
+          type="submit"
+        >
           {isUploading ? (
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
           ) : (
@@ -131,7 +139,7 @@ export function SourceUploader({ projectId }: { projectId: string }) {
         ) : null}
         <Button
           className="mt-3"
-          disabled={isRegistering}
+          disabled={!isHydrated || isRegistering}
           size="sm"
           type="submit"
         >
@@ -144,5 +152,13 @@ export function SourceUploader({ projectId }: { projectId: string }) {
         </Button>
       </form>
     </div>
+  );
+}
+
+function useHydrationStatus() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
   );
 }

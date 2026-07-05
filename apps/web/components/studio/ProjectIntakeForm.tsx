@@ -2,21 +2,23 @@
 
 import { Loader2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 
 export function ProjectIntakeForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const isHydrated = useHydrationStatus();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     setError(null);
     setIsSubmitting(true);
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(form);
     const payload = Object.fromEntries(formData.entries());
 
     const response = await fetch("/api/projects", {
@@ -97,7 +99,11 @@ export function ProjectIntakeForm() {
         </label>
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button className="w-fit" disabled={isSubmitting} type="submit">
+      <Button
+        className="w-fit"
+        disabled={!isHydrated || isSubmitting}
+        type="submit"
+      >
         {isSubmitting ? (
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
         ) : (
@@ -106,6 +112,14 @@ export function ProjectIntakeForm() {
         Create project
       </Button>
     </form>
+  );
+}
+
+function useHydrationStatus() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
   );
 }
 

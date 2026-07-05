@@ -16,7 +16,7 @@ test("creates a project and registers a source", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/projects\/.+/);
   await expect(page.getByText("Project Sources")).toBeVisible();
-  await expect(page.getByText("Signal Loom Studio")).toBeVisible();
+  await expect(page.locator("header").getByText("Signal Loom Studio")).toBeVisible();
 
   await page
     .getByPlaceholder("https://brand.example/about")
@@ -27,4 +27,16 @@ test("creates a project and registers a source", async ({ page }) => {
   await page.getByRole("button", { name: "Add URL" }).click();
 
   await expect(page.getByText("https://example.com/about")).toBeVisible();
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "logo.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+  await page.getByRole("button", { name: "Store source" }).click();
+
+  await expect(page.getByText("image/png")).toBeVisible();
 });
