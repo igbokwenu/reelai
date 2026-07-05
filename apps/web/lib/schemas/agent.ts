@@ -126,9 +126,29 @@ const flexibleConceptSchema = z
 export function parseCreativeConceptsOutput(
   value: unknown,
 ): CreativeConceptsOutput {
-  const concepts = extractConceptArray(value)
-    .slice(0, 3)
-    .map((item: unknown, index: number) => normalizeConcept(item, index));
+  const extracted = extractConceptArray(value).slice(0, 3);
+
+  while (extracted.length < 3) {
+    extracted.push({
+      title: `Creative direction ${extracted.length + 1}`,
+      hook: "A distinct brand-safe hook for this direction.",
+      strategy:
+        "Use a distinct short-form ad strategy grounded in the Brand Kit and supplied source materials.",
+      narrativeArc:
+        "Open with a clear problem, show the branded proof point, and close with a simple next step.",
+      visualStyle:
+        "Vertical brand-led visuals with clear product context and clean caption safe zones.",
+      estimatedScenes: 3,
+      estimatedDurationSec: 24,
+      previewPrompt: `9:16 preview frame for creative direction ${extracted.length + 1}`,
+      rationale:
+        "This direction gives the reviewer a meaningfully different creative path while staying grounded in the Brand Kit.",
+    });
+  }
+
+  const concepts = extracted.map((item: unknown, index: number) =>
+    normalizeConcept(item, index),
+  );
 
   return creativeConceptsSchema.parse({ concepts });
 }

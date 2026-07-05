@@ -7,7 +7,15 @@ const stringWithDefault = (fallback: string) =>
   );
 
 const optionalString = z.preprocess(
-  (value) => (value === null ? undefined : value),
+  (value) => {
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+    if (Array.isArray(value)) {
+      return value.filter((v) => typeof v === "string").join(", ");
+    }
+    return value;
+  },
   z.string().optional(),
 );
 
@@ -115,7 +123,15 @@ const flexibleBrandKitSchema = z
     summary: stringWithDefault("Brand summary was not provided."),
     valueProps: arrayWithDefault(z.union([looseValuePropSchema, z.string()])),
     audience: z.preprocess(
-      (value) => (value === null ? undefined : value),
+      (value) => {
+        if (value === null || value === undefined) {
+          return undefined;
+        }
+        if (Array.isArray(value)) {
+          return value.filter((v) => typeof v === "string").join(", ");
+        }
+        return value;
+      },
       z.string().nullable().optional(),
     ),
     targetAudience: optionalString,
