@@ -57,8 +57,10 @@ Completion rules:
   - Which checklist items passed.
   - Which commands/tests passed.
   - What still needs human testing.
+  - Any setup/configuration that only a human can complete, with clear beginner-friendly steps before the testing instructions and success summary.
   - Human reviewer instructions: where to go in the app/project, what to click or inspect, what data to use, and what success looks like.
   - Whether the phase tracker was updated.
+- Agents must always try to implement the phase end to end themselves. Only give the human setup/configuration steps when you are absolutely sure the remaining task requires human-only access, credentials, account ownership, billing, console approval, or another action the agent cannot perform. Do not offload ordinary implementation, debugging, testing, or configuration work to the human.
 
 Human sign-off wording:
 
@@ -90,6 +92,7 @@ Phase Tracker
 - Human sign-off: still required
 
 Human Review Instructions
+- Human-only setup before testing:
 - Where to go:
 - What to test:
 - Test data to use:
@@ -100,7 +103,7 @@ Known Gaps / Risks
 - ...
 ```
 
-The `Human Review Instructions` section is mandatory. It should be specific enough that a non-implementing reviewer can open the app or repo and verify the phase without reading the code.
+The `Human Review Instructions` section is mandatory. It should be specific enough that a non-implementing reviewer can open the app or repo and verify the phase without reading the code. If human-only setup is required before testing, explain it in beginner-friendly steps before the testing instructions, and include what the human should see when the setup is complete. If no human-only setup is required, write `None required; the agent completed setup end to end.`
 
 ## Phase 1 Prompt: Foundation And Open-Source Repo
 
