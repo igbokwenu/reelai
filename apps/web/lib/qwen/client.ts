@@ -1,6 +1,7 @@
 import "server-only";
 
 import { performance } from "node:perf_hooks";
+import { ZodError } from "zod";
 
 export const QWEN_BASE_URL =
   process.env.QWEN_BASE_URL ??
@@ -142,6 +143,10 @@ export function sanitizeQwenError(error: unknown) {
 
   if (error instanceof SyntaxError) {
     return "The model response could not be parsed as JSON.";
+  }
+
+  if (error instanceof ZodError) {
+    return "The model response did not match the Brand Kit schema. Try again or add one more source URL.";
   }
 
   return "Brand Kit generation failed. Check server logs for sanitized provider metadata.";

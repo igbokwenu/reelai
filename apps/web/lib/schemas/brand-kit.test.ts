@@ -141,4 +141,44 @@ describe("brandKitOutputSchema", () => {
     expect(parsed.policyRisks[0]?.severity).toBe("medium");
     expect(parsed.sourceCitations[0]?.sourceId).toBe("project-intake");
   });
+
+  it("normalizes nulls and alternate no-offer fields instead of throwing", () => {
+    const parsed = parseBrandKitOutput({
+      result: {
+        overview: null,
+        key_messages: null,
+        audience: null,
+        tone: null,
+        colors: null,
+        visual_language: null,
+        supported_claims: [
+          {
+            text: "Brand positioning should be grounded in source context.",
+            evidence: "Website and intake context.",
+            confidence: "Medium",
+          },
+        ],
+        ad_policy_risks: [
+          {
+            issue: "Avoid invented product claims when offer is blank.",
+            severity: "High",
+            recommendation: "Use cautious brand positioning.",
+          },
+        ],
+        references: [
+          {
+            id: "project-intake",
+            title: "Project intake",
+            detail: "Business and audience context.",
+          },
+        ],
+        style_guide: null,
+      },
+    });
+
+    expect(parsed.summary).toHaveLength(40);
+    expect(parsed.valueProps).toHaveLength(2);
+    expect(parsed.claims[0]?.confidence).toBe("medium");
+    expect(parsed.policyRisks[0]?.severity).toBe("high");
+  });
 });

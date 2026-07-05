@@ -282,7 +282,7 @@ Project:
 - Name: ${project.name}
 - Business: ${project.businessName}
 - Target audience: ${project.targetAudience ?? "Unknown"}
-- Offer: ${project.offer ?? "Unknown"}
+- Offer: ${project.offer ?? "Not supplied; infer a cautious brand positioning from sources instead of inventing a product claim."}
 - Style: ${project.style}
 - Target duration: ${project.videoLengthSec}s
 
@@ -293,6 +293,7 @@ Rules:
 - Use only the supplied source context and project intake.
 - Cite every important brand fact using sourceCitations.sourceId.
 - Keep claims conservative. If support is weak, mark confidence "low" and add a policy risk.
+- If no offer is supplied, do not invent one. Describe brand positioning from website/source context.
 - Include practical colors. Use neutral fallback colors only when sources do not establish a palette.
 - lockedStyle must be concise style language later agents can reuse for concepts, keyframes, and video prompts.
 - Return only JSON that matches the schema.`;
@@ -308,7 +309,7 @@ function enrichBrandKitFromProject(
 ) {
   const sourceIds = contexts.map((context) => context.id);
   const primarySourceId = sourceIds[0] ?? "project-intake";
-  const offer = project.offer ?? "the supplied offer";
+  const positioning = getProjectPositioning(project, contexts);
   const audience = project.targetAudience ?? "the intended audience";
   const business = project.businessName;
   const hasFallbackSummary = brandKit.summary.startsWith(
@@ -318,11 +319,20 @@ function enrichBrandKitFromProject(
   return brandKitOutputSchema.parse({
     ...brandKit,
     summary: hasFallbackSummary
-      ? `${business} is positioned for ${audience} with ${offer}. The Brand Kit should keep the reel source-grounded, practical, and focused on clear short-form ad storytelling rather than unsupported performance claims.`
+      ? `${business} is positioned for ${audience} around ${positioning}. The Brand Kit should keep the reel source-grounded, practical, and focused on clear short-form ad storytelling rather than unsupported performance claims.`
       : brandKit.summary,
     audience: brandKit.audience ?? audience,
-    valueProps: replaceFallbackValueProps(brandKit.valueProps, offer, business),
-    claims: replaceFallbackClaims(brandKit.claims, offer),
+    valueProps: replaceFallbackValueProps(
+      brandKit.valueProps,
+      positioning,
+      business,
+      Boolean(project.offer),
+    ),
+    claims: replaceFallbackClaims(
+      brandKit.claims,
+      positioning,
+      Boolean(project.offer),
+    ),
     sourceCitations: replaceFallbackCitations(
       brandKit.sourceCitations,
       primarySourceId,
@@ -333,8 +343,9 @@ function enrichBrandKitFromProject(
 
 function replaceFallbackValueProps(
   valueProps: BrandKitOutput["valueProps"],
-  offer: string,
+  positioning: string,
   business: string,
+  hasOffer: boolean,
 ) {
   if (valueProps[0]?.label !== "Clear offer") {
     return valueProps;
@@ -342,8 +353,8 @@ function replaceFallbackValueProps(
 
   return [
     {
-      label: "Clear offer",
-      detail: `${business} should lead with ${offer}, using simple ad copy that a viewer can understand in the first few seconds.`,
+      label: hasOffer ? "Clear offer" : "Clear positioning",
+      detail: `${business} should lead with ${positioning}, using simple ad copy that a viewer can understand in the first few seconds.`,
     },
     {
       label: "Source-grounded trust",
@@ -355,7 +366,8 @@ function replaceFallbackValueProps(
 
 function replaceFallbackClaims(
   claims: BrandKitOutput["claims"],
-  offer: string,
+  positioning: string,
+  hasOffer: boolean,
 ) {
   if (claims[0]?.claim !== "Use only source-grounded claims in ad copy.") {
     return claims;
@@ -363,9 +375,11 @@ function replaceFallbackClaims(
 
   return [
     {
-      claim: offer,
-      support: "Project intake supplied this as the offer.",
-      confidence: "high" as const,
+      claim: positioning,
+      support: hasOffer
+        ? "Project intake supplied this as the offer."
+        : "Available source context supports this cautious brand positioning.",
+      confidence: hasOffer ? ("high" as const) : ("medium" as const),
     },
   ];
 }
@@ -388,4 +402,23 @@ function replaceFallbackCitations(
       note: "Used as the source for the business, audience, and offer positioning.",
     },
   ];
+}
+
+function getProjectPositioning(project: Project, contexts: SourceContext[]) {
+  if (project.offer) {
+    return project.offer;
+  }
+
+  const websiteContext = contexts.find((context) => context.kind === "WEBSITE");
+  const contextText = normalizeText(websiteContext?.text ?? contexts[0]?.text ?? "");
+
+  if (contextText.length > 40) {
+    return contextText.slice(0, 160);
+  }
+
+  if (project.websiteUrl) {
+    return `the brand presence at ${project.websiteUrl}`;
+  }
+
+  return `${project.businessName}'s supplied brand context`;
 }

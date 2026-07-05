@@ -1,5 +1,22 @@
 import { z } from "zod";
 
+const stringWithDefault = (fallback: string) =>
+  z.preprocess(
+    (value) => (value === null ? undefined : value),
+    z.string().default(fallback),
+  );
+
+const optionalString = z.preprocess(
+  (value) => (value === null ? undefined : value),
+  z.string().optional(),
+);
+
+const arrayWithDefault = <T extends z.ZodType>(schema: T) =>
+  z.preprocess(
+    (value) => (value === null ? undefined : value),
+    z.array(schema).default([]),
+  );
+
 export const brandKitValuePropSchema = z.object({
   label: z.string().min(2).max(80),
   detail: z.string().min(10).max(280),
@@ -46,57 +63,65 @@ export type BrandKitOutput = z.infer<typeof brandKitOutputSchema>;
 
 const looseValuePropSchema = z
   .object({
-    label: z.string().optional(),
-    detail: z.string().optional(),
+    label: optionalString,
+    title: optionalString,
+    detail: optionalString,
+    description: optionalString,
   })
   .passthrough();
 const looseClaimSchema = z
   .object({
-    claim: z.string().optional(),
-    support: z.string().optional(),
-    confidence: z.string().optional(),
+    claim: optionalString,
+    text: optionalString,
+    support: optionalString,
+    evidence: optionalString,
+    confidence: optionalString,
   })
   .passthrough();
 const loosePolicyRiskSchema = z
   .object({
-    risk: z.string().optional(),
-    severity: z.string().optional(),
-    mitigation: z.string().optional(),
+    risk: optionalString,
+    issue: optionalString,
+    severity: optionalString,
+    mitigation: optionalString,
+    recommendation: optionalString,
   })
   .passthrough();
 const looseCitationSchema = z
   .object({
-    sourceId: z.string().optional(),
-    source_id: z.string().optional(),
-    label: z.string().optional(),
-    note: z.string().optional(),
+    sourceId: optionalString,
+    source_id: optionalString,
+    id: optionalString,
+    label: optionalString,
+    title: optionalString,
+    note: optionalString,
+    detail: optionalString,
   })
   .passthrough();
 
 const flexibleBrandKitSchema = z
   .object({
-    summary: z.string().default("Brand summary was not provided."),
-    valueProps: z.array(z.union([looseValuePropSchema, z.string()])).default([]),
-    audience: z.string().nullable().optional(),
-    tone: z.string().default("Clear, confident, and brand-safe."),
-    palette: z
-      .array(
-        z.object({
-          name: z.string().default("Brand color"),
-          hex: z.string().optional(),
-          usage: z.string().default("Brand accent"),
-        }),
-      )
-      .default([]),
-    visualMotifs: z.array(z.string()).default([]),
-    claims: z.array(z.union([looseClaimSchema, z.string()])).default([]),
-    policyRisks: z
-      .array(z.union([loosePolicyRiskSchema, z.string()]))
-      .default([]),
-    sourceCitations: z
-      .array(z.union([looseCitationSchema, z.string()]))
-      .default([]),
-    lockedStyle: z.string().default("Clean vertical ad style with restrained captions."),
+    summary: stringWithDefault("Brand summary was not provided."),
+    valueProps: arrayWithDefault(z.union([looseValuePropSchema, z.string()])),
+    audience: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.string().nullable().optional(),
+    ),
+    tone: stringWithDefault("Clear, confident, and brand-safe."),
+    palette: arrayWithDefault(
+      z
+        .object({
+          name: stringWithDefault("Brand color"),
+          hex: optionalString,
+          usage: stringWithDefault("Brand accent"),
+        })
+        .passthrough(),
+    ),
+    visualMotifs: arrayWithDefault(z.string()),
+    claims: arrayWithDefault(z.union([looseClaimSchema, z.string()])),
+    policyRisks: arrayWithDefault(z.union([loosePolicyRiskSchema, z.string()])),
+    sourceCitations: arrayWithDefault(z.union([looseCitationSchema, z.string()])),
+    lockedStyle: stringWithDefault("Clean vertical ad style with restrained captions."),
   })
   .transform((input) => {
     const fallbackCitation = {
@@ -116,11 +141,19 @@ const flexibleBrandKitSchema = z
               }
             : {
                 label: ensureMinLength(
-                  item.label ?? item.detail ?? "Value proposition",
+                  item.label ??
+                    item.title ??
+                    item.detail ??
+                    item.description ??
+                    "Value proposition",
                   2,
                 ).slice(0, 80),
                 detail: ensureMinLength(
-                  item.detail ?? item.label ?? "Source-grounded brand value.",
+                  item.detail ??
+                    item.description ??
+                    item.label ??
+                    item.title ??
+                    "Source-grounded brand value.",
                   10,
                 ),
               },
@@ -171,9 +204,14 @@ const flexibleBrandKitSchema = z
                 confidence: "low" as const,
               }
             : {
-                claim: ensureMinLength(item.claim ?? "Source-grounded claim", 4),
+                claim: ensureMinLength(
+                  item.claim ?? item.text ?? "Source-grounded claim",
+                  4,
+                ),
                 support: ensureMinLength(
-                  item.support ?? "Model supplied this claim from source context.",
+                  item.support ??
+                    item.evidence ??
+                    "Model supplied this claim from source context.",
                   4,
                 ),
                 confidence: normalizeConfidence(item.confidence),
@@ -196,10 +234,15 @@ const flexibleBrandKitSchema = z
                 mitigation: "Keep copy conservative and source-grounded.",
               }
             : {
-                risk: ensureMinLength(item.risk ?? "Ad policy risk", 4),
+                risk: ensureMinLength(
+                  item.risk ?? item.issue ?? "Ad policy risk",
+                  4,
+                ),
                 severity: normalizeSeverity(item.severity),
                 mitigation: ensureMinLength(
-                  item.mitigation ?? "Keep copy conservative and source-grounded.",
+                  item.mitigation ??
+                    item.recommendation ??
+                    "Keep copy conservative and source-grounded.",
                   6,
                 ),
               },
@@ -223,15 +266,17 @@ const flexibleBrandKitSchema = z
               }
             : {
                 sourceId: ensureMinLength(
-                  item.sourceId ?? item.source_id ?? "project-intake",
+                  item.sourceId ?? item.source_id ?? item.id ?? "project-intake",
                   1,
                 ),
-                label: ensureMinLength(item.label ?? "Project intake", 2).slice(
-                  0,
-                  120,
-                ),
+                label: ensureMinLength(
+                  item.label ?? item.title ?? "Project intake",
+                  2,
+                ).slice(0, 120),
                 note: ensureMinLength(
-                  item.note ?? "Model cited this source for Brand Kit context.",
+                  item.note ??
+                    item.detail ??
+                    "Model cited this source for Brand Kit context.",
                   4,
                 ),
               },
@@ -276,12 +321,33 @@ function canonicalizeBrandKitValue(value: unknown) {
       nested.valueProps ??
       nested.value_props ??
       nested.valuePropositions ??
-      nested.value_propositions,
-    visualMotifs: nested.visualMotifs ?? nested.visual_motifs,
-    policyRisks: nested.policyRisks ?? nested.policy_risks,
+      nested.value_propositions ??
+      nested.keyMessages ??
+      nested.key_messages,
+    palette: nested.palette ?? nested.colors ?? nested.brand_colors,
+    visualMotifs:
+      nested.visualMotifs ??
+      nested.visual_motifs ??
+      nested.motifs ??
+      nested.visualLanguage ??
+      nested.visual_language,
+    claims: nested.claims ?? nested.supported_claims,
+    policyRisks:
+      nested.policyRisks ??
+      nested.policy_risks ??
+      nested.risks ??
+      nested.ad_policy_risks,
     sourceCitations:
-      nested.sourceCitations ?? nested.source_citations ?? nested.citations,
-    lockedStyle: nested.lockedStyle ?? nested.locked_style ?? nested.styleGuide,
+      nested.sourceCitations ??
+      nested.source_citations ??
+      nested.citations ??
+      nested.sources ??
+      nested.references,
+    lockedStyle:
+      nested.lockedStyle ??
+      nested.locked_style ??
+      nested.styleGuide ??
+      nested.style_guide,
   };
 }
 
