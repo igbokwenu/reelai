@@ -17,6 +17,27 @@ The headline demo beat should be:
 3. User picks one concept.
 4. Reel AI expands it into an editable storyboard and generates a continuity-aware vertical reel.
 
+## Hackathon Spirit Fit
+
+The hackathon asks builders to create production-ready agents on Qwen Cloud, with advanced reasoning, multimodal workflows, architectural depth, and real deployment. Reel AI should therefore be judged as an original agentic production system, not a lightly modified sample app.
+
+Custom product mechanics that make Reel AI substantial:
+
+- Multi-agent showrunner workflow: Brand Research, Creative Director, Storyboard, Visual Consistency, Production, Review, and Composer agents.
+- Parallel concept pitching: the agent creates three different creative strategies before generation spend.
+- Reusable Brand Kit: persistent brand facts, palette, tone, claims, and source citations across projects.
+- Continuity-first generation: keyframes and i2v scenes instead of one blind text-to-video prompt.
+- Human-in-the-loop checkpoints: concept pick, storyboard approval, scene locks, and take comparison.
+- Real ad-readiness: platform safe zones, AI-content disclosure, claim/policy checks, and export-ready narration/captions.
+- Visible production orchestration: job table, model/task status, artifacts, estimates, and final render.
+
+Judging-weight alignment:
+
+- Technical Depth & Engineering: modular QwenCloud clients, state-machine jobs, OSS artifacts, Remotion composition, deployment proof, and error handling.
+- Innovation & AI Creativity: showrunner-style concept selection, continuity controls, and take comparison.
+- Problem Value & Impact: real business/agency workflow for producing short-form ads from brand materials.
+- Presentation & Documentation: architecture diagram, live pipeline UI, README, deployment proof, and short public demo.
+
 ## Positioning For The Hackathon
 
 Submit under Track 2: AI Showrunner. The project should visibly demonstrate an agentic creative pipeline, not just a form that calls a video API. The strongest demo is: business intake -> brand analysis -> parallel concept pitches -> selected creative direction -> storyboard -> editable scene plan -> generated keyframes -> image-to-video segments -> final stitched reel with voiceover and optional background music.
@@ -220,6 +241,40 @@ Build the platform in layers so the demo survives even if video generation is sl
 - Multi-user billing and enterprise account management.
 - Complex collaborative editing.
 - Guaranteed 60-second generation in every demo run. Prepare a 15 to 30 second reliable path first.
+
+## Submission Flaw Audit
+
+The hackathon update and proof-of-deployment guide are blunt: projects can be disqualified or weakened if they look local-only, cloned, undocumented, or vague about QwenCloud usage. Reel AI should avoid those failure modes by design.
+
+| Common flaw from prior submissions | Reel AI prevention |
+| --- | --- |
+| No proof the backend ran on Alibaba Cloud | Deploy the backend to Alibaba Cloud ECS or Function Compute and capture a Workbench/console screenshot. Add the screenshot or recording link to `README.md` and Devpost. |
+| QwenCloud API usage not visible in the repository | Create `apps/web/src/lib/qwen/client.ts` or equivalent with `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` and native DashScope media endpoints clearly visible. Never hardcode secrets. |
+| Demo is just a Figma mockup or local-only recording | Record the deployed app URL and show a real project run: intake, Brand Kit, concept table, storyboard, generation status, and final reel. |
+| Architecture is unclear | Add `docs/architecture.md` with a Mermaid diagram showing frontend, backend, Postgres, OSS, Remotion worker, QwenCloud APIs, and Alibaba Cloud hosting. |
+| Submission lacks a concise written feature summary | Include a one-paragraph pitch plus bullet feature list in `README.md` and Devpost. |
+| Open-source repo missing license or setup instructions | Add `LICENSE`, `.env.example`, local setup commands, deployment notes, and a “Judging Proof” section. |
+| Direct repo clone or thin wrapper | Build original Reel AI product mechanics: three-way concept pitching, reusable Brand Kit, take comparison, claims review, and continuity-first video generation. |
+| Looks like copied sample code | Keep QwenCloud snippets isolated inside original app modules, add custom schemas/prompts/orchestration, and make the UI/workflow specific to Reel AI. |
+| Agent behavior is invisible | Show live pipeline states, model names, task IDs, cost/time estimates, and generated artifacts in the UI. |
+| Demo tries too much and fails | Use a reliable 15 to 30 second render path for judging. Keep 60-second, spokesperson, generated music, and multi-format export as stretch paths. |
+| Poor mapping to Track 2 | Frame Reel AI as an AI Showrunner that handles scriptwriting, storyboarding, video generation, editing, narration, and final render. |
+
+## Judging Package Checklist
+
+Before submission, the repo and Devpost page should include:
+
+- Public open-source repository with visible license.
+- `README.md` with local setup, environment variables, deployment instructions, and feature summary.
+- `.env.example` with `DASHSCOPE_API_KEY`, Qwen base URLs, database URL, and OSS variables.
+- `.gitignore` that excludes `.env`, `.env.*`, generated outputs, logs, and build artifacts.
+- Code file visibly using QwenCloud base URL: `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`.
+- Architecture diagram in `docs/architecture.md`.
+- Proof screenshot/recording of backend running on Alibaba Cloud.
+- 1 to 3 minute demo video, focused on the live deployed app.
+- Track explicitly listed as Track 2: AI Showrunner.
+- Written summary explaining the features and agent workflow.
+- Clear note that secrets are loaded from environment variables, not committed.
 
 ### Text And Agent Reasoning
 

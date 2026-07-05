@@ -6,6 +6,7 @@ This file is the implementation-phase bookmark list for Reel AI. Use it before a
 
 - Hackathon home: https://qwencloud-hackathon.devpost.com/
 - Proof of deployment update: https://qwencloud-hackathon.devpost.com/updates/45055-proof-of-deployment-101-what-judges-need-to-see
+- Proof of Deploy 1 Pager: https://docs.google.com/document/d/1XsiewMDMOGKxWGp7PRlaEnB7hN5n2JNIUho7cDIV8Vo/edit?tab=t.0
 
 Key submission implications as of July 5, 2026:
 
@@ -67,4 +68,3 @@ Key submission implications as of July 5, 2026:
 - `.agents/skills/qwencloud-image-generation/SKILL.md`
 - `.agents/skills/qwencloud-video-generation/SKILL.md`
 - `.agents/skills/qwencloud-audio-tts/SKILL.md`
-
