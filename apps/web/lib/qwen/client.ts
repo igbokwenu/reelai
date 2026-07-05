@@ -25,6 +25,7 @@ type QwenChatInput = {
   model: string;
   messages: QwenMessage[];
   responseFormat?: unknown;
+  enableThinking?: boolean;
   temperature?: number;
   maxTokens?: number;
 };
@@ -53,20 +54,35 @@ export async function qwenChatCompletion(
 ): Promise<QwenChatResult> {
   const apiKey = getQwenApiKey();
   const startedAt = performance.now();
-  const response = await fetch(`${QWEN_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  const requestBody = {
+    model: input.model,
+    messages: input.messages,
+    temperature: input.temperature ?? 0.2,
+    max_tokens: input.maxTokens ?? 2400,
+    response_format: input.responseFormat,
+    enable_thinking: input.enableThinking,
+  };
+  let response: Response;
+
+  try {
+    response = await fetchWithRetry({
+      apiKey,
+      body: requestBody,
+    });
+  } catch {
+    const elapsedMs = Math.round(performance.now() - startedAt);
+    logQwenEvent({
+      operation: input.operation,
       model: input.model,
-      messages: input.messages,
-      temperature: input.temperature ?? 0.2,
-      max_tokens: input.maxTokens ?? 2400,
-      response_format: input.responseFormat,
-    }),
-  });
+      status: "failed",
+      elapsedMs,
+      providerRequestId: null,
+      error: "Network request failed",
+    });
+    throw new QwenClientError(
+      "QwenCloud request could not be completed. Try again in a moment.",
+    );
+  }
 
   const elapsedMs = Math.round(performance.now() - startedAt);
   const providerRequestId =
@@ -178,6 +194,39 @@ function sanitizeProviderError(status: number) {
   }
 
   return "QwenCloud rejected the request. Review source size and model settings.";
+}
+
+async function fetchWithRetry({
+  apiKey,
+  body,
+}: {
+  apiKey: string;
+  body: Record<string, unknown>;
+}) {
+  let response: Response | null = null;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    response = await fetch(`${QWEN_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (response.status !== 429 && response.status < 500) {
+      return response;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 750));
+  }
+
+  if (!response) {
+    throw new Error("QwenCloud request did not return a response");
+  }
+
+  return response;
 }
 
 function logQwenEvent(event: {
