@@ -442,12 +442,15 @@ Locked style: ${brandKit?.lockedStyle}
 Value props: ${JSON.stringify(brandKit?.valueProps)}
 Claims: ${JSON.stringify(brandKit?.claims)}
 Policy risks: ${JSON.stringify(brandKit?.policyRisks)}
+Palette: ${JSON.stringify(brandKit?.palette)}
+Visual motifs: ${JSON.stringify(brandKit?.visualMotifs)}
 
 Requirements:
 - Return exactly three concepts.
 - Make them different strategies, not three hook variants.
 - Keep estimated scenes between 2 and 4 and duration between 15 and 30 seconds.
 - Preview prompts must be 9:16 frame prompts suitable for ${QWEN_PREVIEW_IMAGE_MODEL}.
+- Use the brand palette colors and visual motifs in your visual direction.
 - Avoid unsupported claims and regulated-category promises.`;
 }
 
@@ -462,7 +465,8 @@ function buildStoryboardPrompt(
 Business: ${project.businessName}
 Audience: ${project.targetAudience ?? brandKit?.audience ?? "Not specified"}
 Offer: ${project.offer ?? "Not specified"}
-Target length: 15 to 30 seconds.
+Target length: ${project.videoLengthSec}s
+Style: ${project.style}
 
 Selected concept:
 Title: ${concept.title}
@@ -478,6 +482,8 @@ Locked style: ${brandKit?.lockedStyle}
 Value props: ${JSON.stringify(brandKit?.valueProps)}
 Claims: ${JSON.stringify(brandKit?.claims)}
 Policy risks: ${JSON.stringify(brandKit?.policyRisks)}
+Palette: ${JSON.stringify(brandKit?.palette)}
+Visual motifs: ${JSON.stringify(brandKit?.visualMotifs)}
 
 Requirements:
 - Use 2 to 4 scenes total.
@@ -485,6 +491,8 @@ Requirements:
 - Voiceover text must be 600 characters or less per scene.
 - Each scene needs caption, voiceover, start/end frame prompts, motion prompt, and continuity notes.
 - Prompts must keep visual continuity and respect the locked brand style.
+- Use the brand palette colors and visual motifs in scene descriptions.
+- Match the ${project.style === "THREE_D_ANIMATION" ? "3D animation" : "realistic"} visual style.
 - Do not create unsupported performance, medical, financial, or legal claims.`;
 }
 
