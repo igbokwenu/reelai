@@ -126,7 +126,14 @@ const flexibleConceptSchema = z
 export function parseCreativeConceptsOutput(
   value: unknown,
 ): CreativeConceptsOutput {
-  const extracted = extractConceptArray(value).slice(0, 3);
+  const extracted = extractConceptArray(value);
+
+  if (extracted.length === 0) {
+    console.warn(
+      "[parseCreativeConceptsOutput] Could not extract concept array from:",
+      JSON.stringify(value, null, 2).slice(0, 2000),
+    );
+  }
 
   while (extracted.length < 3) {
     extracted.push({
@@ -146,9 +153,9 @@ export function parseCreativeConceptsOutput(
     });
   }
 
-  const concepts = extracted.map((item: unknown, index: number) =>
-    normalizeConcept(item, index),
-  );
+  const concepts = extracted
+    .slice(0, 3)
+    .map((item: unknown, index: number) => normalizeConcept(item, index));
 
   return creativeConceptsSchema.parse({ concepts });
 }
