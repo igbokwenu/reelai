@@ -94,6 +94,7 @@ const flexibleConceptSchema = z
     strategy: z.unknown().optional(),
     approach: z.unknown().optional(),
     concept: z.unknown().optional(),
+    concept_summary: z.unknown().optional(),
     narrativeArc: z.unknown().optional(),
     narrative_arc: z.unknown().optional(),
     arc: z.unknown().optional(),
@@ -105,12 +106,14 @@ const flexibleConceptSchema = z
     estimated_scenes: z.unknown().optional(),
     sceneCount: z.unknown().optional(),
     scene_count: z.unknown().optional(),
+    scenes: z.unknown().optional(),
     estimatedDurationSec: z.unknown().optional(),
     estimated_duration_sec: z.unknown().optional(),
     estimatedDuration: z.unknown().optional(),
     estimated_duration: z.unknown().optional(),
     durationSec: z.unknown().optional(),
     duration: z.unknown().optional(),
+    target_duration_seconds: z.unknown().optional(),
     previewPrompt: z.unknown().optional(),
     preview_prompt: z.unknown().optional(),
     imagePrompt: z.unknown().optional(),
@@ -127,13 +130,6 @@ export function parseCreativeConceptsOutput(
   value: unknown,
 ): CreativeConceptsOutput {
   const extracted = extractConceptArray(value);
-
-  if (extracted.length === 0) {
-    console.warn(
-      "[parseCreativeConceptsOutput] Could not extract concept array from:",
-      JSON.stringify(value, null, 2).slice(0, 2000),
-    );
-  }
 
   while (extracted.length < 3) {
     extracted.push({
@@ -212,7 +208,8 @@ function extractConceptArray(value: unknown): unknown[] {
     arrayValue(record.creative_concepts) ??
     arrayValue(record.directions) ??
     arrayValue(record.options) ??
-    arrayValue(record.results);
+    arrayValue(record.results) ??
+    arrayValue(record.strategies);
 
   if (nested) {
     return nested;
@@ -229,24 +226,32 @@ function extractConceptArray(value: unknown): unknown[] {
 
 function normalizeConcept(value: unknown, index: number) {
   const parsed = flexibleConceptSchema.parse(asRecord(value) ?? {});
+  const scenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
+  const firstScene = scenes[0] ? asRecord(scenes[0]) : null;
+  
   const title = text(parsed.title, {
     fallback: `Creative direction ${index + 1}`,
     min: 3,
     max: 90,
   });
-  const hook = text(parsed.hook, {
-    fallback: `${title} opens with a specific, brand-safe hook.`,
-    min: 8,
-    max: 220,
-  });
-  const strategy = text(parsed.strategy ?? parsed.approach ?? parsed.concept, {
+  const hook = text(
+    parsed.hook ?? 
+    (firstScene ? firstScene.text_overlay : undefined) ??
+    (firstScene ? firstScene.visual_description : undefined),
+    {
+      fallback: `${title} opens with a specific, brand-safe hook.`,
+      min: 8,
+      max: 220,
+    },
+  );
+  const strategy = text(parsed.strategy ?? parsed.approach ?? parsed.concept ?? parsed.concept_summary, {
     fallback:
       "Use a distinct short-form ad strategy grounded in the Brand Kit and supplied source materials.",
     min: 20,
     max: 420,
   });
   const narrativeArc = text(
-    parsed.narrativeArc ?? parsed.narrative_arc ?? parsed.arc ?? parsed.storyArc,
+    parsed.narrativeArc ?? parsed.narrative_arc ?? parsed.arc ?? parsed.storyArc ?? parsed.concept_summary,
     {
       fallback:
         "Open with a clear problem, show the branded proof point, and close with a simple next step.",
@@ -255,7 +260,10 @@ function normalizeConcept(value: unknown, index: number) {
     },
   );
   const visualStyle = text(
-    parsed.visualStyle ?? parsed.visual_style ?? parsed.style,
+    parsed.visualStyle ?? 
+    parsed.visual_style ?? 
+    parsed.style ??
+    (firstScene ? firstScene.visual_description : undefined),
     {
       fallback:
         "Vertical brand-led visuals with clear product context and clean caption safe zones.",
@@ -286,7 +294,8 @@ function normalizeConcept(value: unknown, index: number) {
       parsed.estimatedScenes ??
         parsed.estimated_scenes ??
         parsed.sceneCount ??
-        parsed.scene_count,
+        parsed.scene_count ??
+        (Array.isArray(parsed.scenes) ? parsed.scenes.length : undefined),
       { fallback: 3, min: 2, max: 4 },
     ),
     estimatedDurationSec: integerInRange(
@@ -295,7 +304,8 @@ function normalizeConcept(value: unknown, index: number) {
         parsed.estimatedDuration ??
         parsed.estimated_duration ??
         parsed.durationSec ??
-        parsed.duration,
+        parsed.duration ??
+        parsed.target_duration_seconds,
       { fallback: 24, min: 15, max: 30 },
     ),
     previewPrompt,
