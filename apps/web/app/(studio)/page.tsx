@@ -10,28 +10,32 @@ import {
   WandSparkles,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProjectIntakeForm } from "@/components/studio/ProjectIntakeForm";
+import { ProjectList } from "@/components/studio/ProjectList";
+import { prisma } from "@/lib/prisma";
 
 const pipelineSteps = [
-  { label: "Brand Kit", status: "Ready for Phase 3", icon: Sparkles },
+  { label: "Brand Kit", status: "Phase 3", icon: Sparkles },
   { label: "Concepts", status: "Three-way pitch", icon: WandSparkles },
-  { label: "Storyboard", status: "Human approval loop", icon: Layers3 },
+  { label: "Storyboard", status: "Approval loop", icon: Layers3 },
   { label: "Generation", status: "Keyframes and clips", icon: Film },
   { label: "Final Render", status: "9:16 export", icon: FileVideo },
 ];
 
-const emptyScenes = [
-  "Hook",
-  "Proof",
-  "Offer",
-  "CTA",
-];
+export default async function StudioHome() {
+  const projects = await prisma.project.findMany({
+    orderBy: { updatedAt: "desc" },
+    include: {
+      _count: {
+        select: { artifacts: true, sources: true },
+      },
+    },
+  });
 
-export default function StudioHome() {
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)_320px]">
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_320px]">
         <aside className="border-border bg-sidebar/70 border-b px-4 py-5 lg:border-r lg:border-b-0">
           <div className="flex items-center gap-3">
             <div className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-md">
@@ -43,37 +47,27 @@ export default function StudioHome() {
             </div>
           </div>
 
-          <div className="mt-8 space-y-2">
-            <Button className="w-full justify-start" size="sm">
+          <div className="mt-7">
+            <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
               <Boxes className="size-4" aria-hidden="true" />
-              New project
-            </Button>
-            <Button className="w-full justify-start" size="sm" variant="outline">
-              <Activity className="size-4" aria-hidden="true" />
-              Demo project
-            </Button>
-          </div>
-
-          <div className="mt-8 rounded-md border border-dashed border-border p-3">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Phase 1
-            </p>
-            <p className="mt-2 text-sm">Foundation is running locally.</p>
+              Projects
+            </div>
+            <ProjectList projects={projects} />
           </div>
         </aside>
 
         <section className="min-w-0 px-5 py-5 lg:px-7">
           <header className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-muted-foreground text-sm">Studio workspace</p>
+              <p className="text-muted-foreground text-sm">Project intake</p>
               <h1 className="mt-1 text-3xl font-semibold tracking-normal">
-                Build a vertical ad reel from brand material
+                Create a persisted production project
               </h1>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
               <Metric label="Target" value="15-30s" />
               <Metric label="Format" value="9:16" />
-              <Metric label="Scenes" value="2-4" />
+              <Metric label="Sources" value="OSS/local" />
               <Metric label="Status" value="Draft" />
             </div>
           </header>
@@ -81,27 +75,10 @@ export default function StudioHome() {
           <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
             <Card>
               <CardHeader>
-                <CardTitle>Production Timeline</CardTitle>
+                <CardTitle>New Project</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-3 md:grid-cols-4">
-                  {emptyScenes.map((scene, index) => (
-                    <div
-                      className="bg-muted/40 min-h-36 rounded-md border border-border p-3"
-                      key={scene}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground text-xs">
-                          Scene {index + 1}
-                        </span>
-                        <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-secondary-foreground">
-                          ghost
-                        </span>
-                      </div>
-                      <p className="mt-12 text-lg font-semibold">{scene}</p>
-                    </div>
-                  ))}
-                </div>
+                <ProjectIntakeForm />
               </CardContent>
             </Card>
 
@@ -110,23 +87,16 @@ export default function StudioHome() {
                 <CardTitle>Run Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
+                <StatusRow label="Database" value="Prisma/Postgres" />
+                <StatusRow label="Storage" value="OSS adapter" />
+                <StatusRow label="Artifacts" value="Durable rows" />
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Model calls</span>
-                  <span>Prepared only</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Storage</span>
-                  <span>OSS contract</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Database</span>
-                  <span>Prisma/Postgres</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Cost estimate</span>
+                  <span className="text-muted-foreground">
+                    Generation spend
+                  </span>
                   <span className="inline-flex items-center gap-1 text-amber-300">
                     <BadgeDollarSign className="size-4" aria-hidden="true" />
-                    pending
+                    none yet
                   </span>
                 </div>
               </CardContent>
@@ -154,12 +124,14 @@ export default function StudioHome() {
         </section>
 
         <aside className="border-border bg-card/40 border-t px-5 py-5 lg:border-t-0 lg:border-l">
-          <p className="text-sm font-semibold">Inspector</p>
+          <div className="flex items-center gap-2">
+            <Activity className="size-4 text-primary" aria-hidden="true" />
+            <p className="text-sm font-semibold">Inspector</p>
+          </div>
           <div className="mt-4 space-y-3">
-            <InspectorRow label="Business" value="Not set" />
-            <InspectorRow label="Audience" value="Not set" />
-            <InspectorRow label="Style" value="Realistic" />
-            <InspectorRow label="Approval" value="Concept required" />
+            <StatusRow label="Projects" value={String(projects.length)} />
+            <StatusRow label="Next step" value="Open project" />
+            <StatusRow label="Approval" value="Sources first" />
           </div>
         </aside>
       </div>
@@ -178,7 +150,7 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function InspectorRow({ label, value }: { label: string; value: string }) {
+function StatusRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
       <span className="text-muted-foreground">{label}</span>

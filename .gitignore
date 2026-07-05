@@ -30,6 +30,8 @@ yarn-error.log*
 # Generated media/output
 output/
 tmp/
+.data/
+apps/web/.data/
 *.mp4
 *.mov
 *.wav

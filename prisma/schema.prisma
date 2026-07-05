@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../apps/web/node_modules/.prisma/client"
 }
 
 datasource db {
@@ -19,6 +18,165 @@ model Project {
   status         ProjectStatus @default(DRAFT)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+
+  brandKit   BrandKit?
+  sources    BrandSource[]
+  concepts   CreativeConcept[]
+  storyboard Storyboard?
+  jobs       GenerationJob[]
+  artifacts  Artifact[]
+  renders    Render[]
+}
+
+model BrandKit {
+  id              String   @id @default(cuid())
+  projectId       String   @unique
+  summary         String
+  valueProps      Json
+  audience        String?
+  tone            String
+  palette         Json
+  visualMotifs    Json
+  claims          Json
+  policyRisks     Json
+  sourceCitations Json
+  lockedStyle     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model BrandSource {
+  id            String     @id @default(cuid())
+  projectId     String
+  type          SourceType
+  url           String?
+  artifactId    String?
+  extractedText String?
+  metadata      Json?
+  createdAt     DateTime   @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model CreativeConcept {
+  id                String   @id @default(cuid())
+  projectId         String
+  title             String
+  hook              String
+  strategy          String
+  narrativeArc      String
+  visualStyle       String
+  estimatedScenes   Int
+  estimatedDuration Int
+  previewPrompt     String
+  previewArtifactId String?
+  selected          Boolean  @default(false)
+  rationale         String
+  createdAt         DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Storyboard {
+  id         String           @id @default(cuid())
+  projectId  String           @unique
+  conceptId  String
+  title      String
+  script     String
+  bgmPrompt  String?
+  bgmEnabled Boolean          @default(true)
+  status     StoryboardStatus @default(DRAFT)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scenes  Scene[]
+}
+
+model Scene {
+  id                     String         @id @default(cuid())
+  storyboardId           String
+  index                  Int
+  durationSec            Int
+  captionText            String
+  voiceoverText          String
+  startFramePrompt       String
+  endFramePrompt         String
+  videoMotionPrompt      String
+  lockedStyleLanguage    String
+  safeZonePreset         SafeZonePreset @default(TIKTOK_REELS)
+  status                 SceneStatus    @default(DRAFT)
+  selectedKeyframeTakeId String?
+  selectedVideoTakeId    String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  storyboard Storyboard @relation(fields: [storyboardId], references: [id], onDelete: Cascade)
+  takes      Take[]
+}
+
+model Take {
+  id         String     @id @default(cuid())
+  sceneId    String
+  kind       TakeKind
+  attempt    Int
+  prompt     String
+  artifactId String?
+  status     TakeStatus @default(QUEUED)
+  selected   Boolean    @default(false)
+  notes      String?
+  createdAt  DateTime   @default(now())
+
+  scene Scene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+}
+
+model GenerationJob {
+  id             String    @id @default(cuid())
+  projectId      String
+  type           JobType
+  status         JobStatus @default(QUEUED)
+  model          String?
+  providerTaskId String?
+  input          Json
+  output         Json?
+  error          String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Artifact {
+  id          String       @id @default(cuid())
+  projectId   String
+  type        ArtifactType
+  ossKey      String
+  publicUrl   String?
+  mimeType    String
+  width       Int?
+  height      Int?
+  durationSec Float?
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Render {
+  id          String       @id @default(cuid())
+  projectId   String
+  artifactId  String?
+  status      RenderStatus @default(QUEUED)
+  format      String       @default("9:16")
+  settings    Json
+  createdAt   DateTime     @default(now())
+  completedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 enum VideoStyle {
@@ -33,6 +191,84 @@ enum ProjectStatus {
   STORYBOARDING
   GENERATING
   RENDERING
+  COMPLETE
+  FAILED
+}
+
+enum SourceType {
+  WEBSITE
+  UPLOAD
+  LOGO
+  PRODUCT_IMAGE
+  DOCUMENT
+  REFERENCE_AD
+}
+
+enum StoryboardStatus {
+  DRAFT
+  APPROVED
+  GENERATING
+  COMPLETE
+}
+
+enum SceneStatus {
+  DRAFT
+  APPROVED
+  GENERATING
+  COMPLETE
+  FAILED
+}
+
+enum SafeZonePreset {
+  TIKTOK_REELS
+  YOUTUBE_SHORTS
+  NONE
+}
+
+enum TakeKind {
+  KEYFRAME_START
+  KEYFRAME_END
+  VIDEO
+}
+
+enum TakeStatus {
+  QUEUED
+  RUNNING
+  COMPLETE
+  FAILED
+}
+
+enum JobType {
+  BRAND_KIT
+  CONCEPTS
+  KEYFRAME
+  VIDEO
+  TTS
+  RENDER
+  POLICY_REVIEW
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  WAITING_PROVIDER
+  COMPLETE
+  FAILED
+  CANCELLED
+}
+
+enum ArtifactType {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  THUMBNAIL
+  FINAL_RENDER
+}
+
+enum RenderStatus {
+  QUEUED
+  RUNNING
   COMPLETE
   FAILED
 }

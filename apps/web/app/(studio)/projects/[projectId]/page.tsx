@@ -1,0 +1,242 @@
+import {
+  ArrowLeft,
+  Boxes,
+  Clapperboard,
+  Database,
+  FileVideo,
+  Globe2,
+  HardDrive,
+} from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { ArtifactPreview } from "@/components/studio/ArtifactPreview";
+import { ProjectList } from "@/components/studio/ProjectList";
+import { SourceUploader } from "@/components/studio/SourceUploader";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { prisma } from "@/lib/prisma";
+import { getProjectGraph } from "@/lib/projects/graph";
+
+type PageProps = {
+  params: Promise<{ projectId: string }>;
+};
+
+export default async function ProjectPage({ params }: PageProps) {
+  const { projectId } = await params;
+  const [project, projects] = await Promise.all([
+    getProjectGraph(projectId),
+    prisma.project.findMany({
+      orderBy: { updatedAt: "desc" },
+      include: {
+        _count: {
+          select: { artifacts: true, sources: true },
+        },
+      },
+    }),
+  ]);
+
+  if (!project) {
+    notFound();
+  }
+
+  return (
+    <main className="min-h-screen bg-background text-foreground">
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_340px]">
+        <aside className="border-border bg-sidebar/70 border-b px-4 py-5 lg:border-r lg:border-b-0">
+          <Link
+            className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+            href="/"
+          >
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            Intake
+          </Link>
+          <div className="flex items-center gap-3">
+            <div className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-md">
+              <Clapperboard className="size-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Reel AI</p>
+              <p className="text-muted-foreground text-xs">Project graph</p>
+            </div>
+          </div>
+          <div className="mt-7">
+            <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              <Boxes className="size-4" aria-hidden="true" />
+              Projects
+            </div>
+            <ProjectList projects={projects} />
+          </div>
+        </aside>
+
+        <section className="min-w-0 px-5 py-5 lg:px-7">
+          <header className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-muted-foreground text-sm">
+                {project.businessName}
+              </p>
+              <h1 className="mt-1 text-3xl font-semibold tracking-normal">
+                {project.name}
+              </h1>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+              <Metric label="Style" value={formatEnum(project.style)} />
+              <Metric label="Length" value={`${project.videoLengthSec}s`} />
+              <Metric label="Sources" value={String(project.sources.length)} />
+              <Metric
+                label="Artifacts"
+                value={String(project.artifacts.length)}
+              />
+            </div>
+          </header>
+
+          <div className="mt-6 grid gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Project Sources</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SourceUploader projectId={project.id} />
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Registered Sources</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {project.sources.length > 0 ? (
+                    <div className="grid gap-2">
+                      {project.sources.map((source) => (
+                        <div
+                          className="rounded-md border border-border bg-background/50 p-3 text-sm"
+                          key={source.id}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-medium">
+                              {formatEnum(source.type)}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {source.artifactId
+                                ? "artifact linked"
+                                : "metadata"}
+                            </span>
+                          </div>
+                          <p className="mt-1 break-all text-xs text-muted-foreground">
+                            {source.url ?? source.artifactId ?? "Uploaded file"}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState text="No sources yet." />
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Artifact Store</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {project.artifacts.length > 0 ? (
+                    <div className="grid gap-3">
+                      {project.artifacts.map((artifact) => (
+                        <ArtifactPreview
+                          artifact={artifact}
+                          key={artifact.id}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState text="Uploads will appear here as durable artifacts." />
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+
+        <aside className="border-border bg-card/40 border-t px-5 py-5 lg:border-t-0 lg:border-l">
+          <p className="text-sm font-semibold">Inspector</p>
+          <div className="mt-4 space-y-3">
+            <InspectorRow
+              icon={Globe2}
+              label="Website"
+              value={project.websiteUrl ?? "Not set"}
+            />
+            <InspectorRow
+              icon={Database}
+              label="Status"
+              value={formatEnum(project.status)}
+            />
+            <InspectorRow
+              icon={HardDrive}
+              label="Storage rows"
+              value={`${project.artifacts.length}`}
+            />
+            <InspectorRow
+              icon={FileVideo}
+              label="Next phase"
+              value="Brand Kit"
+            />
+          </div>
+          <div className="mt-5 rounded-md border border-dashed border-border p-3 text-sm">
+            <p className="font-medium">Persistence check</p>
+            <p className="mt-2 text-muted-foreground">
+              This page is rendered from the project graph API shape: project,
+              sources, artifacts, jobs, storyboard, renders, and related rows.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-border bg-card px-3 py-2">
+      <p className="text-muted-foreground text-[11px] uppercase tracking-[0.16em]">
+        {label}
+      </p>
+      <p className="mt-1 whitespace-nowrap text-sm font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function InspectorRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Globe2;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-md border border-border px-3 py-2 text-sm">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Icon className="size-4" aria-hidden="true" />
+        <span>{label}</span>
+      </div>
+      <p className="mt-1 break-words font-medium">{value}</p>
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+      {text}
+    </div>
+  );
+}
+
+function formatEnum(value: string) {
+  return value
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
