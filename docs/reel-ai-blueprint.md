@@ -10,6 +10,8 @@ Reel AI is an AI showrunner for short-form business ads and story-led social vid
 
 Reel AI should not feel like “paste a URL, get one generic video.” The winning shape is a showrunner interface: it researches the brand, pitches competing creative directions, lets the user choose a direction, and then produces a controllable reel with visible creative and cost decisions.
 
+Implementation source of truth: use `docs/implementation-guide.md` for exact framework, folder, API, database, deployment, and open-source repo decisions. This blueprint explains the product strategy; the implementation guide is the build contract.
+
 The headline demo beat should be:
 
 1. User enters a business URL and optional brand/reference materials.
