@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Artifact, BrandSource, Project } from "@prisma/client";
+import { ZodError } from "zod";
 
 import { prisma } from "@/lib/prisma";
 import { QWEN_STRUCTURED_MODEL, sanitizeQwenError } from "@/lib/qwen/client";
@@ -61,7 +62,21 @@ export async function generateBrandKitForProject(projectId: string) {
 }
 
 export function getBrandKitGenerationError(error: unknown) {
+  if (error instanceof ZodError) {
+    return `Brand Kit response schema mismatch: ${formatZodIssues(error)}. Try regenerating.`;
+  }
+
   return sanitizeQwenError(error);
+}
+
+function formatZodIssues(error: ZodError) {
+  return error.issues
+    .slice(0, 4)
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.join(".") : "root";
+      return `${path} ${issue.message}`;
+    })
+    .join("; ");
 }
 
 async function collectBrandContexts(project: ProjectWithContext) {
@@ -375,10 +390,13 @@ function replaceFallbackClaims(
 
   return [
     {
-      claim: positioning,
-      support: hasOffer
-        ? "Project intake supplied this as the offer."
-        : "Available source context supports this cautious brand positioning.",
+      claim: truncateText(positioning, 220),
+      support: truncateText(
+        hasOffer
+          ? "Project intake supplied this as the offer."
+          : "Available source context supports this cautious brand positioning.",
+        260,
+      ),
       confidence: hasOffer ? ("high" as const) : ("medium" as const),
     },
   ];
@@ -421,4 +439,8 @@ function getProjectPositioning(project: Project, contexts: SourceContext[]) {
   }
 
   return `${project.businessName}'s supplied brand context`;
+}
+
+function truncateText(value: string, maxLength: number) {
+  return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
 }

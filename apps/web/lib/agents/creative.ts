@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Artifact, BrandKit, CreativeConcept, Project } from "@prisma/client";
+import { ZodError } from "zod";
 
 import { prisma } from "@/lib/prisma";
 import { QWEN_STRUCTURED_MODEL, sanitizeQwenError } from "@/lib/qwen/client";
@@ -180,6 +181,10 @@ export async function generateStoryboardForProject(projectId: string) {
 }
 
 export function getCreativeGenerationError(error: unknown) {
+  if (error instanceof ZodError) {
+    return `Creative output schema mismatch: ${formatZodIssues(error)}. Try regenerating.`;
+  }
+
   const safe = sanitizeQwenError(error);
 
   if (safe.includes("Brand Kit")) {
@@ -187,6 +192,16 @@ export function getCreativeGenerationError(error: unknown) {
   }
 
   return safe;
+}
+
+function formatZodIssues(error: ZodError) {
+  return error.issues
+    .slice(0, 4)
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.join(".") : "root";
+      return `${path} ${issue.message}`;
+    })
+    .join("; ");
 }
 
 async function saveStoryboard({

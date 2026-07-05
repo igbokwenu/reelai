@@ -13,7 +13,13 @@ const optionalString = z.preprocess(
 
 const arrayWithDefault = <T extends z.ZodType>(schema: T) =>
   z.preprocess(
-    (value) => (value === null ? undefined : value),
+    (value) => {
+      if (value === null || value === undefined) {
+        return undefined;
+      }
+
+      return Array.isArray(value) ? value : [value];
+    },
     z.array(schema).default([]),
   );
 
@@ -75,13 +81,17 @@ const looseClaimSchema = z
     text: optionalString,
     support: optionalString,
     evidence: optionalString,
+    source: optionalString,
     confidence: optionalString,
+    risk: optionalString,
   })
   .passthrough();
 const loosePolicyRiskSchema = z
   .object({
     risk: optionalString,
     issue: optionalString,
+    category: optionalString,
+    reason: optionalString,
     severity: optionalString,
     mitigation: optionalString,
     recommendation: optionalString,
@@ -96,6 +106,7 @@ const looseCitationSchema = z
     title: optionalString,
     note: optionalString,
     detail: optionalString,
+    url: optionalString,
   })
   .passthrough();
 
@@ -107,13 +118,15 @@ const flexibleBrandKitSchema = z
       (value) => (value === null ? undefined : value),
       z.string().nullable().optional(),
     ),
+    targetAudience: optionalString,
     tone: stringWithDefault("Clear, confident, and brand-safe."),
     palette: arrayWithDefault(
       z
         .object({
-          name: stringWithDefault("Brand color"),
+          name: optionalString,
+          label: optionalString,
           hex: optionalString,
-          usage: stringWithDefault("Brand accent"),
+          usage: optionalString,
         })
         .passthrough(),
     ),
@@ -131,30 +144,50 @@ const flexibleBrandKitSchema = z
     };
 
     return {
-      summary: ensureMinLength(input.summary, 40),
+      summary: textInRange(input.summary, {
+        fallback: "Brand summary was not provided.",
+        min: 40,
+        max: 900,
+      }),
       valueProps: ensureAtLeast(
         input.valueProps.map((item) =>
           typeof item === "string"
             ? {
-                label: ensureMinLength(item.slice(0, 80), 2),
-                detail: ensureMinLength(item, 10),
+                label: textInRange(item, {
+                  fallback: "Value proposition",
+                  min: 2,
+                  max: 80,
+                }),
+                detail: textInRange(item, {
+                  fallback: "Source-grounded brand value.",
+                  min: 10,
+                  max: 280,
+                }),
               }
             : {
-                label: ensureMinLength(
+                label: textInRange(
                   item.label ??
                     item.title ??
                     item.detail ??
                     item.description ??
                     "Value proposition",
-                  2,
-                ).slice(0, 80),
-                detail: ensureMinLength(
+                  {
+                    fallback: "Value proposition",
+                    min: 2,
+                    max: 80,
+                  },
+                ),
+                detail: textInRange(
                   item.detail ??
                     item.description ??
                     item.label ??
                     item.title ??
                     "Source-grounded brand value.",
-                  10,
+                  {
+                    fallback: "Source-grounded brand value.",
+                    min: 10,
+                    max: 280,
+                  },
                 ),
               },
         ),
@@ -171,8 +204,12 @@ const flexibleBrandKitSchema = z
           },
         ],
       ).slice(0, 6),
-      audience: input.audience ?? null,
-      tone: ensureMinLength(input.tone, 6),
+      audience: input.audience ?? input.targetAudience ?? null,
+      tone: textInRange(input.tone, {
+        fallback: "Clear, confident, and brand-safe.",
+        min: 6,
+        max: 180,
+      }),
       palette: ensureAtLeast(
         input.palette.map((item) => {
           const hex =
@@ -181,9 +218,17 @@ const flexibleBrandKitSchema = z
               : "#7C8A99";
 
           return {
-            name: ensureMinLength(item.name, 2),
+            name: textInRange(item.name ?? item.label, {
+              fallback: "Brand color",
+              min: 2,
+              max: 60,
+            }),
             hex,
-            usage: ensureMinLength(item.usage, 4),
+            usage: textInRange(item.usage ?? item.label, {
+              fallback: "Brand accent",
+              min: 4,
+              max: 160,
+            }),
           };
         }),
         [
@@ -194,27 +239,48 @@ const flexibleBrandKitSchema = z
       visualMotifs: ensureAtLeast(input.visualMotifs, [
         "clean product detail",
         "human workflow context",
-      ]).slice(0, 8),
+      ])
+        .map((item) =>
+          textInRange(item, {
+            fallback: "brand visual motif",
+            min: 3,
+            max: 120,
+          }),
+        )
+        .slice(0, 8),
       claims: ensureAtLeast(
         input.claims.map((item) =>
           typeof item === "string"
             ? {
-                claim: item,
+                claim: textInRange(item, {
+                  fallback: "Source-grounded claim",
+                  min: 4,
+                  max: 220,
+                }),
                 support: "Model supplied this claim from source context.",
                 confidence: "low" as const,
               }
             : {
-                claim: ensureMinLength(
+                claim: textInRange(
                   item.claim ?? item.text ?? "Source-grounded claim",
-                  4,
+                  {
+                    fallback: "Source-grounded claim",
+                    min: 4,
+                    max: 220,
+                  },
                 ),
-                support: ensureMinLength(
+                support: textInRange(
                   item.support ??
                     item.evidence ??
+                    item.source ??
                     "Model supplied this claim from source context.",
-                  4,
+                  {
+                    fallback: "Model supplied this claim from source context.",
+                    min: 4,
+                    max: 260,
+                  },
                 ),
-                confidence: normalizeConfidence(item.confidence),
+                confidence: normalizeConfidence(item.confidence ?? item.risk),
               },
         ),
         [
@@ -229,21 +295,38 @@ const flexibleBrandKitSchema = z
         input.policyRisks.map((item) =>
           typeof item === "string"
             ? {
-                risk: item,
+                risk: textInRange(item, {
+                  fallback: "Ad policy risk",
+                  min: 4,
+                  max: 220,
+                }),
                 severity: "medium" as const,
                 mitigation: "Keep copy conservative and source-grounded.",
               }
             : {
-                risk: ensureMinLength(
-                  item.risk ?? item.issue ?? "Ad policy risk",
-                  4,
+                risk: textInRange(
+                  item.risk ??
+                    item.issue ??
+                    item.reason ??
+                    item.category ??
+                    "Ad policy risk",
+                  {
+                    fallback: "Ad policy risk",
+                    min: 4,
+                    max: 220,
+                  },
                 ),
                 severity: normalizeSeverity(item.severity),
-                mitigation: ensureMinLength(
+                mitigation: textInRange(
                   item.mitigation ??
                     item.recommendation ??
+                    item.reason ??
                     "Keep copy conservative and source-grounded.",
-                  6,
+                  {
+                    fallback: "Keep copy conservative and source-grounded.",
+                    min: 6,
+                    max: 260,
+                  },
                 ),
               },
         ),
@@ -265,25 +348,46 @@ const flexibleBrandKitSchema = z
                 note: "Model supplied this citation as text.",
               }
             : {
-                sourceId: ensureMinLength(
-                  item.sourceId ?? item.source_id ?? item.id ?? "project-intake",
-                  1,
+                sourceId: textInRange(
+                  item.sourceId ??
+                    item.source_id ??
+                    item.id ??
+                    item.label ??
+                    "project-intake",
+                  {
+                    fallback: "project-intake",
+                    min: 1,
+                    max: 120,
+                  },
                 ),
-                label: ensureMinLength(
+                label: textInRange(
                   item.label ?? item.title ?? "Project intake",
-                  2,
-                ).slice(0, 120),
-                note: ensureMinLength(
+                  {
+                    fallback: "Project intake",
+                    min: 2,
+                    max: 120,
+                  },
+                ),
+                note: textInRange(
                   item.note ??
                     item.detail ??
+                    item.url ??
                     "Model cited this source for Brand Kit context.",
-                  4,
+                  {
+                    fallback: "Model cited this source for Brand Kit context.",
+                    min: 4,
+                    max: 260,
+                  },
                 ),
               },
         ),
         [fallbackCitation],
       ).slice(0, 12),
-      lockedStyle: ensureMinLength(input.lockedStyle, 20),
+      lockedStyle: textInRange(input.lockedStyle, {
+        fallback: "Clean vertical ad style with restrained captions.",
+        min: 20,
+        max: 500,
+      }),
     } satisfies BrandKitOutput;
   });
 
@@ -317,6 +421,10 @@ function canonicalizeBrandKitValue(value: unknown) {
       nested.brandSummary ??
       nested.brand_summary ??
       nested.overview,
+    audience:
+      nested.audience ??
+      nested.targetAudience ??
+      nested.target_audience,
     valueProps:
       nested.valueProps ??
       nested.value_props ??
@@ -346,6 +454,8 @@ function canonicalizeBrandKitValue(value: unknown) {
     lockedStyle:
       nested.lockedStyle ??
       nested.locked_style ??
+      nested.lockedStyleLanguage ??
+      nested.locked_style_language ??
       nested.styleGuide ??
       nested.style_guide,
   };
@@ -361,12 +471,31 @@ function ensureAtLeast<T>(items: T[], fallback: T[]) {
   return items.length > 0 ? items : fallback;
 }
 
-function ensureMinLength(value: string, minLength: number) {
-  if (value.trim().length >= minLength) {
-    return value.trim();
-  }
+function textInRange(
+  value: unknown,
+  {
+    fallback,
+    min,
+    max,
+  }: {
+    fallback: string;
+    min: number;
+    max: number;
+  },
+) {
+  const raw =
+    typeof value === "string"
+      ? value
+      : value === null || value === undefined
+        ? fallback
+        : String(value);
+  const trimmed = raw.replace(/\s+/g, " ").trim() || fallback;
+  const padded =
+    trimmed.length >= min
+      ? trimmed
+      : `${trimmed} ${fallback}`.replace(/\s+/g, " ").trim();
 
-  return `${value.trim()} ${".".repeat(minLength)}`.slice(0, minLength);
+  return padded.slice(0, max);
 }
 
 function normalizeConfidence(value: string | undefined): "high" | "medium" | "low" {
@@ -374,6 +503,18 @@ function normalizeConfidence(value: string | undefined): "high" | "medium" | "lo
 
   if (normalized === "high" || normalized === "medium" || normalized === "low") {
     return normalized;
+  }
+
+  if (normalized === "info") {
+    return "high";
+  }
+
+  if (normalized === "warning") {
+    return "medium";
+  }
+
+  if (normalized === "blocker") {
+    return "low";
   }
 
   return "low";
@@ -384,6 +525,18 @@ function normalizeSeverity(value: string | undefined): "high" | "medium" | "low"
 
   if (normalized === "high" || normalized === "medium" || normalized === "low") {
     return normalized;
+  }
+
+  if (normalized === "info") {
+    return "low";
+  }
+
+  if (normalized === "warning") {
+    return "medium";
+  }
+
+  if (normalized === "blocker") {
+    return "high";
   }
 
   return "medium";

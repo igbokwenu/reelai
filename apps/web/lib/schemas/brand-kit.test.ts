@@ -176,9 +176,66 @@ describe("brandKitOutputSchema", () => {
       },
     });
 
-    expect(parsed.summary).toHaveLength(40);
+    expect(parsed.summary.length).toBeGreaterThanOrEqual(40);
     expect(parsed.valueProps).toHaveLength(2);
     expect(parsed.claims[0]?.confidence).toBe("medium");
     expect(parsed.policyRisks[0]?.severity).toBe("high");
+  });
+
+  it("normalizes implementation-guide Brand Kit output with long fields", () => {
+    const longDetail =
+      "This is a deliberately long model-generated value proposition that explains the customer, the offer, the emotional angle, the visual proof, and the short-form ad strategy in far more words than the persistence schema allows, because real structured model output often includes prose that is useful but too verbose for the database field limits.";
+    const parsed = parseBrandKitOutput({
+      brandKit: {
+        summary:
+          "A source-grounded business summary that is intentionally useful for a short-form ad studio and gives later agents enough context to create brand-safe concepts.",
+        valueProps: [longDetail, { title: "Trust", description: longDetail }],
+        targetAudience: "Founders, operators, and creative teams",
+        tone: "Clear, helpful, energetic, and practical.",
+        palette: [
+          { hex: "#101010", label: "Charcoal" },
+          { hex: "#B6FF4D", label: "Signal lime" },
+        ],
+        visualMotifs: [
+          "workflow screenshots and product close-ups with clean captions",
+          "human handoff moments and source-grounded brand proof",
+        ],
+        claims: [
+          {
+            claim:
+              "The product helps teams plan short-form ads from source materials without starting from a blank page.",
+            evidence: longDetail,
+            source: "Uploaded brand kit and project intake",
+            risk: "medium",
+          },
+        ],
+        policyRisks: [
+          {
+            category: "Unsupported outcome claims",
+            reason:
+              "Avoid saying the tool guarantees sales, virality, platform approval, or measurable revenue lift.",
+            severity: "warning",
+          },
+          {
+            category: "Regulated claims",
+            reason: "Do not imply medical, legal, or financial outcomes.",
+            severity: "blocker",
+          },
+        ],
+        lockedStyleLanguage:
+          "Vertical editorial studio style with tactile product context, source-grounded text overlays, confident pacing, and conservative claims.",
+        sourceCitations: [
+          { label: "Project intake", url: "https://example.com" },
+        ],
+      },
+    });
+
+    expect(parsed.audience).toBe("Founders, operators, and creative teams");
+    expect(parsed.valueProps[0]?.detail.length).toBeLessThanOrEqual(280);
+    expect(parsed.palette[0]?.name).toBe("Charcoal");
+    expect(parsed.claims[0]?.support.length).toBeLessThanOrEqual(260);
+    expect(parsed.policyRisks[0]?.severity).toBe("medium");
+    expect(parsed.policyRisks[1]?.severity).toBe("high");
+    expect(parsed.lockedStyle).toContain("Vertical editorial");
   });
 });

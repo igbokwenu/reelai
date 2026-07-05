@@ -89,8 +89,8 @@ export type PolicyWarning = z.infer<typeof policyWarningSchema>;
 
 const flexibleConceptSchema = z
   .object({
-    title: z.unknown(),
-    hook: z.unknown(),
+    title: z.unknown().optional(),
+    hook: z.unknown().optional(),
     strategy: z.unknown().optional(),
     approach: z.unknown().optional(),
     concept: z.unknown().optional(),
