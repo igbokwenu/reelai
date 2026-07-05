@@ -6,9 +6,20 @@ Updated: July 5, 2026
 
 Reel AI is an AI showrunner for short-form business ads and story-led social videos: it studies a brand, drafts a one-minute concept, creates an editable storyboard with continuity frames, generates video segments, adds narration and music, and exports a vertical reel.
 
+## Product Thesis
+
+Reel AI should not feel like “paste a URL, get one generic video.” The winning shape is a showrunner interface: it researches the brand, pitches competing creative directions, lets the user choose a direction, and then produces a controllable reel with visible creative and cost decisions.
+
+The headline demo beat should be:
+
+1. User enters a business URL and optional brand/reference materials.
+2. Reel AI pitches three distinct concepts with one cheap preview frame each.
+3. User picks one concept.
+4. Reel AI expands it into an editable storyboard and generates a continuity-aware vertical reel.
+
 ## Positioning For The Hackathon
 
-Submit under Track 2: AI Showrunner. The project should visibly demonstrate an agentic creative pipeline, not just a form that calls a video API. The strongest demo is: business intake -> brand analysis -> script -> storyboard -> editable scene plan -> generated keyframes -> image-to-video segments -> final stitched reel with voiceover and optional background music.
+Submit under Track 2: AI Showrunner. The project should visibly demonstrate an agentic creative pipeline, not just a form that calls a video API. The strongest demo is: business intake -> brand analysis -> parallel concept pitches -> selected creative direction -> storyboard -> editable scene plan -> generated keyframes -> image-to-video segments -> final stitched reel with voiceover and optional background music.
 
 Judges explicitly ask for a real Alibaba Cloud deployment, QwenCloud API usage in code, an architecture diagram, and a demo video. The proof update also says the repo should include a code file with a visible QwenCloud base URL such as `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`.
 
@@ -41,7 +52,7 @@ The user enters:
 Agent output:
 
 - Brand brief with audience, value proposition, tone, visual motifs, claims to avoid, and source references
-- Hook options
+- Three divergent creative directions with hook, narrative strategy, pacing, style language, estimated scene count, and one preview keyframe each
 - Script
 - Scene-by-scene storyboard
 - Keyframe prompts for each scene start/end
@@ -52,7 +63,9 @@ Agent output:
 
 Human checkpoint:
 
+- Concept table where the user chooses one direction before full storyboard/video spend.
 - Premium storyboard editor where the user can revise copy, timing, visuals, voice, music feel, and generation style before spending video tokens.
+- Take compare UI where regenerated keyframes or clips are added as alternate takes instead of overwriting approved work.
 
 ### Flow 2: Short Story Generator
 
@@ -69,17 +82,36 @@ This shares the same storyboard and generation engine, but the brand intake is o
 
 ## What Makes It Original
 
-Most hackathon video demos will stop at text-to-video. Reel AI should emphasize continuity, editorial control, and business usefulness.
+Most hackathon video demos will stop at text-to-video. Reel AI should emphasize creative direction, continuity, editorial control, and business usefulness.
 
 Differentiators:
 
+- Parallel creative directions, not one script: the Creative Director Agent pitches three genuinely different concepts with cheap preview frames before any full storyboard or video spend.
+- Optional consistent AI spokesperson: using reference-to-video, the same character can hold their face, outfit, and presence across the reel. Treat this as the main visual wow path when generation quality is stable enough.
 - Continuity-first storyboard: each scene has start and end keyframes, not just a text prompt.
-- Brand-aware creative director: website and documents become a concise brand bible.
-- Token-budget planner: the agent proposes a low-cost draft path and a high-quality render path.
-- Premium storyboard approval UI: generated clips are not launched until the user approves scene prompts.
-- Claim safety: the brand analyzer flags unverifiable claims from the script before generation.
-- Output-ready reels: final export includes voiceover, optional BGM, captions, and a vertical 9:16 render.
+- Brand-aware creative director: website and documents become a reusable Brand Kit, not a one-time analysis.
+- Take-compare editing: every regeneration is additive; the user chooses between takes like an editor.
+- Token-budget planner: the agent proposes a low-cost draft path and a high-quality render path, with a live generation ticker.
+- Claim safety and platform ad-policy checks: flag unsupported claims, regulated-category risks, and likely platform rejection issues before render.
+- Output-ready reels: final export includes voiceover, optional BGM, captions, safe-zone-aware overlays, optional AI-content disclosure, and a vertical 9:16 render.
 - Judge-friendly pipeline visualization: a live run page shows each agent step, model used, status, and artifacts.
+
+## Wow Moment
+
+Design one centerpiece moment for the demo instead of spreading the drama across every agent step.
+
+Primary choice:
+
+- Parallel Concept Table: after brand research, show three concept cards side-by-side with preview frames, audience angle, hook, pacing, expected cost, and “why this could work.” This is the safest MVP wow moment because it is cheap, fast, and visibly showrunner-like.
+
+Stretch choice:
+
+- Consistent AI Spokesperson: for projects that include a founder/person/reference image, generate a stable narrator or product guide across scenes using reference-to-video. This is the strongest visual differentiator, but it should be behind a “spokesperson mode” toggle because it can add model and prompt risk.
+
+Supporting polish:
+
+- Live cost/progress ticker during generation: scene count, model names, estimated vs actual cost, and render progress.
+- Reveal transition: when generation finishes, the website screenshot or concept frame transitions into the first video frame.
 
 ## Recommended Stack
 
@@ -92,7 +124,7 @@ Differentiators:
 - TanStack Query for job polling and cache state
 - Zustand for local storyboard editor state
 - React Hook Form + Zod for intake validation
-- Remotion or FFmpeg-based rendering for captions, audio mixing, and final composition
+- Remotion for final composition, captions, safe-zone overlays, BGM mixing, brand watermarking, and export. Remotion uses FFmpeg underneath, so avoid separate hand-rolled FFmpeg filter graphs unless Remotion cannot cover a specific post-processing need.
 
 UI direction:
 
@@ -100,14 +132,20 @@ UI direction:
 - First screen should be the usable creator workspace, not a marketing hero.
 - Left rail for project history, center for storyboard timeline, right inspector for scene/audio/model settings.
 - Use real media previews, progress states, and artifact cards; keep controls compact and production-tool-like.
+- Use a distinctive display face for hooks/scene titles paired with a neutral workhorse typeface for controls and data.
+- Motion should communicate status: queued, researching, generating, reviewing, rendering, done, failed.
+- Show actual waveforms after voiceover generation and actual generated keyframes as scene thumbnails. Avoid generic placeholders once real artifacts exist.
+- Empty states should show ghost scenes and a faint timeline preview so the workspace feels ready, not blank.
+- Optional UI sound for job completion should be off by default and user-enabled.
 
 ### Backend
 
 - Next.js route handlers or a small Fastify service in the same repo.
 - Prisma with PostgreSQL for projects, scenes, jobs, artifacts, and user settings.
-- Redis-compatible queue for background orchestration; on Alibaba Cloud use Tair for Redis if available.
+- Postgres-backed job table for MVP orchestration and polling.
+- Redis-compatible queue as an at-scale upgrade; on Alibaba Cloud use Tair for Redis if needed after the demo is stable.
 - Object storage with Alibaba Cloud OSS for uploads, generated frames, generated clips, audio, and final exports.
-- FFmpeg for stitching clips, mixing voiceover/BGM, and burning captions.
+- Remotion render worker for stitching clips, mixing voiceover/BGM, adding captions, safe zones, disclosure labels, and final export.
 - Playwright for app smoke tests and screenshot proof.
 
 For the hackathon, use a monorepo:
@@ -116,7 +154,7 @@ For the hackathon, use a monorepo:
 apps/web              Next.js UI and API routes
 packages/ai           QwenCloud clients, prompts, schemas
 packages/orchestrator Job state machine
-packages/media        FFmpeg/Remotion composition helpers
+packages/media        Remotion composition helpers
 packages/db           Prisma schema
 docs                  Blueprint, architecture, deployment notes
 ```
@@ -151,6 +189,8 @@ Primary path:
 - Generate 4 to 8 segments of 5 to 15 seconds.
 - Chain scenes by using generated keyframes and/or the previous segment’s final frame.
 - Stitch segments into a 15 to 60 second vertical reel.
+- For spokesperson mode, persist the selected reference character image and pass it consistently into reference-to-video calls where supported.
+- For non-spokesperson ads, persist a product/brand reference image and locked style language to stabilize product details, palette, lens, camera movement, and motion language across scenes.
 
 Docs-verified options:
 
@@ -186,9 +226,20 @@ QwenCloud video models can generate or accept audio in several video paths, but 
 - Store `bgm_enabled`, `bgm_preset`, and `bgm_prompt` on the project.
 - Presets: cinematic pulse, upbeat startup, luxury minimal, documentary tension, playful 3D, ambient tech, dramatic reveal.
 - MVP: let the user download without BGM or upload/select a sample loop.
-- Stretch: generate/obtain music externally, store in OSS, and mix with FFmpeg.
+- Stretch: generate/obtain music externally, store in OSS, and mix it in the Remotion composition.
 
 Do not attempt lip sync for MVP. Narrative voiceover over generated visuals is the right scope. If later using avatar/dialogue, evaluate `wan2.7-r2v` or audio-sync features separately.
+
+## Visual Consistency Mechanism
+
+Do not rely on an agent name alone. Consistency should be enforced through data that is reused in every generation step.
+
+- `lockedStyleLanguage`: one compact string containing lens, lighting, palette, camera movement, pacing, texture, and negative prompts.
+- `brandPalette`: extracted from logo/site and editable by the user.
+- `productReferenceArtifactId`: a stable product/logo reference passed into keyframe generation when relevant.
+- `spokespersonReferenceArtifactId`: optional person/character reference passed into reference-to-video when spokesperson mode is enabled.
+- `sceneContinuityNotes`: prior scene ending frame description and object positions.
+- `takeSetId`: groups multiple generated attempts for the same scene so comparison is additive.
 
 ## Agent Architecture
 
@@ -198,24 +249,27 @@ Use a state-machine orchestrator, not one giant prompt.
 flowchart LR
   A["Intake"] --> B["Brand Research Agent"]
   B --> C["Creative Director Agent"]
-  C --> D["Storyboard Agent"]
-  D --> E["Human Review"]
-  E --> F["Keyframe Generator"]
-  F --> G["Video Segment Generator"]
-  G --> H["Voiceover Generator"]
-  H --> I["Composer"]
-  I --> J["Review And Export"]
+  C --> D["Parallel Concept Table"]
+  D --> E["Human Concept Pick"]
+  E --> F["Storyboard Agent"]
+  F --> G["Human Storyboard Review"]
+  G --> H["Keyframe Generator"]
+  H --> I["Video Segment Generator"]
+  I --> J["Voiceover Generator"]
+  J --> K["Composer"]
+  K --> L["Review And Export"]
 ```
 
 Agents:
 
 - Brand Research Agent: crawls the website, summarizes pages, reads uploaded materials, extracts brand voice and product facts.
 - Compliance/Claims Agent: flags unsupported claims, prohibited categories, and risky ad language.
-- Creative Director Agent: creates hooks, audience angle, story arc, and style language.
+- Creative Director Agent: creates three distinct concepts with hook, audience angle, story arc, pacing, style language, preview prompt, and rationale.
 - Storyboard Agent: emits strict JSON scenes with timestamps, start frame prompt, end frame prompt, motion prompt, voiceover, caption, and music cue.
 - Visual Consistency Agent: keeps colors, product details, character descriptions, lens language, and scene motifs stable.
 - Production Agent: chooses model path, submits jobs, polls status, stores artifacts, retries failures.
 - Edit Agent: stitches, mixes, captions, exports, and optionally creates thumbnail/poster images.
+- Review Agent: compares takes, surfaces differences, and helps the user pick the best scene without overwriting prior outputs.
 
 ## Data Model
 
@@ -223,10 +277,13 @@ Core tables:
 
 - `User`
 - `Project`
+- `BrandKit`
 - `BrandSource`
 - `BrandBrief`
+- `CreativeConcept`
 - `Storyboard`
 - `Scene`
+- `Take`
 - `GenerationJob`
 - `Artifact`
 - `Render`
@@ -245,9 +302,22 @@ Important scene fields:
 - `bgmCue`
 - `modelMode`
 - `status`
+- `lockedStyleLanguage`
+- `safeZonePreset`
 - `startFrameArtifactId`
 - `endFrameArtifactId`
 - `videoArtifactId`
+
+Important take fields:
+
+- `sceneId`
+- `kind`: `keyframe` or `video`
+- `attemptNumber`
+- `prompt`
+- `artifactId`
+- `status`
+- `selected`
+- `notes`
 
 ## API Shape
 
@@ -256,11 +326,18 @@ Public app endpoints:
 - `POST /api/projects`
 - `POST /api/projects/:id/sources`
 - `POST /api/projects/:id/analyze-brand`
+- `POST /api/brand-kits`
+- `PATCH /api/brand-kits/:id`
+- `POST /api/projects/:id/concepts`
+- `POST /api/projects/:id/select-concept`
 - `POST /api/projects/:id/storyboard`
 - `PATCH /api/storyboards/:id`
 - `POST /api/projects/:id/generate-keyframes`
 - `POST /api/projects/:id/generate-video`
+- `POST /api/scenes/:id/takes`
+- `POST /api/takes/:id/select`
 - `POST /api/projects/:id/render`
+- `POST /api/projects/:id/review-link`
 - `GET /api/jobs/:id`
 - `GET /api/projects/:id/artifacts`
 
@@ -290,25 +367,31 @@ Never log secrets.
 ### Main Screens
 
 - Project Studio: intake form, source uploads, brand source status.
-- Brand Brief: concise extracted brand bible with source citations.
+- Brand Kit: reusable extracted brand bible with source citations, palette, product references, tone, and compliance notes.
+- Concept Table: three divergent creative directions with preview frames, cost/time estimate, audience angle, hook, and “why this works.”
 - Creative Board: hook options, script, storyboard timeline.
 - Scene Inspector: edit each scene’s visual prompt, motion, narration, captions, duration, and model mode.
+- Take Compare: compare regenerated keyframes/clips side-by-side and choose the selected take.
 - Generation Console: live agent pipeline with statuses and artifacts.
 - Final Review: video player, captions, audio toggles, thumbnail, download/export.
+- Share Review: no-login client review link with scene comments and approve/request-changes status.
 
 ### Premium Details
 
 - Timeline strip with scene thumbnails.
 - Split view: storyboard table on left, selected scene preview on right.
 - “Draft render” and “Final render” modes.
-- Token/time estimate before video generation.
+- Token/time estimate before video generation plus live cost ticker during generation.
 - Scene lock controls so regenerated scenes do not disturb approved ones.
 - Brand palette chips extracted from upload/logo.
 - Revision history for storyboard and script.
+- Real waveform display for generated narration chunks.
+- Platform safe-zone preview for TikTok/Reels/Shorts overlays.
+- Optional AI-content disclosure/watermark toggle in export settings.
 
 ## Deployment On Alibaba Cloud
 
-Recommended hackathon path: Dockerized Next.js app on Alibaba Cloud ECS or Function Compute custom container, PostgreSQL-compatible database, OSS bucket, and optional Tair Redis.
+Recommended hackathon path: Dockerized Next.js app on Alibaba Cloud ECS or Function Compute custom container, PostgreSQL-compatible database, and OSS bucket. Add Tair Redis only if the Postgres job table becomes insufficient.
 
 ### Option A: ECS + Docker Compose
 
@@ -319,14 +402,14 @@ Resources:
 - ECS instance running Docker
 - Alibaba Cloud OSS bucket
 - ApsaraDB RDS PostgreSQL, or a Postgres container for hackathon-only
-- Tair Redis, or a Redis container for hackathon-only
+- Optional Tair Redis only for a queue upgrade after the MVP works
 - Security group allowing HTTPS
 - Domain or temporary public IP
 
 Pros:
 
 - Easiest to debug.
-- Long-running FFmpeg and polling jobs are straightforward.
+- Long-running render and polling jobs are straightforward.
 - Screenshot proof is easy from ECS console.
 
 Cons:
@@ -338,7 +421,7 @@ Deployment outline:
 1. Create ECS instance.
 2. Install Docker and Docker Compose.
 3. Build app image locally or on ECS.
-4. Configure `.env.production` with `DASHSCOPE_API_KEY`, database URL, OSS credentials, and Redis URL.
+4. Configure `.env.production` with `DASHSCOPE_API_KEY`, database URL, and OSS credentials.
 5. Run `docker compose up -d`.
 6. Capture proof screenshot from Alibaba Cloud ECS Workbench/console.
 7. Ensure repo includes code with QwenCloud base URL and deployment instructions.
@@ -354,7 +437,7 @@ Resources:
 - Separate worker function or queue consumer
 - OSS bucket
 - RDS PostgreSQL
-- Tair Redis
+- Tair Redis only if using a queue beyond the MVP Postgres job table
 
 Pros:
 
@@ -394,7 +477,6 @@ Required:
 - `DASHSCOPE_API_KEY`
 - `QWEN_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1`
 - `DATABASE_URL`
-- `REDIS_URL`
 - `OSS_REGION`
 - `OSS_BUCKET`
 - `OSS_ACCESS_KEY_ID`
@@ -402,6 +484,7 @@ Required:
 
 Optional:
 
+- `REDIS_URL`
 - `QWEN_VIDEO_BASE_URL`
 - `QWEN_IMAGE_BASE_URL`
 - `QWEN_TTS_BASE_URL`
@@ -423,7 +506,10 @@ Do not print these values in logs or docs.
 
 - Build intake UI.
 - Implement website fetch and document ingestion.
-- Generate brand brief and storyboard JSON.
+- Generate reusable Brand Kit.
+- Generate three parallel creative concepts with preview keyframes.
+- Add concept selection before storyboard generation.
+- Generate storyboard JSON from the selected concept.
 - Add editable storyboard timeline and scene inspector.
 - Add claim-safety pass.
 
@@ -439,6 +525,7 @@ Do not print these values in logs or docs.
 - Submit i2v jobs for each approved scene.
 - Poll and persist status.
 - Show live generation console.
+- Add take-compare for regenerated clips.
 - Store clips in OSS.
 
 ### Phase 4: Audio And Final Render
@@ -446,7 +533,8 @@ Do not print these values in logs or docs.
 - Generate TTS narration in chunks.
 - Add captions from voiceover text.
 - Mix BGM if enabled.
-- Stitch video segments with FFmpeg.
+- Stitch video segments with Remotion.
+- Apply safe-zone-aware captions, optional AI disclosure, brand watermark, and thumbnail.
 - Export MP4 and thumbnail.
 
 ### Phase 5: Deployment And Submission
@@ -466,6 +554,9 @@ Do:
 - One brand/source at first, then multiple uploads.
 - One vertical aspect ratio first: 9:16.
 - Realistic and 3D animation styles only.
+- Parallel concept table before full storyboard.
+- Additive take comparison for regenerations.
+- Reusable Brand Kit.
 
 Do not do in MVP:
 
@@ -474,6 +565,14 @@ Do not do in MVP:
 - Multi-user billing.
 - Fully custom music generation unless an API path is confirmed.
 - Complex collaborative editing.
+- Full multi-format export automation. Keep it as a roadmap item after vertical export is reliable.
+
+Stretch after MVP:
+
+- Consistent spokesperson mode using reference-to-video.
+- Style transfer from a reference ad URL: analyze pacing, structure, hook timing, and voiceover style without copying protected visual content.
+- Multi-format export: 9:16, 1:1, and 16:9 from the same approved storyboard with safe-zone-aware recomposition.
+- Agency/client approval flow with comment threads on scenes.
 
 ## Risk Register
 
@@ -481,7 +580,9 @@ Do not do in MVP:
 - Cost spikes: estimate before generation, cap scene count, and require approval before render.
 - Model drift between docs and skills: run `qwencloud models list --all --format json` before implementation freeze.
 - Weak continuity: use image-to-video, locked keyframes, stable visual descriptions, and scene-by-scene chaining.
+- Spokesperson consistency risk: ship as optional stretch until reference-to-video quality is verified on demo assets.
 - Long one-minute render failure: generate independent 5 to 15 second segments and stitch.
+- Platform compliance gaps: include disclosure toggle, safe zones, regulated-category warnings, and claim evidence before final render.
 - Judge eligibility: put deployment proof and QwenCloud base URL in the repo early.
 
 ## Definition Of Done For Hackathon
@@ -490,9 +591,10 @@ Do not do in MVP:
 - Public repo with license.
 - Code visibly calls QwenCloud APIs.
 - User can create a project from a business website/materials.
+- User can select from three generated creative directions.
 - User can review and edit a generated storyboard.
+- User can compare at least two generated takes for one scene.
 - App generates at least one complete short reel from approved scenes.
-- Final reel includes narration and optional music controls.
+- Final reel includes narration, optional music controls, safe-zone-aware captions, and optional AI-content disclosure.
 - Architecture diagram and deployment proof are included.
 - Demo video clearly shows the agent pipeline and final output.
-
