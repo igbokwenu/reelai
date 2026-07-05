@@ -129,7 +129,13 @@ const flexibleConceptSchema = z
 export function parseCreativeConceptsOutput(
   value: unknown,
 ): CreativeConceptsOutput {
+  console.log("[parseCreativeConceptsOutput] Raw AI response:", JSON.stringify(value, null, 2).slice(0, 3000));
+  
   const extracted = extractConceptArray(value);
+  
+  if (extracted.length > 0) {
+    console.log("[parseCreativeConceptsOutput] First concept structure:", JSON.stringify(extracted[0], null, 2).slice(0, 2000));
+  }
 
   while (extracted.length < 3) {
     extracted.push({
