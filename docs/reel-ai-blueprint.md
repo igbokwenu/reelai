@@ -163,6 +163,64 @@ docs                  Blueprint, architecture, deployment notes
 
 Prefer docs-verified models during implementation and confirm with `qwencloud models list --all --format json` before final submission.
 
+## QwenCloud Capability Support Check
+
+The planned MVP is supported by the current QwenCloud platform, with a few scope boundaries to keep the project attainable.
+
+| Platform need | QwenCloud support | Reel AI implementation decision |
+| --- | --- | --- |
+| Brand research, scriptwriting, concepts, storyboard JSON | Text generation models such as `qwen3.7-plus` support 1M context, function calling, built-in tools, and structured output. | Use `qwen3.7-plus` for Brand Kit, three concept pitches, storyboard JSON, claims review, and policy review. |
+| Website and brand material understanding | Visual understanding models support image/video analysis, OCR-style extraction, structured output, and long-context multimodal input. | Fetch website content in our backend, render/parse uploads, then send text/images to Qwen for structured Brand Kit extraction. Do not depend on opaque browsing as the only source of truth. |
+| Preview frames and storyboard keyframes | `wan2.7-image-pro` supports text rendering, brand color control, multi-image references, consistent image sets, and image editing. | Generate one cheap preview frame per creative concept, then start/end keyframes for approved storyboard scenes. |
+| Video generation | HappyHorse/Wan support t2v, i2v, r2v, video editing, 720P/1080P, audio-capable clips, and 3 to 15 second segments depending on model. | Use image-to-video as the default continuity path. Generate 2 to 4 scenes for MVP and stitch into a 15 to 30 second reel first; 60 seconds is a final/stretch render path. |
+| Consistent spokesperson | `happyhorse-1.1-r2v` supports consistent characters from 1 to 9 reference images; Wan r2v supports richer reference inputs. | Keep as optional “spokesperson mode” after the default product/story ad flow works. Do not make this a blocker for the main submission. |
+| Narration | Qwen non-realtime TTS supports content-production voiceover, audio URLs, multiple languages, and instruction control. | Generate narrative voiceover chunks; skip lip sync for MVP. |
+| Background music | Some video paths support audio/custom audio, but dedicated controllable music generation is not confirmed in the current plan. | MVP supports BGM prompt metadata, enable/disable, preset moods, and optional uploaded/sample audio mixed at render time. Full generated music is stretch only. |
+| Final composition | QwenCloud generates assets; composition is application logic. | Use Remotion to stitch clips, mix narration/BGM, add captions, safe zones, brand watermark, and AI disclosure. |
+
+Sources checked: QwenCloud text models, vision models, image models, video models, and TTS docs.
+
+## Attainable Hackathon Build Cut
+
+Build the platform in layers so the demo survives even if video generation is slow or a stretch feature misbehaves.
+
+### Must Ship
+
+- Next.js studio with project intake, source upload, and Brand Kit view.
+- Backend QwenCloud client with visible base URL for judging proof.
+- Brand Kit generation from website text plus uploaded/logo images.
+- Three parallel creative concepts with one preview frame each.
+- Concept selection and editable storyboard.
+- Keyframe generation for approved scenes.
+- Video generation for 2 to 4 scenes, targeting a 15 to 30 second vertical reel.
+- Narration via Qwen TTS.
+- Remotion final render with captions, safe zones, optional AI disclosure, and optional sample/uploaded BGM.
+- Postgres-backed job table, live pipeline statuses, and a generation cost/time estimate.
+- Alibaba Cloud deployment proof.
+
+### Should Ship
+
+- Take Compare for at least keyframes, with video takes if time allows.
+- Claim safety and regulated-category warning pass.
+- Brand palette extraction and locked style language.
+- Final thumbnail/poster selection.
+
+### Stretch
+
+- Consistent spokesperson mode with `happyhorse-1.1-r2v`.
+- Style analysis from a reference ad URL, extracting pacing and structure without copying visuals.
+- Shareable client review link.
+- Multi-format export from the same project.
+- Fully generated custom music if a clean QwenCloud-supported path is verified.
+
+### Explicit Non-Goals For The Hackathon
+
+- Lip sync.
+- Full ad-platform publishing.
+- Multi-user billing and enterprise account management.
+- Complex collaborative editing.
+- Guaranteed 60-second generation in every demo run. Prepare a 15 to 30 second reliable path first.
+
 ### Text And Agent Reasoning
 
 Use `qwen3.7-plus` for scriptwriting, storyboard planning, structured JSON, and brand analysis. The current QwenCloud docs recommend it as a balanced model with 1M context, tool support, function calling, and structured output. Use `qwen3.7-max` only for the final “creative director pass” or complex reasoning.
@@ -186,9 +244,10 @@ Source: https://docs.qwencloud.com/developer-guides/getting-started/image-models
 Primary path:
 
 - Use image-to-video for continuity.
-- Generate 4 to 8 segments of 5 to 15 seconds.
+- Generate 2 to 4 segments of 5 to 15 seconds for the reliable hackathon MVP.
+- Generate 4 to 8 segments only for final/high-cost 45 to 60 second renders after the shorter path works.
 - Chain scenes by using generated keyframes and/or the previous segment’s final frame.
-- Stitch segments into a 15 to 60 second vertical reel.
+- Stitch segments into a 15 to 30 second vertical reel first, with 45 to 60 seconds as a stretch render.
 - For spokesperson mode, persist the selected reference character image and pass it consistently into reference-to-video calls where supported.
 - For non-spokesperson ads, persist a product/brand reference image and locked style language to stabilize product details, palette, lens, camera movement, and motion language across scenes.
 
