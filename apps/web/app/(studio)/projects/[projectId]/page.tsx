@@ -11,6 +11,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ArtifactPreview } from "@/components/studio/ArtifactPreview";
+import { BrandKitPanel } from "@/components/studio/BrandKitPanel";
 import { ProjectList } from "@/components/studio/ProjectList";
 import { SourceUploader } from "@/components/studio/SourceUploader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,6 +91,22 @@ export default async function ProjectPage({ params }: PageProps) {
           </header>
 
           <div className="mt-6 grid gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Brand Kit</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <BrandKitPanel
+                  brandKit={project.brandKit}
+                  latestBrandKitJob={
+                    project.jobs.find((job) => job.type === "BRAND_KIT") ??
+                    null
+                  }
+                  projectId={project.id}
+                />
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Project Sources</CardTitle>
@@ -178,7 +195,15 @@ export default async function ProjectPage({ params }: PageProps) {
             <InspectorRow
               icon={FileVideo}
               label="Next phase"
-              value="Brand Kit"
+              value={project.brandKit ? "Creative Concepts" : "Brand Kit"}
+            />
+            <InspectorRow
+              icon={Clapperboard}
+              label="Brand Kit job"
+              value={
+                project.jobs.find((job) => job.type === "BRAND_KIT")?.status ??
+                "Not started"
+              }
             />
           </div>
           <div className="mt-5 rounded-md border border-dashed border-border p-3 text-sm">
