@@ -8,6 +8,8 @@ import { generateImageWithQwen } from "@/lib/qwen/image";
 import { generateStructuredWithQwen } from "@/lib/qwen/structured";
 import {
   creativeConceptsSchema,
+  parseCreativeConceptsOutput,
+  parseStoryboardOutput,
   storyboardSchema,
   type PolicyWarning,
   type StoryboardOutput,
@@ -41,6 +43,7 @@ export async function generateConceptsForProject(projectId: string) {
     schema: creativeConceptsSchema,
     schemaName: "reel_ai_creative_concepts",
     model: QWEN_STRUCTURED_MODEL,
+    parse: parseCreativeConceptsOutput,
     system: conceptSystemPrompt,
     user: buildConceptPrompt(project),
   });
@@ -138,6 +141,7 @@ export async function generateStoryboardForProject(projectId: string) {
     schema: storyboardSchema,
     schemaName: "reel_ai_storyboard",
     model: QWEN_STRUCTURED_MODEL,
+    parse: parseStoryboardOutput,
     system: storyboardSystemPrompt,
     user: buildStoryboardPrompt(project, selectedConcept),
   });

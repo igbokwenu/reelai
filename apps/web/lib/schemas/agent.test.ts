@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { creativeConceptsSchema, storyboardSchema } from "./agent";
+import {
+  creativeConceptsSchema,
+  parseCreativeConceptsOutput,
+  parseStoryboardOutput,
+  storyboardSchema,
+} from "./agent";
 
 describe("Phase 4 agent schemas", () => {
   it("requires exactly three creative concepts", () => {
@@ -71,5 +76,59 @@ describe("Phase 4 agent schemas", () => {
         scenes: [scene(1)],
       }).success,
     ).toBe(false);
+  });
+
+  it("normalizes common model variants for creative concepts", () => {
+    const makeConcept = (index: number) => ({
+      title: `Direction ${index}`,
+      hook: `Hook ${index}: make the business feel immediately useful.`,
+      approach: "Lead with a proof-led story instead of a generic feature list.",
+      narrative_arc:
+        "Open on the customer problem, move into the branded solution, and end with a direct call to action.",
+      visual_style: "Clean vertical product-led visuals with warm human context.",
+      estimated_scenes: "3 scenes",
+      estimatedDuration: "24 seconds",
+      preview_prompt:
+        "Vertical 9:16 preview frame with branded product detail, warm light, and clean caption-safe composition.",
+      why_it_works:
+        "This gives the reviewer a distinct strategy while keeping claims conservative.",
+    });
+
+    const parsed = parseCreativeConceptsOutput({
+      creative_concepts: [makeConcept(1), makeConcept(2), makeConcept(3)],
+    });
+
+    expect(parsed.concepts).toHaveLength(3);
+    expect(parsed.concepts[0]?.estimatedDurationSec).toBe(24);
+    expect(parsed.concepts[0]?.narrativeArc).toContain("customer problem");
+  });
+
+  it("normalizes storyboard variants before strict validation", () => {
+    const scene = (index: number) => ({
+      index,
+      duration: "8 seconds",
+      caption: `Scene ${index}`,
+      voiceover: "A concise source-grounded narration line.",
+      start_frame_prompt:
+        "Vertical branded opening frame with clean product detail and safe-zone composition.",
+      end_frame_prompt:
+        "Vertical branded ending frame that preserves palette, subject, and lighting.",
+      motionPrompt:
+        "Slow camera push with restrained movement and clear caption-safe space.",
+      continuity_notes:
+        "Keep palette, lighting, subject identity, and caption placement consistent.",
+    });
+
+    const parsed = parseStoryboardOutput({
+      title: "Launch reel",
+      copy:
+        "A compact launch script that frames the problem, shows the brand answer, and closes clearly.",
+      music: { mood: "warm pulse", description: "Light upbeat background bed." },
+      storyboard_scenes: [scene(1), scene(2), scene(3)],
+    });
+
+    expect(parsed.scenes).toHaveLength(3);
+    expect(parsed.scenes[0]?.durationSec).toBe(8);
+    expect(parsed.bgm.preset).toBe("warm pulse");
   });
 });
