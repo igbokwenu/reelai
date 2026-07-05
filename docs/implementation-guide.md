@@ -715,6 +715,228 @@ Follow this order exactly:
 
 At every step, keep the app runnable. Do not merge a phase that breaks the previous phase.
 
+## Phased Implementation Plan
+
+Use these phases as the project tracker. A phase is complete only when every checkbox in its exit checklist is done. Do not begin stretch work until Phase 6 is complete.
+
+### Phase 1: Foundation And Open-Source Repo
+
+Goal: create a clean, secure, runnable project foundation that is safe to make public.
+
+Build:
+
+- Next.js App Router app in `apps/web`.
+- pnpm workspace.
+- TypeScript, Tailwind, ESLint, Prettier.
+- shadcn/ui/Radix setup.
+- Prisma/Postgres setup.
+- Env validation in `apps/web/lib/env.ts`.
+- Open-source repo files.
+- Basic studio shell route.
+
+Exit checklist:
+
+- [ ] `pnpm install` works from repo root.
+- [ ] `pnpm lint` passes.
+- [ ] `pnpm typecheck` passes.
+- [ ] `pnpm test` runs with at least one placeholder/unit test.
+- [ ] `.env` is ignored and not tracked.
+- [ ] `.env.example` contains only placeholders.
+- [ ] `README.md`, `LICENSE`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and `SECURITY.md` exist.
+- [ ] `docs/architecture.md` renders a Mermaid architecture diagram.
+- [ ] App starts locally and shows the studio shell.
+
+### Phase 2: Data Model, Project Intake, And Artifact Storage
+
+Goal: make the app persist real projects, accept sources, and store durable artifacts.
+
+Build:
+
+- Prisma schema from this guide.
+- Initial migration and seed script.
+- `ProjectIntakeForm`.
+- `SourceUploader`.
+- Project detail page.
+- Alibaba OSS helper in `apps/web/lib/oss`.
+- Artifact creation and metadata retrieval.
+- Project graph API.
+
+Exit checklist:
+
+- [ ] Database migration applies cleanly.
+- [ ] Seed script creates one demo project.
+- [ ] User can create a project from the UI.
+- [ ] User can add website URL/business metadata.
+- [ ] User can upload at least one image/logo/document source.
+- [ ] Uploaded source is stored in OSS or local dev-compatible storage with the same interface.
+- [ ] `Artifact` and `BrandSource` rows are created.
+- [ ] Project page reloads from persisted database state.
+- [ ] Playwright smoke test creates or opens a project page.
+
+### Phase 3: QwenCloud Client And Brand Kit Agent
+
+Goal: prove secure server-side QwenCloud integration and generate a useful Brand Kit.
+
+Build:
+
+- `apps/web/lib/qwen/client.ts` with visible QwenCloud base URL.
+- Server-only QwenCloud structured text wrapper.
+- Vision/asset analysis wrapper or adapter.
+- Brand Kit prompt and Zod schema validation.
+- `POST /api/projects/[projectId]/brand-kit`.
+- `GenerationJob` creation and polling for Brand Kit.
+- `BrandKitPanel`.
+
+Exit checklist:
+
+- [ ] QwenCloud API key is read only server-side.
+- [ ] QwenCloud base URL is visible in source code.
+- [ ] Brand Kit generation creates a `GenerationJob`.
+- [ ] Job status transitions are persisted.
+- [ ] Brand Kit output validates with Zod before saving.
+- [ ] UI displays summary, value props, tone, palette, claims, policy risks, and citations.
+- [ ] Sanitized errors appear in UI when generation fails.
+- [ ] No prompts, API keys, or uploaded private content are logged in production mode.
+
+### Phase 4: Creative Concepts And Storyboard Editor
+
+Goal: deliver the signature showrunner mechanic and human approval loop.
+
+Build:
+
+- Creative Director agent that returns exactly three concepts.
+- Preview frame generation for each concept.
+- `ConceptTable` and `ConceptCard`.
+- Concept selection endpoint.
+- Storyboard agent using selected concept and Brand Kit.
+- Editable `StoryboardTimeline`.
+- `SceneInspector`.
+- Storyboard update endpoint.
+- Claim/policy review pass for storyboard text.
+
+Exit checklist:
+
+- [ ] User can generate exactly three concepts from a Brand Kit.
+- [ ] Each concept has title, hook, strategy, narrative arc, preview prompt, rationale, and preview frame.
+- [ ] User can select exactly one concept.
+- [ ] Storyboard generation requires a selected concept.
+- [ ] Storyboard contains 2 to 4 scenes for MVP.
+- [ ] Each scene has duration, caption, voiceover text, start/end frame prompts, motion prompt, and continuity notes.
+- [ ] User can edit scene caption, voiceover, prompts, duration, and BGM settings.
+- [ ] Storyboard edits persist after refresh.
+- [ ] Policy/claims warnings are visible before generation.
+
+### Phase 5: Keyframes, Video Generation, And Take Compare
+
+Goal: generate durable scene assets and make regeneration additive instead of destructive.
+
+Build:
+
+- Keyframe generation endpoint.
+- Image generation wrapper for preview/start/end frames.
+- `Take` creation for keyframes.
+- `TakeCompare` for keyframe takes.
+- Video generation endpoint using i2v.
+- Async video task submission and polling.
+- `GenerationConsole`.
+- Artifact previews for images and videos.
+
+Exit checklist:
+
+- [ ] User can generate start/end keyframes for approved scenes.
+- [ ] Keyframe outputs are copied to OSS and saved as `Artifact` rows.
+- [ ] Regenerating a keyframe creates a new `Take`; it does not overwrite the previous take.
+- [ ] User can select the preferred keyframe take.
+- [ ] User can submit 2 to 4 scenes for i2v generation.
+- [ ] Video provider task IDs are stored on jobs.
+- [ ] Video polling survives page refresh.
+- [ ] Completed video clips are copied to OSS and shown in the UI.
+- [ ] Failed scene generation can be retried.
+- [ ] Generation console shows model, status, task ID, and artifact links.
+
+### Phase 6: Narration, Composition, And Final Export
+
+Goal: turn generated clips into one complete, reusable reel.
+
+Build:
+
+- TTS endpoint and narration job.
+- Audio artifact storage.
+- Waveform preview.
+- Remotion composition.
+- Captions with TikTok/Reels safe zones.
+- Optional AI-content disclosure overlay.
+- Optional uploaded/sample BGM mix.
+- Final render endpoint.
+- `FinalVideoPlayer` and download link.
+
+Exit checklist:
+
+- [ ] Narration is generated from scene voiceover text.
+- [ ] TTS chunks respect model text limits.
+- [ ] Narration audio is stored as an `Artifact`.
+- [ ] UI shows narration status and waveform/metadata.
+- [ ] Final render combines selected scene videos in order.
+- [ ] Captions are visible and safe-zone-aware.
+- [ ] AI disclosure can be toggled and defaults on for export.
+- [ ] Optional BGM can be disabled or included.
+- [ ] Final MP4 is stored in OSS as `FINAL_RENDER`.
+- [ ] User can play and download the final reel.
+- [ ] Manual demo path works end to end for a 15 to 30 second reel.
+
+### Phase 7: Deployment, Documentation, And Judging Package
+
+Goal: make Reel AI live, reusable, and submission-ready.
+
+Build:
+
+- Dockerfile.
+- `docker-compose.yml`.
+- `scripts/deploy/README.md`.
+- ECS deployment.
+- Production environment setup.
+- README completion.
+- Architecture and proof screenshots.
+- Public demo project seed or fixture.
+- Playwright deployed smoke test.
+
+Exit checklist:
+
+- [ ] Docker image builds successfully.
+- [ ] App runs with Docker Compose locally.
+- [ ] Database migration process is documented.
+- [ ] Alibaba Cloud ECS deployment is live.
+- [ ] OSS bucket is configured for generated artifacts.
+- [ ] Public deployed URL opens the app.
+- [ ] End-to-end demo succeeds on deployed app.
+- [ ] Alibaba Cloud proof screenshot/recording is captured.
+- [ ] README includes setup, env vars, QwenCloud usage, deployment, and judging proof.
+- [ ] Repo contains visible QwenCloud API usage and no committed secrets.
+- [ ] 1 to 3 minute demo video is recorded.
+- [ ] Project can be reused for a second brand without code changes.
+
+### Phase 8: Post-MVP Polish And Reusability
+
+Goal: improve the open-source product after the judged MVP is stable.
+
+Build only after Phase 7:
+
+- Shareable review links.
+- Spokesperson mode with reference-to-video.
+- Style analysis from reference ads.
+- Multi-format export: 9:16, 1:1, 16:9.
+- Tair/Redis queue if concurrent usage needs it.
+- Separate render/worker service if media rendering blocks the web app.
+- Better observability and analytics.
+
+Exit checklist:
+
+- [ ] Each new feature has an ADR or implementation note.
+- [ ] New feature can be disabled by config or feature flag.
+- [ ] Existing end-to-end demo still passes.
+- [ ] Public docs explain the feature and limitations.
+- [ ] Deployment remains reproducible.
+
 ## Acceptance Tests
 
 Minimum automated checks:
@@ -750,4 +972,3 @@ Current fixed decisions:
 - Narrative voiceover instead of lip sync because lip sync is outside MVP scope.
 
 If a builder changes any of these, add an ADR under `docs/decisions/`.
-
