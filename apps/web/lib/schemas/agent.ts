@@ -95,6 +95,7 @@ const flexibleConceptSchema = z
     approach: z.unknown().optional(),
     concept: z.unknown().optional(),
     concept_summary: z.unknown().optional(),
+    core_strategy: z.unknown().optional(),
     narrativeArc: z.unknown().optional(),
     narrative_arc: z.unknown().optional(),
     arc: z.unknown().optional(),
@@ -226,10 +227,6 @@ function extractConceptArray(value: unknown): unknown[] {
 
 function normalizeConcept(value: unknown, index: number) {
   const parsed = flexibleConceptSchema.parse(asRecord(value) ?? {});
-  console.log(`[normalizeConcept ${index}] parsed keys:`, Object.keys(parsed));
-  console.log(`[normalizeConcept ${index}] concept_summary:`, parsed.concept_summary);
-  console.log(`[normalizeConcept ${index}] strategy:`, parsed.strategy);
-  
   const scenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
   const firstScene = scenes[0] ? asRecord(scenes[0]) : null;
   
@@ -249,14 +246,14 @@ function normalizeConcept(value: unknown, index: number) {
       max: 220,
     },
   );
-  const strategy = text(parsed.strategy ?? parsed.approach ?? parsed.concept ?? parsed.concept_summary, {
+  const strategy = text(parsed.strategy ?? parsed.approach ?? parsed.concept ?? parsed.concept_summary ?? parsed.core_strategy, {
     fallback:
       "Use a distinct short-form ad strategy grounded in the Brand Kit and supplied source materials.",
     min: 20,
     max: 420,
   });
   const narrativeArc = text(
-    parsed.narrativeArc ?? parsed.narrative_arc ?? parsed.arc ?? parsed.storyArc ?? parsed.concept_summary,
+    parsed.narrativeArc ?? parsed.narrative_arc ?? parsed.arc ?? parsed.storyArc ?? parsed.concept_summary ?? parsed.core_strategy,
     {
       fallback:
         "Open with a clear problem, show the branded proof point, and close with a simple next step.",
@@ -321,7 +318,8 @@ function normalizeConcept(value: unknown, index: number) {
         parsed.why ??
         parsed.whyItWorks ??
         parsed.why_it_works ??
-        parsed.concept_summary,
+        parsed.concept_summary ??
+        parsed.core_strategy,
       {
         fallback:
           "This direction gives the reviewer a meaningfully different creative path while staying grounded in the Brand Kit.",
