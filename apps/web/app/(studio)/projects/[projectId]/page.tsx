@@ -10,7 +10,7 @@ import {
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ArtifactPreview } from "@/components/studio/ArtifactPreview";
+import { ArtifactStore } from "@/components/studio/ArtifactStore";
 import { BrandKitPanel } from "@/components/studio/BrandKitPanel";
 import { ConceptTable } from "@/components/studio/ConceptTable";
 import { ProjectList } from "@/components/studio/ProjectList";
@@ -201,18 +201,7 @@ export default async function ProjectPage({ params }: PageProps) {
                   <CardTitle>Artifact Store</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {project.artifacts.length > 0 ? (
-                    <div className="grid gap-3">
-                      {project.artifacts.map((artifact) => (
-                        <ArtifactPreview
-                          artifact={artifact}
-                          key={artifact.id}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyState text="Uploads will appear here as durable artifacts." />
-                  )}
+                  <ArtifactStore artifacts={project.artifacts} />
                 </CardContent>
               </Card>
             </div>

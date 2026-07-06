@@ -5,7 +5,7 @@ type Artifact = {
   type: string;
   mimeType: string;
   publicUrl: string | null;
-  createdAt: Date;
+  createdAt: Date | string;
   metadata: unknown;
 };
 
