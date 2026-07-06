@@ -92,6 +92,71 @@ export const storyboardSchema = z
     }
   });
 
+export const storyboardJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "script", "bgm", "scenes"],
+  properties: {
+    title: { type: "string", minLength: 3, maxLength: 100 },
+    script: { type: "string", minLength: 20, maxLength: 2400 },
+    bgm: {
+      type: "object",
+      additionalProperties: false,
+      required: ["enabled", "preset", "prompt"],
+      properties: {
+        enabled: { type: "boolean" },
+        preset: { type: "string", minLength: 2, maxLength: 80 },
+        prompt: { type: "string", minLength: 4, maxLength: 400 },
+      },
+    },
+    scenes: {
+      type: "array",
+      minItems: 2,
+      maxItems: 4,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "index",
+          "durationSec",
+          "captionText",
+          "voiceoverText",
+          "startFramePrompt",
+          "endFramePrompt",
+          "videoMotionPrompt",
+          "continuityNotes",
+        ],
+        properties: {
+          index: { type: "integer", minimum: 1, maximum: 4 },
+          durationSec: { type: "integer", minimum: 4, maximum: 15 },
+          captionText: { type: "string", minLength: 1, maxLength: 140 },
+          voiceoverText: { type: "string", minLength: 1, maxLength: 600 },
+          startFramePrompt: {
+            type: "string",
+            minLength: 20,
+            maxLength: 1200,
+          },
+          endFramePrompt: {
+            type: "string",
+            minLength: 20,
+            maxLength: 1200,
+          },
+          videoMotionPrompt: {
+            type: "string",
+            minLength: 20,
+            maxLength: 1200,
+          },
+          continuityNotes: {
+            type: "string",
+            minLength: 6,
+            maxLength: 700,
+          },
+        },
+      },
+    },
+  },
+} satisfies Record<string, unknown>;
+
 export const storyboardPatchSchema = z.object({
   title: z.string().min(3).max(100).optional(),
   script: z.string().min(20).max(2400).optional(),
@@ -198,13 +263,12 @@ export function parseStoryboardOutput(value: unknown): StoryboardOutput {
 
   return storyboardSchema.parse({
     title: text(record.title ?? record.name ?? "Generated storyboard", {
-      fallback: "Generated storyboard",
+      fallback: "",
       min: 3,
       max: 100,
     }),
     script: text(record.script ?? record.voiceoverScript ?? record.copy, {
-      fallback:
-        "A concise vertical reel script with a clear setup, branded middle, and action-oriented finish.",
+      fallback: "",
       min: 20,
       max: 2400,
     }),
@@ -384,7 +448,7 @@ function normalizeStoryboardScene(value: unknown, index: number) {
       { fallback: 8, min: 4, max: 15 },
     ),
     captionText: text(record.captionText ?? record.caption ?? record.onScreenText, {
-      fallback: `Scene ${index + 1}`,
+      fallback: "",
       min: 1,
       max: 140,
     }),
@@ -392,9 +456,9 @@ function normalizeStoryboardScene(value: unknown, index: number) {
       record.voiceoverText ??
         record.voiceover ??
         record.narration ??
-        record.voiceOver,
+      record.voiceOver,
       {
-        fallback: "A concise narration line grounded in the selected concept.",
+        fallback: "",
         min: 1,
         max: 600,
       },
@@ -405,8 +469,7 @@ function normalizeStoryboardScene(value: unknown, index: number) {
         record.startPrompt ??
         record.keyframeStartPrompt,
       {
-        fallback:
-          "Vertical branded opening frame with clear subject, safe-zone composition, and source-grounded styling.",
+        fallback: "",
         min: 20,
         max: 1200,
       },
@@ -417,8 +480,7 @@ function normalizeStoryboardScene(value: unknown, index: number) {
         record.endPrompt ??
         record.keyframeEndPrompt,
       {
-        fallback:
-          "Vertical branded ending frame that preserves subject, palette, lighting, and caption safe zones.",
+        fallback: "",
         min: 20,
         max: 1200,
       },
@@ -429,8 +491,7 @@ function normalizeStoryboardScene(value: unknown, index: number) {
         record.motionPrompt ??
         record.motion,
       {
-        fallback:
-          "Smooth, restrained camera movement with consistent subject placement and no unsupported claim text.",
+        fallback: "",
         min: 20,
         max: 1200,
       },
@@ -441,8 +502,7 @@ function normalizeStoryboardScene(value: unknown, index: number) {
         record.continuity ??
         record.notes,
       {
-        fallback:
-          "Preserve brand palette, typography, subject identity, lighting, and safe-zone caption placement.",
+        fallback: "",
         min: 6,
         max: 700,
       },
@@ -456,8 +516,8 @@ function normalizeBgm(value: unknown) {
   if (!record) {
     return {
       enabled: true,
-      preset: "warm editorial pulse",
-      prompt: "Light rhythmic background bed that supports narration.",
+      preset: "",
+      prompt: "",
     };
   }
 
@@ -469,12 +529,12 @@ function normalizeBgm(value: unknown) {
           ? record.bgmEnabled
           : true,
     preset: text(record.preset ?? record.mood ?? record.style, {
-      fallback: "warm editorial pulse",
+      fallback: "",
       min: 2,
       max: 80,
     }),
     prompt: text(record.prompt ?? record.description, {
-      fallback: "Light rhythmic background bed that supports narration.",
+      fallback: "",
       min: 4,
       max: 400,
     }),

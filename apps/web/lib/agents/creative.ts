@@ -12,6 +12,7 @@ import {
   creativeConceptsJsonSchema,
   parseCreativeConceptsOutput,
   parseStoryboardOutput,
+  storyboardJsonSchema,
   storyboardSchema,
   type PolicyWarning,
   type StoryboardOutput,
@@ -143,6 +144,7 @@ export async function generateStoryboardForProject(projectId: string) {
     operation: "storyboard_generation",
     schema: storyboardSchema,
     schemaName: "reel_ai_storyboard",
+    jsonSchema: storyboardJsonSchema,
     model: QWEN_STRUCTURED_MODEL,
     parse: parseStoryboardOutput,
     system: storyboardSystemPrompt,
@@ -495,8 +497,12 @@ Visual motifs: ${JSON.stringify(brandKit?.visualMotifs)}
 Requirements:
 - Use 2 to 4 scenes total.
 - Total duration must be 15 to 30 seconds.
+- The storyboard must clearly execute the selected concept's strategy, narrative arc, and visual style.
+- Do not drift into a different concept, a generic ad, or a list of disconnected scenes.
 - Voiceover text must be 600 characters or less per scene.
 - Each scene needs caption, voiceover, start/end frame prompts, motion prompt, and continuity notes.
+- startFramePrompt, endFramePrompt, videoMotionPrompt, and continuityNotes must be specific, visual, and production-ready.
+- Do not leave any required field blank or generic.
 - Prompts must keep visual continuity and respect the locked brand style.
 - Use the brand palette colors and visual motifs in scene descriptions.
 - Match the ${project.style === "THREE_D_ANIMATION" ? "3D animation" : "realistic"} visual style.

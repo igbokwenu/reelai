@@ -5,6 +5,7 @@ import {
   creativeConceptsJsonSchema,
   parseCreativeConceptsOutput,
   parseStoryboardOutput,
+  storyboardJsonSchema,
   storyboardSchema,
 } from "./agent";
 
@@ -166,5 +167,45 @@ describe("Phase 4 agent schemas", () => {
     expect(parsed.scenes).toHaveLength(3);
     expect(parsed.scenes[0]?.durationSec).toBe(8);
     expect(parsed.bgm.preset).toBe("warm pulse");
+  });
+
+  it("rejects incomplete storyboards instead of filling generic scene prompts", () => {
+    expect(() =>
+      parseStoryboardOutput({
+        title: "Care intro",
+        script:
+          "A short script that introduces the care need and points viewers to the service.",
+        bgm: {
+          enabled: true,
+          preset: "calm",
+          prompt: "Soft warm background music.",
+        },
+        scenes: [
+          {
+            index: 1,
+            durationSec: 8,
+            captionText: "Need support at home?",
+            voiceoverText: "Getting reliable help should feel simple.",
+          },
+          {
+            index: 2,
+            durationSec: 8,
+            captionText: "Find the right match.",
+            voiceoverText: "Choose care that fits your family.",
+          },
+        ],
+      }),
+    ).toThrow();
+  });
+
+  it("defines an explicit strict provider JSON schema for storyboard generation", () => {
+    const scenes = storyboardJsonSchema.properties.scenes;
+
+    expect(storyboardJsonSchema.additionalProperties).toBe(false);
+    expect(scenes.minItems).toBe(2);
+    expect(scenes.maxItems).toBe(4);
+    expect(scenes.items.required).toContain("startFramePrompt");
+    expect(scenes.items.required).toContain("videoMotionPrompt");
+    expect(scenes.items.properties.continuityNotes.minLength).toBe(6);
   });
 });
