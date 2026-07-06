@@ -226,6 +226,10 @@ function extractConceptArray(value: unknown): unknown[] {
 
 function normalizeConcept(value: unknown, index: number) {
   const parsed = flexibleConceptSchema.parse(asRecord(value) ?? {});
+  console.log(`[normalizeConcept ${index}] parsed keys:`, Object.keys(parsed));
+  console.log(`[normalizeConcept ${index}] concept_summary:`, parsed.concept_summary);
+  console.log(`[normalizeConcept ${index}] strategy:`, parsed.strategy);
+  
   const scenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
   const firstScene = scenes[0] ? asRecord(scenes[0]) : null;
   
