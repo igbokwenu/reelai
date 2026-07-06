@@ -161,7 +161,7 @@ export default async function ProjectPage({ params }: PageProps) {
               </CardContent>
             </Card>
 
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="grid gap-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Registered Sources</CardTitle>

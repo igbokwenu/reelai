@@ -93,7 +93,7 @@ export function ArtifactStore({ artifacts }: { artifacts: Artifact[] }) {
           ) : null}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+        <div className="grid gap-3 md:grid-cols-3">
           {recentArtifacts.map((artifact) => (
             <ArtifactPreview artifact={artifact} key={artifact.id} />
           ))}
