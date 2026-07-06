@@ -130,6 +130,8 @@ const flexibleConceptSchema = z
 export function parseCreativeConceptsOutput(
   value: unknown,
 ): CreativeConceptsOutput {
+  console.log("[parseCreativeConceptsOutput] Raw AI response:", JSON.stringify(value, null, 2).slice(0, 2000));
+  
   const extracted = extractConceptArray(value);
 
   while (extracted.length < 3) {
@@ -226,7 +228,14 @@ function extractConceptArray(value: unknown): unknown[] {
 }
 
 function normalizeConcept(value: unknown, index: number) {
+  console.log(`[normalizeConcept ${index}] Raw value:`, JSON.stringify(value, null, 2).slice(0, 1000));
+  
   const parsed = flexibleConceptSchema.parse(asRecord(value) ?? {});
+  
+  console.log(`[normalizeConcept ${index}] Parsed object:`, JSON.stringify(parsed, null, 2).slice(0, 1000));
+  console.log(`[normalizeConcept ${index}] core_strategy value:`, parsed.core_strategy);
+  console.log(`[normalizeConcept ${index}] core_strategy type:`, typeof parsed.core_strategy);
+  
   const scenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
   const firstScene = scenes[0] ? asRecord(scenes[0]) : null;
   

@@ -56,6 +56,7 @@ export async function generateStructuredWithQwen<T>({
       throw error;
     }
 
+    console.warn(`[${operation}] Strict JSON schema failed, falling back to json_object mode`);
     result = await qwenChatCompletion({
       operation: `${operation}_json_object_fallback`,
       model,
