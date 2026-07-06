@@ -1,4 +1,4 @@
-import { FileText, ImageIcon } from "lucide-react";
+import { FileText, ImageIcon, Video } from "lucide-react";
 
 type Artifact = {
   id: string;
@@ -11,6 +11,7 @@ type Artifact = {
 
 export function ArtifactPreview({ artifact }: { artifact: Artifact }) {
   const isImage = artifact.mimeType.startsWith("image/");
+  const isVideo = artifact.mimeType.startsWith("video/");
   const href = `/api/artifacts/${artifact.id}/file`;
 
   return (
@@ -23,6 +24,8 @@ export function ArtifactPreview({ artifact }: { artifact: Artifact }) {
       <div className="flex items-center gap-2 text-sm font-medium">
         {isImage ? (
           <ImageIcon className="size-4 text-primary" aria-hidden="true" />
+        ) : isVideo ? (
+          <Video className="size-4 text-primary" aria-hidden="true" />
         ) : (
           <FileText className="size-4 text-primary" aria-hidden="true" />
         )}
@@ -34,6 +37,13 @@ export function ArtifactPreview({ artifact }: { artifact: Artifact }) {
         <img
           alt="Uploaded artifact preview"
           className="mt-3 aspect-video w-full rounded-md border border-border object-cover"
+          src={href}
+        />
+      ) : isVideo ? (
+        <video
+          className="mt-3 aspect-video w-full rounded-md border border-border object-cover"
+          controls
+          preload="metadata"
           src={href}
         />
       ) : (

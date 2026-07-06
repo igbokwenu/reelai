@@ -13,6 +13,7 @@ import { notFound } from "next/navigation";
 import { ArtifactStore } from "@/components/studio/ArtifactStore";
 import { BrandKitPanel } from "@/components/studio/BrandKitPanel";
 import { ConceptTable } from "@/components/studio/ConceptTable";
+import { GenerationConsole } from "@/components/studio/GenerationConsole";
 import { ProjectList } from "@/components/studio/ProjectList";
 import { StoryboardTimeline } from "@/components/studio/StoryboardTimeline";
 import { SourceUploader } from "@/components/studio/SourceUploader";
@@ -50,6 +51,10 @@ export default async function ProjectPage({ params }: PageProps) {
     project.jobs.find((job) => job.type === "STORYBOARD") ?? null;
   const latestPolicyJob =
     project.jobs.find((job) => job.type === "POLICY_REVIEW") ?? null;
+  const latestKeyframeJob =
+    project.jobs.find((job) => job.type === "KEYFRAME") ?? null;
+  const latestVideoJob =
+    project.jobs.find((job) => job.type === "VIDEO") ?? null;
   const selectedConcept =
     project.concepts.find((concept) => concept.selected) ?? null;
 
@@ -147,6 +152,21 @@ export default async function ProjectPage({ params }: PageProps) {
                   latestStoryboardJob={latestStoryboardJob}
                   projectId={project.id}
                   selectedConcept={selectedConcept}
+                  storyboard={project.storyboard}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Generation</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <GenerationConsole
+                  artifacts={project.artifacts}
+                  latestKeyframeJob={latestKeyframeJob}
+                  latestVideoJob={latestVideoJob}
+                  projectId={project.id}
                   storyboard={project.storyboard}
                 />
               </CardContent>

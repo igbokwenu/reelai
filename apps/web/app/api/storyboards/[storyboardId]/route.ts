@@ -37,6 +37,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           script: body.script,
           bgmEnabled: body.bgmEnabled,
           bgmPrompt: body.bgmPrompt,
+          status: "APPROVED",
         },
       }),
       ...(body.scenes ?? []).map((scene) =>
@@ -50,6 +51,7 @@ export async function PATCH(request: Request, context: RouteContext) {
             endFramePrompt: scene.endFramePrompt,
             videoMotionPrompt: scene.videoMotionPrompt,
             continuityNotes: scene.continuityNotes,
+            status: "APPROVED",
           },
         }),
       ),
