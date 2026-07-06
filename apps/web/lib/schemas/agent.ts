@@ -129,13 +129,7 @@ const flexibleConceptSchema = z
 export function parseCreativeConceptsOutput(
   value: unknown,
 ): CreativeConceptsOutput {
-  console.log("[parseCreativeConceptsOutput] Raw AI response:", JSON.stringify(value, null, 2).slice(0, 3000));
-  
   const extracted = extractConceptArray(value);
-  
-  if (extracted.length > 0) {
-    console.log("[parseCreativeConceptsOutput] First concept structure:", JSON.stringify(extracted[0], null, 2).slice(0, 2000));
-  }
 
   while (extracted.length < 3) {
     extracted.push({
@@ -243,6 +237,7 @@ function normalizeConcept(value: unknown, index: number) {
   const hook = text(
     parsed.hook ?? 
     (firstScene ? firstScene.text_overlay : undefined) ??
+    (firstScene ? firstScene.visual_direction : undefined) ??
     (firstScene ? firstScene.visual_description : undefined),
     {
       fallback: `${title} opens with a specific, brand-safe hook.`,
@@ -269,6 +264,7 @@ function normalizeConcept(value: unknown, index: number) {
     parsed.visualStyle ?? 
     parsed.visual_style ?? 
     parsed.style ??
+    (firstScene ? firstScene.visual_direction : undefined) ??
     (firstScene ? firstScene.visual_description : undefined),
     {
       fallback:
@@ -282,7 +278,8 @@ function normalizeConcept(value: unknown, index: number) {
       parsed.preview_prompt ??
       parsed.imagePrompt ??
       parsed.image_prompt ??
-      parsed.framePrompt,
+      parsed.framePrompt ??
+      (firstScene ? firstScene.preview_prompt : undefined),
     {
       fallback: `9:16 preview frame for "${title}" using ${visualStyle}`,
       min: 20,
@@ -319,7 +316,8 @@ function normalizeConcept(value: unknown, index: number) {
       parsed.rationale ??
         parsed.why ??
         parsed.whyItWorks ??
-        parsed.why_it_works,
+        parsed.why_it_works ??
+        parsed.concept_summary,
       {
         fallback:
           "This direction gives the reviewer a meaningfully different creative path while staying grounded in the Brand Kit.",

@@ -7,8 +7,8 @@ export const QWEN_BASE_URL =
   process.env.QWEN_BASE_URL ??
   "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
 
-export const QWEN_STRUCTURED_MODEL = "qwen3.7-plus";
-export const QWEN_VISION_MODEL = "qwen-vl-max";
+export const QWEN_STRUCTURED_MODEL = "qwen3.6-plus";
+export const QWEN_VISION_MODEL = "qwen3.6-plus";
 
 type QwenMessage = {
   role: "system" | "user" | "assistant";
