@@ -105,7 +105,7 @@ function TakeGroup({
           const artifact = take.artifactId
             ? artifactById.get(take.artifactId)
             : null;
-          const isSelected = selectedTakeId === take.id || take.selected;
+          const isSelected = selectedTakeId === take.id;
           const isVideo = artifact?.mimeType.startsWith("video/");
           const href = artifact ? `/api/artifacts/${artifact.id}/file` : null;
 

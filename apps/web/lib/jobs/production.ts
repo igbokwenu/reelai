@@ -81,12 +81,17 @@ export async function selectTake(takeId: string) {
       ? { selectedVideoTakeId: take.id }
       : { selectedKeyframeTakeId: take.id };
 
+  const siblingTakeFilter: Prisma.TakeWhereInput =
+    take.kind === "VIDEO"
+      ? { sceneId: take.sceneId, kind: "VIDEO" }
+      : {
+          sceneId: take.sceneId,
+          kind: { in: ["KEYFRAME_START", "KEYFRAME_END"] },
+        };
+
   await prisma.$transaction([
     prisma.take.updateMany({
-      where: {
-        sceneId: take.sceneId,
-        kind: take.kind,
-      },
+      where: siblingTakeFilter,
       data: { selected: false },
     }),
     prisma.take.update({
@@ -247,16 +252,29 @@ async function runKeyframeJob(jobId: string) {
         kind: "KEYFRAME_END",
         prompt: buildKeyframePrompt(scene, "end"),
       });
+      const selectedKeyframeTakeId = scene.selectedKeyframeTakeId ?? startTake.id;
 
       created.push(startTake, endTake);
-      await prisma.scene.update({
-        where: { id: scene.id },
-        data: {
-          status: "APPROVED",
-          selectedKeyframeTakeId:
-            scene.selectedKeyframeTakeId ?? startTake.id,
-        },
-      });
+      await prisma.$transaction([
+        prisma.take.updateMany({
+          where: {
+            sceneId: scene.id,
+            kind: { in: ["KEYFRAME_START", "KEYFRAME_END"] },
+          },
+          data: { selected: false },
+        }),
+        prisma.take.update({
+          where: { id: selectedKeyframeTakeId },
+          data: { selected: true },
+        }),
+        prisma.scene.update({
+          where: { id: scene.id },
+          data: {
+            status: "APPROVED",
+            selectedKeyframeTakeId,
+          },
+        }),
+      ]);
     }
 
     await prisma.project.update({
