@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   creativeConceptsSchema,
+  creativeConceptsJsonSchema,
   parseCreativeConceptsOutput,
   parseStoryboardOutput,
   storyboardSchema,
@@ -101,6 +102,41 @@ describe("Phase 4 agent schemas", () => {
     expect(parsed.concepts).toHaveLength(3);
     expect(parsed.concepts[0]?.estimatedDurationSec).toBe(24);
     expect(parsed.concepts[0]?.narrativeArc).toContain("customer problem");
+  });
+
+  it("rejects incomplete scene-like concepts instead of filling generic strategy text", () => {
+    const sceneLikeConcept = (index: number) => ({
+      title: `The Example ${index}`,
+      hook: "Need assistance at home?",
+      visualStyle:
+        "Medium shot of a person in a comfortable home environment with neutral tones.",
+      estimatedScenes: 3,
+      estimatedDurationSec: 20,
+      previewPrompt:
+        "Vertical 9:16 preview frame with a calm home-care scene and clear safe-zone composition.",
+    });
+
+    expect(() =>
+      parseCreativeConceptsOutput({
+        concepts: [
+          sceneLikeConcept(1),
+          sceneLikeConcept(2),
+          sceneLikeConcept(3),
+        ],
+      }),
+    ).toThrow();
+  });
+
+  it("defines an explicit strict provider JSON schema for concept generation", () => {
+    const concepts = creativeConceptsJsonSchema.properties.concepts;
+
+    expect(creativeConceptsJsonSchema.additionalProperties).toBe(false);
+    expect(concepts.minItems).toBe(3);
+    expect(concepts.maxItems).toBe(3);
+    expect(concepts.items.required).toContain("strategy");
+    expect(concepts.items.required).toContain("rationale");
+    expect(concepts.items.properties.strategy.minLength).toBe(20);
+    expect(concepts.items.properties.rationale.minLength).toBe(20);
   });
 
   it("normalizes storyboard variants before strict validation", () => {

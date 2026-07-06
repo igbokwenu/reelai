@@ -16,6 +16,45 @@ export const creativeConceptsSchema = z.object({
   concepts: z.array(creativeConceptSchema).length(3),
 });
 
+export const creativeConceptsJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["concepts"],
+  properties: {
+    concepts: {
+      type: "array",
+      minItems: 3,
+      maxItems: 3,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "title",
+          "hook",
+          "strategy",
+          "narrativeArc",
+          "visualStyle",
+          "estimatedScenes",
+          "estimatedDurationSec",
+          "previewPrompt",
+          "rationale",
+        ],
+        properties: {
+          title: { type: "string", minLength: 3, maxLength: 90 },
+          hook: { type: "string", minLength: 8, maxLength: 220 },
+          strategy: { type: "string", minLength: 20, maxLength: 420 },
+          narrativeArc: { type: "string", minLength: 20, maxLength: 520 },
+          visualStyle: { type: "string", minLength: 12, maxLength: 320 },
+          estimatedScenes: { type: "integer", minimum: 2, maximum: 4 },
+          estimatedDurationSec: { type: "integer", minimum: 15, maximum: 30 },
+          previewPrompt: { type: "string", minLength: 20, maxLength: 1200 },
+          rationale: { type: "string", minLength: 20, maxLength: 520 },
+        },
+      },
+    },
+  },
+} satisfies Record<string, unknown>;
+
 export const storyboardSceneSchema = z.object({
   index: z.number().int().min(1).max(4),
   durationSec: z.number().int().min(4).max(15),
@@ -132,27 +171,9 @@ export function parseCreativeConceptsOutput(
 ): CreativeConceptsOutput {
   const extracted = extractConceptArray(value);
 
-  while (extracted.length < 3) {
-    extracted.push({
-      title: `Creative direction ${extracted.length + 1}`,
-      hook: "A distinct brand-safe hook for this direction.",
-      strategy:
-        "Use a distinct short-form ad strategy grounded in the Brand Kit and supplied source materials.",
-      narrativeArc:
-        "Open with a clear problem, show the branded proof point, and close with a simple next step.",
-      visualStyle:
-        "Vertical brand-led visuals with clear product context and clean caption safe zones.",
-      estimatedScenes: 3,
-      estimatedDurationSec: 24,
-      previewPrompt: `9:16 preview frame for creative direction ${extracted.length + 1}`,
-      rationale:
-        "This direction gives the reviewer a meaningfully different creative path while staying grounded in the Brand Kit.",
-    });
-  }
-
   const concepts = extracted
     .slice(0, 3)
-    .map((item: unknown, index: number) => normalizeConcept(item, index));
+    .map((item: unknown) => normalizeConcept(item));
 
   return creativeConceptsSchema.parse({ concepts });
 }
@@ -225,13 +246,13 @@ function extractConceptArray(value: unknown): unknown[] {
   return inner ? extractConceptArray(inner) : [];
 }
 
-function normalizeConcept(value: unknown, index: number) {
+function normalizeConcept(value: unknown) {
   const parsed = flexibleConceptSchema.parse(asRecord(value) ?? {});
   const scenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
   const firstScene = scenes[0] ? asRecord(scenes[0]) : null;
   
   const title = text(parsed.title, {
-    fallback: `Creative direction ${index + 1}`,
+    fallback: "",
     min: 3,
     max: 90,
   });
@@ -241,22 +262,20 @@ function normalizeConcept(value: unknown, index: number) {
     (firstScene ? firstScene.visual_direction : undefined) ??
     (firstScene ? firstScene.visual_description : undefined),
     {
-      fallback: `${title} opens with a specific, brand-safe hook.`,
+      fallback: "",
       min: 8,
       max: 220,
     },
   );
   const strategy = text(parsed.strategy ?? parsed.approach ?? parsed.concept ?? parsed.concept_summary ?? parsed.core_strategy, {
-    fallback:
-      "Use a distinct short-form ad strategy grounded in the Brand Kit and supplied source materials.",
+    fallback: "",
     min: 20,
     max: 420,
   });
   const narrativeArc = text(
     parsed.narrativeArc ?? parsed.narrative_arc ?? parsed.arc ?? parsed.storyArc ?? parsed.concept_summary ?? parsed.core_strategy,
     {
-      fallback:
-        "Open with a clear problem, show the branded proof point, and close with a simple next step.",
+      fallback: "",
       min: 20,
       max: 520,
     },
@@ -268,8 +287,7 @@ function normalizeConcept(value: unknown, index: number) {
     (firstScene ? firstScene.visual_direction : undefined) ??
     (firstScene ? firstScene.visual_description : undefined),
     {
-      fallback:
-        "Vertical brand-led visuals with clear product context and clean caption safe zones.",
+      fallback: "",
       min: 12,
       max: 320,
     },
@@ -282,7 +300,7 @@ function normalizeConcept(value: unknown, index: number) {
       parsed.framePrompt ??
       (firstScene ? firstScene.preview_prompt : undefined),
     {
-      fallback: `9:16 preview frame for "${title}" using ${visualStyle}`,
+      fallback: "",
       min: 20,
       max: 1200,
     },
@@ -321,8 +339,7 @@ function normalizeConcept(value: unknown, index: number) {
         parsed.concept_summary ??
         parsed.core_strategy,
       {
-        fallback:
-          "This direction gives the reviewer a meaningfully different creative path while staying grounded in the Brand Kit.",
+        fallback: "",
         min: 20,
         max: 520,
       },

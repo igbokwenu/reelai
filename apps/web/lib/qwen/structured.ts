@@ -1,6 +1,6 @@
 import "server-only";
 
-import { z, type ZodType } from "zod";
+import { z, ZodError, type ZodType } from "zod";
 
 import {
   parseQwenJson,
@@ -13,6 +13,7 @@ export async function generateStructuredWithQwen<T>({
   operation,
   schema,
   schemaName,
+  jsonSchema,
   system,
   user,
   model = QWEN_STRUCTURED_MODEL,
@@ -21,6 +22,7 @@ export async function generateStructuredWithQwen<T>({
   operation: string;
   schema: ZodType<T>;
   schemaName: string;
+  jsonSchema?: Record<string, unknown>;
   system: string;
   user: string;
   model?: string;
@@ -37,7 +39,7 @@ export async function generateStructuredWithQwen<T>({
     type: "json_schema",
     json_schema: {
       name: schemaName,
-      schema: z.toJSONSchema(schema),
+      schema: jsonSchema ?? z.toJSONSchema(schema),
       strict: true,
     },
   };
@@ -66,11 +68,59 @@ export async function generateStructuredWithQwen<T>({
     });
   }
 
+  const parsed = parseQwenJson(result.content);
+  let data: T;
+
+  try {
+    data = parse(parsed);
+  } catch (error) {
+    if (!(error instanceof ZodError)) {
+      throw error;
+    }
+
+    const repaired = await qwenChatCompletion({
+      operation: `${operation}_schema_repair`,
+      model,
+      messages: [
+        {
+          role: "system" as const,
+          content:
+            "You repair JSON so it exactly satisfies the requested schema. Preserve the creative intent, do not add private facts, and return JSON only.",
+        },
+        {
+          role: "user" as const,
+          content: [
+            `The previous ${schemaName} JSON failed validation.`,
+            `Validation issues: ${formatZodIssues(error)}`,
+            "Rewrite it to satisfy every required field with substantive, non-empty content.",
+            "Invalid JSON:",
+            JSON.stringify(parsed),
+          ].join("\n\n"),
+        },
+      ],
+      enableThinking: false,
+      responseFormat: schemaResponseFormat,
+    });
+
+    data = parse(parseQwenJson(repaired.content));
+    result = repaired;
+  }
+
   return {
-    data: parse(parseQwenJson(result.content)),
+    data,
     model: result.model,
     providerRequestId: result.providerRequestId,
     elapsedMs: result.elapsedMs,
     usage: result.usage,
   };
+}
+
+function formatZodIssues(error: ZodError) {
+  return error.issues
+    .slice(0, 8)
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.join(".") : "root";
+      return `${path}: ${issue.message}`;
+    })
+    .join("; ");
 }

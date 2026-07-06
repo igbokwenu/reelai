@@ -9,6 +9,7 @@ import { generateImageWithQwen } from "@/lib/qwen/image";
 import { generateStructuredWithQwen } from "@/lib/qwen/structured";
 import {
   creativeConceptsSchema,
+  creativeConceptsJsonSchema,
   parseCreativeConceptsOutput,
   parseStoryboardOutput,
   storyboardSchema,
@@ -43,6 +44,7 @@ export async function generateConceptsForProject(projectId: string) {
     operation: "creative_director_concepts",
     schema: creativeConceptsSchema,
     schemaName: "reel_ai_creative_concepts",
+    jsonSchema: creativeConceptsJsonSchema,
     model: QWEN_STRUCTURED_MODEL,
     parse: parseCreativeConceptsOutput,
     system: conceptSystemPrompt,
@@ -448,6 +450,11 @@ Visual motifs: ${JSON.stringify(brandKit?.visualMotifs)}
 Requirements:
 - Return exactly three concepts.
 - Make them different strategies, not three hook variants.
+- Each concept must be a complete creative direction, not a storyboard scene.
+- strategy must describe the ad strategy in one or two substantive sentences.
+- narrativeArc must describe the beginning, middle, and ending beat.
+- rationale must explain why this direction can work for this brand and audience.
+- Do not leave strategy, narrativeArc, previewPrompt, or rationale blank or generic.
 - Keep estimated scenes between 2 and 4 and duration between 15 and 30 seconds.
 - Preview prompts must be 9:16 frame prompts suitable for ${QWEN_PREVIEW_IMAGE_MODEL}.
 - Use the brand palette colors and visual motifs in your visual direction.
