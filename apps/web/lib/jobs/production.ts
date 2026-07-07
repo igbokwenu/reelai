@@ -10,7 +10,7 @@ import {
   sanitizeVideoError,
   submitImageToVideoTask,
 } from "@/lib/qwen/video";
-import { storeObject } from "@/lib/oss";
+import { createArtifactFromUrl } from "@/lib/media/artifacts";
 
 export const QWEN_KEYFRAME_IMAGE_MODEL = "wan2.7-image-pro";
 
@@ -496,51 +496,6 @@ async function getSelectedKeyframeArtifact(scene: ProductionScene) {
   }
 
   return prisma.artifact.findUnique({ where: { id: selectedTake.artifactId } });
-}
-
-async function createArtifactFromUrl({
-  projectId,
-  fileName,
-  mimeType,
-  type,
-  url,
-  metadata,
-}: {
-  projectId: string;
-  fileName: string;
-  mimeType: string;
-  type: "IMAGE" | "VIDEO";
-  url: string;
-  metadata: Prisma.InputJsonValue;
-}) {
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error("Provider output could not be copied into durable storage.");
-  }
-
-  const body = Buffer.from(await response.arrayBuffer());
-  const stored = await storeObject({
-    projectId,
-    fileName,
-    mimeType: response.headers.get("content-type") ?? mimeType,
-    body,
-  });
-
-  return prisma.artifact.create({
-    data: {
-      projectId,
-      type,
-      ossKey: stored.key,
-      publicUrl: stored.publicUrl,
-      mimeType: response.headers.get("content-type") ?? mimeType,
-      metadata: {
-        ...(metadata as Record<string, unknown>),
-        sourceCopiedToDurableStorage: true,
-        storageMode: stored.storageMode,
-      },
-    },
-  });
 }
 
 function artifactUrl(artifact: Artifact) {

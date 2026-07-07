@@ -13,6 +13,7 @@ import { notFound } from "next/navigation";
 import { ArtifactStore } from "@/components/studio/ArtifactStore";
 import { BrandKitPanel } from "@/components/studio/BrandKitPanel";
 import { ConceptTable } from "@/components/studio/ConceptTable";
+import { FinalVideoPlayer } from "@/components/studio/FinalVideoPlayer";
 import { GenerationConsole } from "@/components/studio/GenerationConsole";
 import { ProjectList } from "@/components/studio/ProjectList";
 import { StoryboardTimeline } from "@/components/studio/StoryboardTimeline";
@@ -55,6 +56,10 @@ export default async function ProjectPage({ params }: PageProps) {
     project.jobs.find((job) => job.type === "KEYFRAME") ?? null;
   const latestVideoJob =
     project.jobs.find((job) => job.type === "VIDEO") ?? null;
+  const latestNarrationJob =
+    project.jobs.find((job) => job.type === "TTS") ?? null;
+  const latestRenderJob =
+    project.jobs.find((job) => job.type === "RENDER") ?? null;
   const selectedConcept =
     project.concepts.find((concept) => concept.selected) ?? null;
 
@@ -174,6 +179,22 @@ export default async function ProjectPage({ params }: PageProps) {
 
             <Card>
               <CardHeader>
+                <CardTitle>Final Render</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FinalVideoPlayer
+                  artifacts={project.artifacts}
+                  latestNarrationJob={latestNarrationJob}
+                  latestRenderJob={latestRenderJob}
+                  projectId={project.id}
+                  renders={project.renders}
+                  storyboard={project.storyboard}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>Project Sources</CardTitle>
               </CardHeader>
               <CardContent>
@@ -275,6 +296,11 @@ export default async function ProjectPage({ params }: PageProps) {
               icon={Clapperboard}
               label="Storyboard"
               value={project.storyboard?.status ?? "Not started"}
+            />
+            <InspectorRow
+              icon={FileVideo}
+              label="Final render"
+              value={project.renders[0]?.status ?? "Not started"}
             />
           </div>
           <div className="mt-5 rounded-md border border-dashed border-border p-3 text-sm">
