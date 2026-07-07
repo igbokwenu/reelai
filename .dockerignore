@@ -2,6 +2,11 @@
 node_modules
 .pnpm-store
 
+# Version control and local agent/plugin caches
+.git
+.agents
+.codex
+
 # Build outputs
 .next
 out

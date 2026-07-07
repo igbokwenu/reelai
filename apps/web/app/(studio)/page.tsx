@@ -23,6 +23,8 @@ const pipelineSteps = [
   { label: "Final Render", status: "9:16 export", icon: FileVideo },
 ];
 
+export const dynamic = "force-dynamic";
+
 export default async function StudioHome() {
   const projects = await prisma.project.findMany({
     orderBy: { updatedAt: "desc" },

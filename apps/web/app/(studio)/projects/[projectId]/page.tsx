@@ -26,6 +26,8 @@ type PageProps = {
   params: Promise<{ projectId: string }>;
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function ProjectPage({ params }: PageProps) {
   const { projectId } = await params;
   const [project, projects] = await Promise.all([
