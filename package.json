@@ -10,11 +10,17 @@
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web typecheck",
     "test": "pnpm --filter web test",
+    "e2e": "pnpm --filter web e2e",
+    "e2e:deployed": "PLAYWRIGHT_SKIP_WEBSERVER=1 pnpm --filter web e2e",
     "format": "prettier --check . --ignore-unknown",
     "format:write": "prettier --write . --ignore-unknown",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "prisma db seed"
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "docker:build": "docker build -t reelai-web .",
+    "compose:migrate": "docker compose --profile setup run --rm migrate",
+    "compose:up": "docker compose up --build web"
   },
   "devDependencies": {
     "@prisma/client": "^7.8.0",

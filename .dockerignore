@@ -1,0 +1,40 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+.next
+out
+dist
+build
+coverage
+*.tsbuildinfo
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and editor noise
+*.log
+.DS_Store
+.idea
+.vscode
+
+# Generated media and local storage
+output
+tmp
+.data
+apps/web/.data
+*.mp4
+*.mov
+*.wav
+*.mp3
+*.png
+*.jpg
+*.jpeg
+*.webp
+
+# Browser/e2e artifacts
+apps/web/test-results
+apps/web/playwright-report
