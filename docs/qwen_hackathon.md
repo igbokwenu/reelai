@@ -1,3 +1,5 @@
+https://qwencloud-hackathon.devpost.com/
+
 Build production-ready agents on Qwen — and show the world what an agent can do.
 The Global AI Hackathon with Qwen Cloud invites professional developers, AI/ML engineers, and builders to design and ship sophisticated multi-agent systems, complex AI workflows, and production-grade applications using Qwen and other flagship models available on Qwen Cloud infrastructure. With advanced reasoning and multimodal capabilities, QwenCloud is built for builders who care about architectural depth and engineering excellence.
 
@@ -52,7 +54,7 @@ Is the technical demo clear, with the key logic visualized effectively? Is the d
 
 
 //Submission
-
+https://docs.google.com/document/d/1XsiewMDMOGKxWGp7PRlaEnB7hN5n2JNIUho7cDIV8Vo/edit?tab=t.0
 Proof of Deploy 1 Pager 
 Global AI Hackathon Series with Qwen Cloud
 ■  Hackathon Overview
