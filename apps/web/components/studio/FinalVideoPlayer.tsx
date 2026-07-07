@@ -288,13 +288,13 @@ export function FinalVideoPlayer({
             />
             <span className="flex items-center gap-2">
               <Music2 className="size-4 text-primary" aria-hidden="true" />
-              Include sample BGM
+              Include built-in sample BGM
             </span>
           </label>
           <div className="flex items-start gap-2 rounded-md border border-border p-3 text-muted-foreground">
             <Captions className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
             <span>
-              Captions render above platform controls using the storyboard safe-zone preset.
+              The BGM option uses a stored neutral sample bed; it does not require generated music.
             </span>
           </div>
         </div>

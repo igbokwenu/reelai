@@ -381,11 +381,12 @@ async function buildReelCompositionInput({
   const project = await prisma.project.findUniqueOrThrow({
     where: { id: projectId },
   });
+  const bgm = bgmEnabled ? await getOrCreateSampleBgmArtifact(projectId) : null;
 
   return {
     scenes,
     narrationUrl: narration ? artifactUrl(narration) : undefined,
-    bgmUrl: bgmEnabled ? findSampleBgmUrl() : undefined,
+    bgmUrl: bgm ? artifactUrl(bgm) : undefined,
     brandWatermark: { text: project.businessName },
     aiDisclosureEnabled,
     safeZonePreset: storyboard.scenes[0]?.safeZonePreset ?? "TIKTOK_REELS",
@@ -437,14 +438,70 @@ function artifactUrl(artifact: Artifact) {
   );
 }
 
-function findSampleBgmUrl() {
-  const publicAppUrl = process.env.PUBLIC_APP_URL;
+async function getOrCreateSampleBgmArtifact(projectId: string) {
+  const existing = await prisma.artifact.findFirst({
+    where: {
+      projectId,
+      type: "AUDIO",
+      metadata: {
+        path: ["operation"],
+        equals: "sample_bgm",
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
 
-  if (!publicAppUrl || publicAppUrl.toLowerCase().includes("placeholder")) {
-    return undefined;
+  if (existing) {
+    return existing;
   }
 
-  return `${publicAppUrl.replace(/\/$/, "")}/api/media/sample-bgm`;
+  return createStoredArtifact({
+    projectId,
+    fileName: "sample-bgm.wav",
+    mimeType: "audio/wav",
+    type: "AUDIO",
+    body: generateSampleBgmWav(),
+    durationSec: 30,
+    metadata: {
+      operation: "sample_bgm",
+      source: "generated_local_sample",
+      description: "Low-volume neutral tone bed for optional MVP BGM mixing.",
+    },
+  });
+}
+
+function generateSampleBgmWav() {
+  const sampleRate = 24000;
+  const durationSec = 30;
+  const samples = sampleRate * durationSec;
+  const data = Buffer.alloc(samples * 2);
+
+  for (let i = 0; i < samples; i += 1) {
+    const t = i / sampleRate;
+    const fade = Math.min(1, t / 1.5, (durationSec - t) / 1.5);
+    const tone =
+      Math.sin(2 * Math.PI * 110 * t) * 0.18 +
+      Math.sin(2 * Math.PI * 165 * t) * 0.08 +
+      Math.sin(2 * Math.PI * 220 * t) * 0.035;
+    data.writeInt16LE(Math.trunc(Math.max(-1, Math.min(1, tone * fade)) * 0x7fff), i * 2);
+  }
+
+  const wav = Buffer.alloc(44 + data.length);
+  wav.write("RIFF", 0);
+  wav.writeUInt32LE(36 + data.length, 4);
+  wav.write("WAVE", 8);
+  wav.write("fmt ", 12);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(sampleRate, 24);
+  wav.writeUInt32LE(sampleRate * 2, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write("data", 36);
+  wav.writeUInt32LE(data.length, 40);
+  data.copy(wav, 44);
+  return wav;
 }
 
 function concatenateWav(buffers: Buffer[]) {
