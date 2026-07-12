@@ -66,9 +66,9 @@ export default async function StudioHome() {
         <section className="min-w-0 px-5 py-5 lg:px-7">
           <header className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-muted-foreground text-sm">Project intake</p>
+              <p className="text-muted-foreground text-sm">AI-powered setup</p>
               <h1 className="mt-1 text-3xl font-semibold tracking-normal">
-                Create a persisted production project
+                Turn your website into a ready-to-create brand
               </h1>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
@@ -82,7 +82,7 @@ export default async function StudioHome() {
           <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
             <Card>
               <CardHeader>
-                <CardTitle>New Project</CardTitle>
+                <CardTitle>Create your project</CardTitle>
               </CardHeader>
               <CardContent>
                 <ProjectIntakeForm />

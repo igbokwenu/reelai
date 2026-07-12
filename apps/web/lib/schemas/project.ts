@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const createProjectSchema = z.object({
-  name: z.string().trim().min(2).max(80),
-  businessName: z.string().trim().min(2).max(80),
+  name: z.string().trim().max(80).optional().or(z.literal("")),
+  businessName: z.string().trim().max(80).optional().or(z.literal("")),
   websiteUrl: z
     .string()
     .trim()
@@ -21,9 +21,40 @@ export const createProjectSchema = z.object({
     .max(220)
     .optional()
     .or(z.literal("").transform(() => undefined)),
+  brief: z
+    .string()
+    .trim()
+    .max(500)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  generateBrandKit: z.coerce.boolean().default(false),
   videoLengthSec: z.coerce.number().int().min(15).max(60).default(30),
   style: z.enum(["REALISTIC", "THREE_D_ANIMATION"]).default("REALISTIC"),
+}).superRefine((input, context) => {
+  if (!input.websiteUrl && (!input.name || !input.businessName)) {
+    context.addIssue({
+      code: "custom",
+      message: "Add a website URL, or provide both a project and business name.",
+      path: ["websiteUrl"],
+    });
+  }
 });
+
+export function inferProjectIdentity(input: z.infer<typeof createProjectSchema>) {
+  const hostname = input.websiteUrl ? new URL(input.websiteUrl).hostname.replace(/^www\./, "") : "";
+  const domainLabel = hostname.split(".")[0] ?? "";
+  const inferredBusiness = domainLabel
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+  const businessName = input.businessName || inferredBusiness || "Untitled brand";
+
+  return {
+    businessName,
+    name: input.name || `${businessName} reel`,
+  };
+}
 
 export const sourceTypeSchema = z.enum([
   "UPLOAD",

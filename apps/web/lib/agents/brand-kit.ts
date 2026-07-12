@@ -4,6 +4,7 @@ import type { Artifact, BrandSource, Project } from "@prisma/client";
 import { ZodError } from "zod";
 
 import { prisma } from "@/lib/prisma";
+import { researchWebsite } from "@/lib/brand/website-research";
 import { QWEN_STRUCTURED_MODEL, sanitizeQwenError } from "@/lib/qwen/client";
 import { generateStructuredWithQwen } from "@/lib/qwen/structured";
 import { analyzeVisualAssetWithQwen } from "@/lib/qwen/vision";
@@ -94,6 +95,7 @@ async function collectBrandContexts(project: ProjectWithContext) {
         project.websiteUrl ? `Website: ${project.websiteUrl}` : null,
         project.targetAudience ? `Target audience: ${project.targetAudience}` : null,
         project.offer ? `Offer: ${project.offer}` : null,
+        project.brief ? `User direction: ${project.brief}` : null,
         `Requested style: ${project.style}`,
         `Requested length: ${project.videoLengthSec}s`,
       ]
@@ -110,11 +112,16 @@ async function collectBrandContexts(project: ProjectWithContext) {
         kind: source.type,
         text: source.extractedText,
       });
+      if (source.url && source.type === "WEBSITE") {
+        const research = await researchWebsite(source.url);
+        await appendWebsiteVisualContexts(contexts, source.id, research?.visualUrls ?? []);
+      }
       continue;
     }
 
     if (source.url) {
-      const extractedText = await extractWebsiteText(source.url);
+      const research = await researchWebsite(source.url);
+      const extractedText = research?.text ?? null;
 
       if (extractedText) {
         await prisma.brandSource.update({
@@ -127,6 +134,7 @@ async function collectBrandContexts(project: ProjectWithContext) {
           kind: source.type,
           text: extractedText,
         });
+        await appendWebsiteVisualContexts(contexts, source.id, research?.visualUrls ?? []);
       }
 
       continue;
@@ -188,7 +196,8 @@ async function collectBrandContexts(project: ProjectWithContext) {
   }
 
   if (project.websiteUrl && !contexts.some((context) => context.label === project.websiteUrl)) {
-    const extractedText = await extractWebsiteText(project.websiteUrl);
+    const research = await researchWebsite(project.websiteUrl);
+    const extractedText = research?.text ?? null;
 
     if (extractedText) {
       contexts.push({
@@ -197,45 +206,26 @@ async function collectBrandContexts(project: ProjectWithContext) {
         kind: "WEBSITE",
         text: extractedText,
       });
+      await appendWebsiteVisualContexts(contexts, "project-website", research?.visualUrls ?? []);
     }
   }
 
   return contexts;
 }
 
-async function extractWebsiteText(url: string) {
-  try {
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(8000),
-      headers: {
-        "User-Agent": "ReelAI-BrandKitBot/0.1",
-      },
-    });
-
-    if (!response.ok) {
-      return null;
+async function appendWebsiteVisualContexts(
+  contexts: SourceContext[],
+  sourceId: string,
+  visuals: { url: string; label: string }[],
+) {
+  for (const [index, visual] of visuals.slice(0, 3).entries()) {
+    try {
+      const analysis = await analyzeVisualAssetWithQwen({ imageUrl: visual.url, label: visual.label });
+      contexts.push({ id: `${sourceId}-visual-${index + 1}`, label: visual.url, kind: "WEBSITE_VISION", text: analysis.summary });
+    } catch {
+      // Text/CSS evidence remains usable when a remote image blocks model access.
     }
-
-    const contentType = response.headers.get("content-type") ?? "";
-
-    if (!contentType.includes("text/html") && !contentType.includes("text/plain")) {
-      return null;
-    }
-
-    const raw = await response.text();
-    return normalizeText(
-      raw
-        .replace(/<script[\s\S]*?<\/script>/gi, " ")
-        .replace(/<style[\s\S]*?<\/style>/gi, " ")
-        .replace(/<[^>]+>/g, " "),
-    ).slice(0, 6000);
-  } catch {
-    return null;
   }
-}
-
-function normalizeText(value: string) {
-  return value.replace(/\s+/g, " ").trim();
 }
 
 function absoluteUrl(publicUrl: string) {
@@ -298,6 +288,7 @@ Project:
 - Business: ${project.businessName}
 - Target audience: ${project.targetAudience ?? "Unknown"}
 - Offer: ${project.offer ?? "Not supplied; infer a cautious brand positioning from sources instead of inventing a product claim."}
+- User direction: ${project.brief ?? "None; determine the most useful positioning from website evidence."}
 - Style: ${project.style}
 - Target duration: ${project.videoLengthSec}s
 
@@ -309,7 +300,8 @@ Rules:
 - Cite every important brand fact using sourceCitations.sourceId.
 - Keep claims conservative. If support is weak, mark confidence "low" and add a policy risk.
 - If no offer is supplied, do not invent one. Describe brand positioning from website/source context.
-- Include practical colors. Use neutral fallback colors only when sources do not establish a palette.
+- Prefer colors evidenced by CSS/HTML candidates or visual analysis. Use neutral fallback colors only when neither source establishes a palette.
+- Treat WEBSITE_VISION sources as direct evidence for logos, product appearance, typography, and visual language.
 - lockedStyle must be concise style language later agents can reuse for concepts, keyframes, and video prompts.
 - Return only JSON that matches the schema.`;
 }
@@ -428,7 +420,7 @@ function getProjectPositioning(project: Project, contexts: SourceContext[]) {
   }
 
   const websiteContext = contexts.find((context) => context.kind === "WEBSITE");
-  const contextText = normalizeText(websiteContext?.text ?? contexts[0]?.text ?? "");
+  const contextText = truncateText(websiteContext?.text ?? contexts[0]?.text ?? "", 10_000);
 
   if (contextText.length > 40) {
     return contextText.slice(0, 160);

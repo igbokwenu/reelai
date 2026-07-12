@@ -1,24 +1,18 @@
 import { expect, test } from "@playwright/test";
 
-test("creates a project and registers a source", async ({ page }) => {
+test("creates a URL-first project and starts Brand Kit research", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByLabel("Project name").fill(`Playwright Reel ${Date.now()}`);
-  await page.getByLabel("Business name").fill("Signal Loom Studio");
-  await page.getByLabel("Website URL").fill("https://example.com");
-  await page
-    .getByLabel("Target audience")
-    .fill("Operators launching short-form product ads");
-  await page
-    .getByLabel("Offer")
-    .fill("A fast studio workflow for vertical reels");
-  await page.getByRole("button", { name: "Create project" }).click();
+  await page.getByLabel("Company website").fill("https://example.com");
+  await page.getByLabel("Anything to keep in mind? Optional").fill("Keep the tone direct and practical.");
+  await page.getByRole("button", { name: "Create project & Brand Kit" }).click();
 
   await expect(page).toHaveURL(/\/projects\/.+/);
   await expect(page.getByText("Project Sources")).toBeVisible();
   await expect(
-    page.locator("header").getByText("Signal Loom Studio"),
+    page.locator("header").getByText("Example"),
   ).toBeVisible();
+  await expect(page.getByText("Brand Kit Agent")).toBeVisible();
 
   await page
     .getByPlaceholder("https://brand.example/about")

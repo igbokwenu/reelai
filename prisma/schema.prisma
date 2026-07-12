@@ -13,6 +13,7 @@ model Project {
   websiteUrl     String?
   targetAudience String?
   offer          String?
+  brief          String?
   videoLengthSec Int           @default(30)
   style          VideoStyle
   status         ProjectStatus @default(DRAFT)

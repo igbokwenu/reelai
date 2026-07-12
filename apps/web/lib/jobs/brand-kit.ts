@@ -10,6 +10,14 @@ import {
 import { QWEN_STRUCTURED_MODEL } from "@/lib/qwen/client";
 
 export async function createAndRunBrandKitJob(projectId: string) {
+  const job = await createQueuedBrandKitJob(projectId);
+  return runBrandKitJob(job.id);
+}
+
+export async function createQueuedBrandKitJob(
+  projectId: string,
+  source = "project_context",
+) {
   const job = await prisma.generationJob.create({
     data: {
       projectId,
@@ -18,12 +26,12 @@ export async function createAndRunBrandKitJob(projectId: string) {
       model: QWEN_STRUCTURED_MODEL,
       input: {
         operation: "brand_kit_generation",
-        source: "project_context",
+        source,
       },
     },
   });
 
-  return runBrandKitJob(job.id);
+  return job;
 }
 
 export async function runBrandKitJob(jobId: string) {

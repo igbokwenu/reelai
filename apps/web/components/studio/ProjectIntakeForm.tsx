@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Plus } from "lucide-react";
+import { ChevronDown, Globe2, Loader2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore, type FormEvent } from "react";
 
@@ -14,136 +14,106 @@ export function ProjectIntakeForm() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
     setError(null);
     setIsSubmitting(true);
+    const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
 
-    const formData = new FormData(form);
-    const payload = Object.fromEntries(formData.entries());
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, generateBrandKit: true }),
+      });
+      const body = (await response.json()) as
+        | { project: { id: string } }
+        | { error: string };
 
-    const response = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const body = (await response.json()) as
-      { project: { id: string } } | { error: string };
+      if (!response.ok || "error" in body) {
+        setError("We couldn't start this project. Check the website address and try again.");
+        return;
+      }
 
-    setIsSubmitting(false);
-
-    if (!response.ok || "error" in body) {
-      setError("Could not create project. Check the highlighted inputs.");
-      return;
+      router.push(`/projects/${body.project.id}`);
+      router.refresh();
+    } catch {
+      setError("We couldn't reach ReelAI. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    router.push(`/projects/${body.project.id}`);
-    router.refresh();
   }
 
   return (
-    <form className="grid gap-3" onSubmit={onSubmit}>
-      <div className="grid gap-3 md:grid-cols-2">
+    <form className="grid gap-5" onSubmit={onSubmit}>
+      <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 sm:p-5">
+        <div className="mb-4 flex items-start gap-3">
+          <span className="rounded-lg bg-primary/15 p-2 text-primary">
+            <Globe2 className="size-5" aria-hidden="true" />
+          </span>
+          <div>
+            <p className="font-medium">Start with your website</p>
+            <p className="mt-1 text-sm leading-5 text-muted-foreground">
+              ReelAI researches your business, visual identity, audience, and offering to build the first Brand Kit automatically.
+            </p>
+          </div>
+        </div>
         <Field
-          label="Project name"
-          name="name"
-          placeholder="Summer launch reel"
+          label="Company website"
+          name="websiteUrl"
+          placeholder="https://yourcompany.com"
+          required
+          type="url"
         />
-        <Field
-          label="Business name"
-          name="businessName"
-          placeholder="Northstar Coffee"
-        />
-      </div>
-      <Field
-        label="Website URL"
-        name="websiteUrl"
-        placeholder="https://example.com"
-        type="url"
-      />
-      <div className="grid gap-3 md:grid-cols-2">
-        <Field
-          label="Target audience"
-          name="targetAudience"
-          placeholder="Busy founders and creative teams"
-        />
-        <Field
-          label="Offer"
-          name="offer"
-          placeholder="Cold brew subscription"
-        />
-      </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <label className="grid gap-1 text-sm">
-          <span className="text-muted-foreground">Style</span>
-          <select
-            className="h-10 rounded-md border border-input bg-background px-3 text-foreground"
-            name="style"
-            defaultValue="REALISTIC"
-          >
-            <option value="REALISTIC">Realistic</option>
-            <option value="THREE_D_ANIMATION">3D animation</option>
-          </select>
-        </label>
-        <label className="grid gap-1 text-sm">
-          <span className="text-muted-foreground">Length target</span>
-          <select
-            className="h-10 rounded-md border border-input bg-background px-3 text-foreground"
-            name="videoLengthSec"
-            defaultValue="30"
-          >
-            <option value="15">15 seconds</option>
-            <option value="30">30 seconds</option>
-            <option value="45">45 seconds</option>
-            <option value="60">60 seconds</option>
-          </select>
+        <label className="mt-4 grid gap-1.5 text-sm">
+          <span className="text-muted-foreground">Anything to keep in mind? <span className="opacity-70">Optional</span></span>
+          <textarea
+            className="min-h-20 resize-y rounded-md border border-input bg-background px-3 py-2.5 text-foreground placeholder:text-muted-foreground"
+            maxLength={500}
+            name="brief"
+            placeholder="e.g. Focus on our new product launch, or leave blank and we'll figure it out."
+          />
         </label>
       </div>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button
-        className="w-fit"
-        disabled={!isHydrated || isSubmitting}
-        type="submit"
-      >
-        {isSubmitting ? (
-          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-        ) : (
-          <Plus className="size-4" aria-hidden="true" />
-        )}
-        Create project
+
+      <details className="group rounded-lg border border-border bg-background/40">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium">
+          Customize project settings
+          <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+        </summary>
+        <div className="grid gap-4 border-t border-border p-4">
+          <p className="text-xs leading-5 text-muted-foreground">
+            These are optional. ReelAI will infer names and brand context from the website when left blank.
+          </p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Project name" name="name" placeholder="Inferred from website" />
+            <Field label="Business name" name="businessName" placeholder="Inferred from website" />
+            <Field label="Target audience" name="targetAudience" placeholder="Inferred from website" />
+            <Field label="Specific offer" name="offer" placeholder="Inferred from website" />
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Select label="Visual style" name="style" options={[["REALISTIC", "Realistic"], ["THREE_D_ANIMATION", "3D animation"]]} />
+            <Select label="Video length" name="videoLengthSec" options={[["15", "15 seconds"], ["30", "30 seconds"], ["45", "45 seconds"], ["60", "60 seconds"]]} defaultValue="30" />
+          </div>
+        </div>
+      </details>
+
+      {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
+      <Button className="h-11 w-full sm:w-fit" disabled={!isHydrated || isSubmitting} type="submit">
+        {isSubmitting ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Sparkles className="size-4" aria-hidden="true" />}
+        {isSubmitting ? "Setting up your project…" : "Create project & Brand Kit"}
       </Button>
+      <p className="text-xs text-muted-foreground">You can review, edit, and regenerate the Brand Kit before creating your reel.</p>
     </form>
   );
 }
 
 function useHydrationStatus() {
-  return useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
+  return useSyncExternalStore(() => () => {}, () => true, () => false);
 }
 
-function Field({
-  label,
-  name,
-  placeholder,
-  type = "text",
-}: {
-  label: string;
-  name: string;
-  placeholder: string;
-  type?: string;
-}) {
-  return (
-    <label className="grid gap-1 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <input
-        className="h-10 rounded-md border border-input bg-background px-3 text-foreground placeholder:text-muted-foreground"
-        name={name}
-        placeholder={placeholder}
-        required={name === "name" || name === "businessName"}
-        type={type}
-      />
-    </label>
-  );
+function Field({ label, name, placeholder, type = "text", required = false }: { label: string; name: string; placeholder: string; type?: string; required?: boolean }) {
+  return <label className="grid gap-1.5 text-sm"><span className="text-muted-foreground">{label}</span><input className="h-10 rounded-md border border-input bg-background px-3 text-foreground placeholder:text-muted-foreground" name={name} placeholder={placeholder} required={required} type={type} /></label>;
+}
+
+function Select({ label, name, options, defaultValue }: { label: string; name: string; options: string[][]; defaultValue?: string }) {
+  return <label className="grid gap-1.5 text-sm"><span className="text-muted-foreground">{label}</span><select className="h-10 rounded-md border border-input bg-background px-3 text-foreground" defaultValue={defaultValue} name={name}>{options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></label>;
 }

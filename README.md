@@ -9,7 +9,9 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Next.js App Router studio in `apps/web`.
 - Prisma/PostgreSQL project graph with projects, sources, artifacts, jobs, concepts, storyboards, takes, narration, and renders.
 - Server-side QwenCloud clients for structured text, vision, image generation, video generation, and TTS.
+- URL-first project creation that automatically queues Brand Kit research; project and business names can be inferred from the website.
 - Reusable Brand Kit with value props, palette, claims, policy risks, locked style language, and citations.
+- Multi-page website evidence collection covering metadata, visible copy, CSS color candidates, logos/social images, and QwenCloud visual analysis.
 - Exactly three creative concepts before full generation spend.
 - Editable 2 to 4 scene storyboard and human approval loop.
 - Additive keyframe/video takes with selection instead of destructive regeneration.

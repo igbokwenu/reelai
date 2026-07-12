@@ -114,7 +114,7 @@ export function BrandKitPanel({
         <div>
           <p className="text-sm font-medium">Brand Kit Agent</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Server-side QwenCloud research, source citations, and ad-readiness notes.
+            Website research, visual analysis, source citations, and ad-readiness notes.
           </p>
         </div>
         <Button disabled={isStarting || isRunning} onClick={generateBrandKit} size="sm">
@@ -160,6 +160,9 @@ export function BrandKitPanel({
             </p>
             <p className="mt-2 text-sm">
               <span className="font-medium">Locked style:</span> {parsed.lockedStyle}
+            </p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Grounded in {parsed.sourceCitations.length} cited source{parsed.sourceCitations.length === 1 ? "" : "s"}. Review low-confidence claims and risks before production.
             </p>
           </section>
 
