@@ -164,7 +164,7 @@ Judging checklist:
 
 Fill these before final submission:
 
-- Public deployed app URL: `TBD`
+- Public deployed app URL: `http://47.84.226.89`
 - 1 to 3 minute demo video: `TBD`
 - Alibaba Cloud ECS/Workbench proof screenshot or recording: `TBD`
 - OSS bucket proof screenshot or recording: `TBD`

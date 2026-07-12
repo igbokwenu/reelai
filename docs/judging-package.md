@@ -6,7 +6,7 @@ Use this document as the submission checklist for Reel AI.
 
 Fill these before final Devpost submission:
 
-- Public deployed app URL: `TBD`
+- Public deployed app URL: `http://47.84.226.89`
 - Demo video, 1 to 3 minutes: `TBD`
 - Alibaba Cloud deployment proof screenshot or recording: `TBD`
 - OSS proof screenshot or recording: `TBD`
@@ -31,6 +31,27 @@ Fill these before final Devpost submission:
 - The pipeline shows server-side QwenCloud usage and durable artifacts.
 - No secrets appear in the repo, screenshots, logs, or video.
 - The README links to setup, deployment, architecture, and proof evidence.
+
+## Phase 7 Evidence Status
+
+Implemented and verified:
+
+- Dockerfile and Docker Compose deployment files exist.
+- ECS deployment is live at `http://47.84.226.89`.
+- Production env vars are configured on the ECS server, not in git.
+- Production app generates real QwenCloud images and stores generated artifacts through the configured artifact pipeline.
+- Public URL returned `HTTP/1.1 200 OK` on July 12, 2026.
+- Repo contains visible QwenCloud base URL usage in `apps/web/lib/qwen/client.ts`.
+- Repo hygiene check found no committed real `.env` file.
+- README and deployment runbook document setup, env vars, QwenCloud usage, Alibaba deployment, security notes, and judging proof.
+
+Human-owned evidence still required before final Phase 7 sign-off:
+
+- Record the 1 to 3 minute demo video.
+- Capture Alibaba Cloud ECS or Workbench proof screenshot/recording.
+- Capture OSS bucket proof screenshot/recording, hiding credentials.
+- Add the proof/video links above before final submission.
+- Run or manually complete the deployed end-to-end demo path in browser and confirm the second-brand reuse flow.
 
 ## Human-Owned Evidence
 
