@@ -7,6 +7,7 @@ import {
   Globe2,
   HardDrive,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -77,9 +78,14 @@ export default async function ProjectPage({ params }: PageProps) {
             Intake
           </Link>
           <div className="flex items-center gap-3">
-            <div className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-md">
-              <Clapperboard className="size-5" aria-hidden="true" />
-            </div>
+            <Image
+              alt="Reel AI logo"
+              className="size-10 rounded-md object-cover"
+              height={40}
+              priority
+              src="/reelai_logo.jpeg"
+              width={40}
+            />
             <div>
               <p className="text-sm font-semibold">Reel AI</p>
               <p className="text-muted-foreground text-xs">Project graph</p>

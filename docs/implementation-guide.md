@@ -936,8 +936,11 @@ Exit checklist:
 - [ ] Alibaba Cloud proof screenshot/recording is captured.
 - [ ] README includes setup, env vars, QwenCloud usage, deployment, and judging proof.
 - [ ] Repo contains visible QwenCloud API usage and no committed secrets.
-- [ ] 1 to 3 minute demo video is recorded.
 - [ ] Project can be reused for a second brand without code changes.
+
+Post-Phase 8 final submission item:
+
+- [ ] 1 to 3 minute demo video is recorded after final polish is complete.
 
 ### Phase 8: Post-MVP Polish And Reusability
 

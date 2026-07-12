@@ -2,13 +2,13 @@ import {
   Activity,
   BadgeDollarSign,
   Boxes,
-  Clapperboard,
   FileVideo,
   Film,
   Layers3,
   Sparkles,
   WandSparkles,
 } from "lucide-react";
+import Image from "next/image";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProjectIntakeForm } from "@/components/studio/ProjectIntakeForm";
@@ -40,9 +40,14 @@ export default async function StudioHome() {
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_320px]">
         <aside className="border-border bg-sidebar/70 border-b px-4 py-5 lg:border-r lg:border-b-0">
           <div className="flex items-center gap-3">
-            <div className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-md">
-              <Clapperboard className="size-5" aria-hidden="true" />
-            </div>
+            <Image
+              alt="Reel AI logo"
+              className="size-10 rounded-md object-cover"
+              height={40}
+              priority
+              src="/reelai_logo.jpeg"
+              width={40}
+            />
             <div>
               <p className="text-sm font-semibold">Reel AI</p>
               <p className="text-muted-foreground text-xs">Showrunner studio</p>

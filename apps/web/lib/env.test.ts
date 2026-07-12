@@ -7,7 +7,6 @@ describe("getEnv", () => {
     expect(
       getEnv({
         DASHSCOPE_API_KEY: "placeholder",
-        QWEN_BASE_URL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
         DATABASE_URL: "postgresql://user:password@localhost:5432/reelai",
         OSS_REGION: "oss-region",
         OSS_BUCKET: "bucket",

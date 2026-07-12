@@ -7,9 +7,9 @@ Use this document as the submission checklist for Reel AI.
 Fill these before final Devpost submission:
 
 - Public deployed app URL: `http://47.84.226.89`
-- Demo video, 1 to 3 minutes: `TBD`
-- Alibaba Cloud deployment proof screenshot or recording: `TBD`
-- OSS proof screenshot or recording: `TBD`
+- Demo video, 1 to 3 minutes: post-Phase 8 final submission item
+- Alibaba Cloud deployment proof screenshot or recording: `apps/web/public/alibaba_deployment_proof.png`
+- OSS proof screenshot or recording: `apps/web/public/oss_bucket_proof.png`
 - Source file with visible QwenCloud base URL: `apps/web/lib/qwen/client.ts`
 - Architecture diagram: `docs/architecture.md`
 
@@ -45,13 +45,16 @@ Implemented and verified:
 - Repo hygiene check found no committed real `.env` file.
 - README and deployment runbook document setup, env vars, QwenCloud usage, Alibaba deployment, security notes, and judging proof.
 
-Human-owned evidence still required before final Phase 7 sign-off:
+Human-owned evidence completed for Phase 7:
 
-- Record the 1 to 3 minute demo video.
-- Capture Alibaba Cloud ECS or Workbench proof screenshot/recording.
-- Capture OSS bucket proof screenshot/recording, hiding credentials.
-- Add the proof/video links above before final submission.
-- Run or manually complete the deployed end-to-end demo path in browser and confirm the second-brand reuse flow.
+- Alibaba Cloud ECS or Workbench proof screenshot added at `apps/web/public/alibaba_deployment_proof.png`.
+- OSS bucket proof screenshot added at `apps/web/public/oss_bucket_proof.png`.
+- Deployed end-to-end demo path was manually tested in production and confirmed to persist.
+- Second-brand reuse flow was manually tested in production and confirmed to work without code changes.
+
+Post-Phase 8 final submission item:
+
+- Record and link the 1 to 3 minute demo video after final polish is complete.
 
 ## Human-Owned Evidence
 
@@ -60,4 +63,4 @@ The repository contains all reproducible deployment files, but these proof asset
 - Alibaba Cloud ECS console or Workbench screenshot.
 - OSS bucket configuration screenshot.
 - Public deployed URL.
-- Final 1 to 3 minute demo recording.
+- Final 1 to 3 minute demo recording after Phase 8 polish.

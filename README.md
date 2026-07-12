@@ -61,7 +61,6 @@ Copy `.env.example` to `.env` for local development or create a server-only env 
 Required:
 
 - `DASHSCOPE_API_KEY`: QwenCloud API key, server-side only.
-- `QWEN_BASE_URL`: defaults to `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`.
 - `DATABASE_URL`: PostgreSQL connection string.
 - `OSS_REGION`: Alibaba Cloud OSS region.
 - `OSS_BUCKET`: OSS bucket for generated artifacts.
@@ -72,7 +71,8 @@ Required:
 Optional:
 
 - `REDIS_URL`: reserved for a future queue upgrade.
-- `QWEN_VIDEO_BASE_URL`, `QWEN_IMAGE_BASE_URL`, `QWEN_TTS_BASE_URL`: media endpoint overrides.
+- `QWEN_BASE_URL`: structured text endpoint override. Defaults in code to `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`.
+- `QWEN_VIDEO_BASE_URL`, `QWEN_IMAGE_BASE_URL`, `QWEN_TTS_BASE_URL`: media endpoint overrides. Default in code to `https://dashscope-intl.aliyuncs.com/api/v1`.
 - `SENTRY_DSN`: production error monitoring.
 
 ## QwenCloud Usage
@@ -165,9 +165,9 @@ Judging checklist:
 Fill these before final submission:
 
 - Public deployed app URL: `http://47.84.226.89`
-- 1 to 3 minute demo video: `TBD`
-- Alibaba Cloud ECS/Workbench proof screenshot or recording: `TBD`
-- OSS bucket proof screenshot or recording: `TBD`
+- 1 to 3 minute demo video: post-Phase 8 final submission item
+- Alibaba Cloud ECS/Workbench proof screenshot or recording: [apps/web/public/alibaba_deployment_proof.png](apps/web/public/alibaba_deployment_proof.png)
+- OSS bucket proof screenshot or recording: [apps/web/public/oss_bucket_proof.png](apps/web/public/oss_bucket_proof.png)
 - Source file with visible QwenCloud base URL: [apps/web/lib/qwen/client.ts](apps/web/lib/qwen/client.ts)
 - Architecture diagram: [docs/architecture.md](docs/architecture.md)
 

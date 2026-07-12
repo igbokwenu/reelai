@@ -16,7 +16,7 @@ Agents must update this tracker at the end of each phase. A phase is not truly c
 | 4     | Creative Concepts And Storyboard Editor          | [x]                 | [x]                         | Implemented, automated checks passed, and human-approved on 2026-07-06. |
 | 5     | Keyframes, Video Generation, And Take Compare    | [x]                 | [x]                         | Implemented, automated checks passed, and human-approved with OSS-backed video artifacts on 2026-07-07. |
 | 6     | Narration, Composition, And Final Export         | [x]                 | [x]                         | Implemented with automated checks passing and human-approved on 2026-07-07. |
-| 7     | Deployment, Documentation, And Judging Package   | [ ]                 | [ ]                         | Live ECS URL verified; awaiting human-owned proof video/screenshots before implementation sign-off. |
+| 7     | Deployment, Documentation, And Judging Package   | [x]                 | [x]                         | Implemented, deployed to ECS, proof screenshots added, and human-approved on 2026-07-12. Demo video moved to post-Phase 8 final submission. |
 | 8     | Post-MVP Polish And Reusability                  | [ ]                 | [ ]                         |                                                                         |
 
 ## Universal Agent Instructions
@@ -427,7 +427,6 @@ Exit only when all Phase 7 checklist items pass:
 - Alibaba Cloud proof screenshot/recording is captured.
 - README includes setup, env vars, QwenCloud usage, deployment, and judging proof.
 - Repo contains visible QwenCloud API usage and no committed secrets.
-- 1 to 3 minute demo video is recorded.
 - Project can be reused for a second brand without code changes.
 
 If all exit checklist items pass, update Phase 7 `Implementation done` to `[x]` in the Phase Status Tracker. Do not mark human sign-off. Run local and deployed smoke checks and use the Required Final Summary Format. Human review instructions must explain how to open the deployed URL, run the end-to-end demo, inspect deployment proof, verify README/judging package, and confirm no secrets are committed.

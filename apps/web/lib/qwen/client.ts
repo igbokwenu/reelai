@@ -3,9 +3,13 @@ import "server-only";
 import { performance } from "node:perf_hooks";
 import { ZodError } from "zod";
 
+import { qwenEndpoint } from "@/lib/qwen/endpoints";
+
 export const QWEN_BASE_URL =
-  process.env.QWEN_BASE_URL ??
-  "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
+  qwenEndpoint(
+    process.env.QWEN_BASE_URL,
+    "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+  );
 
 export const QWEN_STRUCTURED_MODEL = "qwen3.6-plus";
 export const QWEN_VISION_MODEL = "qwen3.6-plus";

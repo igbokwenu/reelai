@@ -92,9 +92,9 @@ Capture proof without exposing secrets:
 - Docker Compose `ps` output showing the `web` container healthy.
 - OSS bucket screenshot showing generated artifact keys or folders, with access keys hidden.
 - Optional RDS screenshot showing the PostgreSQL instance, with credentials hidden.
-- One 1 to 3 minute demo video: intake, Brand Kit, concepts, storyboard, generation status, final render/download.
+- After Phase 8 polish, one 1 to 3 minute demo video: intake, Brand Kit, concepts, storyboard, generation status, final render/download.
 
-Store proof assets outside git or link to a public video/file host from the README judging section. Generated media and screenshots are ignored by the repo by default.
+Store sensitive proof assets outside git or link to a public video/file host from the README judging section. Public-safe proof screenshots may live in `apps/web/public/` when they hide credentials.
 
 ## 6. Rollback
 
