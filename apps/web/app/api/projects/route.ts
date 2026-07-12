@@ -1,6 +1,7 @@
 import { created, handleRoute, ok } from "@/lib/http/responses";
-import { createQueuedBrandKitJob, runBrandKitJob } from "@/lib/jobs/brand-kit";
+import { runBrandKitJob } from "@/lib/jobs/brand-kit";
 import { prisma } from "@/lib/prisma";
+import { QWEN_STRUCTURED_MODEL } from "@/lib/qwen/client";
 import { createProjectSchema, inferProjectIdentity } from "@/lib/schemas/project";
 import { after } from "next/server";
 
@@ -23,34 +24,47 @@ export async function POST(request: Request) {
   return handleRoute(async () => {
     const input = createProjectSchema.parse(await request.json());
     const identity = inferProjectIdentity(input);
-    const project = await prisma.project.create({
-      data: {
-        ...identity,
-        websiteUrl: input.websiteUrl,
-        targetAudience: input.targetAudience,
-        offer: input.offer,
-        brief: input.brief,
-        videoLengthSec: input.videoLengthSec,
-        style: input.style,
-        sources: input.websiteUrl
-          ? {
-              create: {
-                type: "WEBSITE",
-                url: input.websiteUrl,
-                metadata: {
-                  label: "Project website",
-                  source: "project-intake",
+    const { project, brandKitJob } = await prisma.$transaction(async (tx) => {
+      const project = await tx.project.create({
+        data: {
+          ...identity,
+          websiteUrl: input.websiteUrl,
+          targetAudience: input.targetAudience,
+          offer: input.offer,
+          videoLengthSec: input.videoLengthSec,
+          style: input.style,
+          sources: input.websiteUrl || input.brief
+            ? {
+                create: {
+                  type: input.websiteUrl ? "WEBSITE" : "DOCUMENT",
+                  url: input.websiteUrl,
+                  metadata: {
+                    label: input.websiteUrl ? "Project website" : "Creative direction",
+                    source: "project-intake",
+                    creativeDirection: input.brief,
+                  },
                 },
+              }
+            : undefined,
+        },
+        include: { sources: true },
+      });
+      const brandKitJob = input.generateBrandKit
+        ? await tx.generationJob.create({
+            data: {
+              projectId: project.id,
+              type: "BRAND_KIT",
+              status: "QUEUED",
+              model: QWEN_STRUCTURED_MODEL,
+              input: {
+                operation: "brand_kit_generation",
+                source: "project_creation",
               },
-            }
-          : undefined,
-      },
-      include: { sources: true },
+            },
+          })
+        : null;
+      return { project, brandKitJob };
     });
-
-    const brandKitJob = input.generateBrandKit
-      ? await createQueuedBrandKitJob(project.id, "project_creation")
-      : null;
 
     if (brandKitJob) {
       after(async () => {

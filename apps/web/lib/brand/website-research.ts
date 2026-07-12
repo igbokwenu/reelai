@@ -49,15 +49,41 @@ export async function researchWebsite(url: string): Promise<WebsiteResearch | nu
 type FetchedPage = { url: string; html: string };
 
 async function fetchPage(url: string): Promise<FetchedPage | null> {
+  return fetchPageWithRedirects(url, 0);
+}
+
+async function fetchPageWithRedirects(url: string, redirects: number): Promise<FetchedPage | null> {
+  const parsed = new URL(url);
+  if (isUnsafeHostname(parsed.hostname) || redirects > 3) return null;
   const response = await fetch(url, {
-    redirect: "follow",
+    redirect: "manual",
     signal: AbortSignal.timeout(8000),
     headers: { "User-Agent": "ReelAI-BrandResearch/1.0" },
   });
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get("location");
+    return location
+      ? fetchPageWithRedirects(new URL(location, parsed).toString(), redirects + 1)
+      : null;
+  }
   if (!response.ok) return null;
   const type = response.headers.get("content-type") ?? "";
   if (!type.includes("text/html") && !type.includes("text/plain")) return null;
   return { url: response.url, html: (await response.text()).slice(0, 500_000) };
+}
+
+function isUnsafeHostname(hostname: string) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host === "0.0.0.0" ||
+    host === "::1" ||
+    /^127\./.test(host) ||
+    /^10\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^169\.254\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+    /^fc|^fd|^fe80:/i.test(host);
 }
 
 function extractMetadata(html: string) {
@@ -80,7 +106,12 @@ function extractVisuals(html: string, base: URL) {
     if (!/(logo|icon|og:image|twitter:image)/i.test(rel)) continue;
     const raw = attribute(tag, "content") ?? attribute(tag, "src") ?? attribute(tag, "href");
     if (!raw || raw.startsWith("data:")) continue;
-    try { candidates.push({ url: new URL(raw, base).toString(), label: rel.trim() || "Website brand image" }); } catch {}
+    try {
+      const url = new URL(raw, base);
+      if (!isUnsafeHostname(url.hostname) && /^https?:$/.test(url.protocol)) {
+        candidates.push({ url: url.toString(), label: rel.trim() || "Website brand image" });
+      }
+    } catch {}
   }
   return candidates;
 }

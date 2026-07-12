@@ -10,7 +10,7 @@ test("creates a URL-first project and starts Brand Kit research", async ({ page 
   await expect(page).toHaveURL(/\/projects\/.+/);
   await expect(page.getByText("Project Sources")).toBeVisible();
   await expect(
-    page.locator("header").getByText("Example"),
+    page.locator("header").getByText("Example", { exact: true }),
   ).toBeVisible();
   await expect(page.getByText("Brand Kit Agent")).toBeVisible();
 

@@ -60,7 +60,6 @@ export function ProjectIntakeForm() {
           label="Company website"
           name="websiteUrl"
           placeholder="https://yourcompany.com"
-          required
           type="url"
         />
         <label className="mt-4 grid gap-1.5 text-sm">
@@ -81,7 +80,7 @@ export function ProjectIntakeForm() {
         </summary>
         <div className="grid gap-4 border-t border-border p-4">
           <p className="text-xs leading-5 text-muted-foreground">
-            These are optional. ReelAI will infer names and brand context from the website when left blank.
+            These are optional when you add a website. For a manual or upload-first project, add both names here.
           </p>
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Project name" name="name" placeholder="Inferred from website" />

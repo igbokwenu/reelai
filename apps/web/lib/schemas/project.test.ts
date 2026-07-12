@@ -19,4 +19,12 @@ describe("URL-first project intake", () => {
   it("requires either a website or explicit names", () => {
     expect(createProjectSchema.safeParse({}).success).toBe(false);
   });
+
+  it("does not coerce the string false into automatic generation", () => {
+    const input = createProjectSchema.parse({
+      websiteUrl: "https://example.com",
+      generateBrandKit: "false",
+    });
+    expect(input.generateBrandKit).toBe(false);
+  });
 });

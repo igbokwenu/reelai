@@ -95,7 +95,9 @@ async function collectBrandContexts(project: ProjectWithContext) {
         project.websiteUrl ? `Website: ${project.websiteUrl}` : null,
         project.targetAudience ? `Target audience: ${project.targetAudience}` : null,
         project.offer ? `Offer: ${project.offer}` : null,
-        project.brief ? `User direction: ${project.brief}` : null,
+        getCreativeDirection(project.sources)
+          ? `User direction: ${getCreativeDirection(project.sources)}`
+          : null,
         `Requested style: ${project.style}`,
         `Requested length: ${project.videoLengthSec}s`,
       ]
@@ -135,6 +137,13 @@ async function collectBrandContexts(project: ProjectWithContext) {
           text: extractedText,
         });
         await appendWebsiteVisualContexts(contexts, source.id, research?.visualUrls ?? []);
+      } else {
+        contexts.push({
+          id: source.id,
+          label: source.url,
+          kind: "WEBSITE_UNAVAILABLE",
+          text: "The website could not be retrieved. Do not infer website copy, visual assets, colors, products, or claims from the URL alone.",
+        });
       }
 
       continue;
@@ -288,7 +297,7 @@ Project:
 - Business: ${project.businessName}
 - Target audience: ${project.targetAudience ?? "Unknown"}
 - Offer: ${project.offer ?? "Not supplied; infer a cautious brand positioning from sources instead of inventing a product claim."}
-- User direction: ${project.brief ?? "None; determine the most useful positioning from website evidence."}
+- User direction: ${getCreativeDirectionFromContexts(contexts) ?? "None; determine the most useful positioning from website evidence."}
 - Style: ${project.style}
 - Target duration: ${project.videoLengthSec}s
 
@@ -308,6 +317,21 @@ Rules:
 
 const brandKitSystemPrompt =
   "You are Reel AI's Brand Research Agent. You convert business intake, website text extracted by the backend, and uploaded visual asset analysis into a verified Brand Kit for ad generation. You are concise, source-grounded, and cautious about claims.";
+
+function getCreativeDirection(sources: BrandSource[]) {
+  for (const source of sources) {
+    const metadata = source.metadata as { creativeDirection?: unknown } | null;
+    if (typeof metadata?.creativeDirection === "string" && metadata.creativeDirection.trim()) {
+      return metadata.creativeDirection.trim();
+    }
+  }
+  return null;
+}
+
+function getCreativeDirectionFromContexts(contexts: SourceContext[]) {
+  const match = contexts.find((context) => context.kind === "INTAKE")?.text.match(/User direction: (.+)/);
+  return match?.[1]?.trim() || null;
+}
 
 function enrichBrandKitFromProject(
   brandKit: BrandKitOutput,

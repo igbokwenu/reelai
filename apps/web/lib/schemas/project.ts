@@ -7,6 +7,7 @@ export const createProjectSchema = z.object({
     .string()
     .trim()
     .url()
+    .refine((value) => /^https?:\/\//i.test(value), "Use an http:// or https:// website URL")
     .optional()
     .or(z.literal("").transform(() => undefined)),
   targetAudience: z
@@ -27,11 +28,17 @@ export const createProjectSchema = z.object({
     .max(500)
     .optional()
     .or(z.literal("").transform(() => undefined)),
-  generateBrandKit: z.coerce.boolean().default(false),
+  generateBrandKit: z
+    .preprocess((value) => value === true || value === "true", z.boolean())
+    .default(false),
   videoLengthSec: z.coerce.number().int().min(15).max(60).default(30),
   style: z.enum(["REALISTIC", "THREE_D_ANIMATION"]).default("REALISTIC"),
 }).superRefine((input, context) => {
-  if (!input.websiteUrl && (!input.name || !input.businessName)) {
+  if (
+    !input.websiteUrl &&
+    ((input.name?.trim().length ?? 0) < 2 ||
+      (input.businessName?.trim().length ?? 0) < 2)
+  ) {
     context.addIssue({
       code: "custom",
       message: "Add a website URL, or provide both a project and business name.",
