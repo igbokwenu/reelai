@@ -2,9 +2,13 @@ import "server-only";
 
 import { performance } from "node:perf_hooks";
 
+import { qwenEndpoint } from "@/lib/qwen/endpoints";
+
 export const QWEN_VIDEO_BASE_URL =
-  process.env.QWEN_VIDEO_BASE_URL ??
-  "https://dashscope-intl.aliyuncs.com/api/v1";
+  qwenEndpoint(
+    process.env.QWEN_VIDEO_BASE_URL,
+    "https://dashscope-intl.aliyuncs.com/api/v1",
+  );
 
 export const QWEN_I2V_MODEL = "wan2.6-i2v-flash";
 

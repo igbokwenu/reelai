@@ -2,12 +2,15 @@ import "server-only";
 
 import { performance } from "node:perf_hooks";
 
+import { qwenEndpoint } from "@/lib/qwen/endpoints";
 import { QWEN_TTS_MAX_CHARS, chunkTtsText } from "@/lib/qwen/tts-chunking";
 
 export const QWEN_TTS_MODEL = "qwen3-tts-flash";
 export const QWEN_TTS_NATIVE_BASE_URL =
-  process.env.QWEN_TTS_BASE_URL ??
-  "https://dashscope-intl.aliyuncs.com/api/v1";
+  qwenEndpoint(
+    process.env.QWEN_TTS_BASE_URL,
+    "https://dashscope-intl.aliyuncs.com/api/v1",
+  );
 
 type TtsResult = {
   audioUrl: string;
