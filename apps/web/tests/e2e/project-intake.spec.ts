@@ -41,3 +41,21 @@ test("creates a URL-first project and starts Brand Kit research", async ({ page 
   await expect(page.getByText("https://example.com/about")).toBeVisible();
   await expect(page.getByText("image/png")).toBeVisible();
 });
+
+test("requires confirmation before deleting a project", async ({ page, request }) => {
+  const name = `Disposable project ${Date.now()}`;
+  const response = await request.post("/api/projects", {
+    data: { name, businessName: "Disposable Brand", generateBrandKit: false },
+  });
+  expect(response.ok()).toBeTruthy();
+
+  await page.goto("/");
+  await page.getByRole("button", { name: `Delete ${name}` }).click();
+  await expect(page.getByRole("dialog")).toContainText(`Delete “${name}”?`);
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await page.getByRole("button", { name: `Delete ${name}` }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete project" }).click();
+  await expect(page.getByText(name, { exact: true })).toHaveCount(0);
+});

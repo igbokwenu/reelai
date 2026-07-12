@@ -10,6 +10,7 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Prisma/PostgreSQL project graph with projects, sources, artifacts, jobs, concepts, storyboards, takes, narration, and renders.
 - Server-side QwenCloud clients for structured text, vision, image generation, video generation, and TTS.
 - URL-first project creation that automatically queues Brand Kit research; project and business names can be inferred from the website.
+- Focused two-column landing workspace with optional pipeline guidance and confirmed project deletion, including local/OSS artifact cleanup.
 - Reusable Brand Kit with value props, palette, claims, policy risks, locked style language, and citations.
 - Multi-page website evidence collection covering metadata, visible copy, CSS color candidates, logos/social images, and QwenCloud visual analysis.
 - Exactly three creative concepts before full generation spend.

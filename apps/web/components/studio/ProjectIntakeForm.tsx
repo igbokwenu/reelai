@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Globe2, Loader2, Sparkles } from "lucide-react";
+import { ChevronDown, Loader2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore, type FormEvent } from "react";
 
@@ -44,31 +44,21 @@ export function ProjectIntakeForm() {
 
   return (
     <form className="grid gap-5" onSubmit={onSubmit}>
-      <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 sm:p-5">
-        <div className="mb-4 flex items-start gap-3">
-          <span className="rounded-lg bg-primary/15 p-2 text-primary">
-            <Globe2 className="size-5" aria-hidden="true" />
-          </span>
-          <div>
-            <p className="font-medium">Start with your website</p>
-            <p className="mt-1 text-sm leading-5 text-muted-foreground">
-              ReelAI researches your business, visual identity, audience, and offering to build the first Brand Kit automatically.
-            </p>
-          </div>
-        </div>
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
         <Field
           label="Company website"
           name="websiteUrl"
           placeholder="https://yourcompany.com"
           type="url"
         />
-        <label className="mt-4 grid gap-1.5 text-sm">
+        <label className="grid gap-1.5 text-sm">
           <span className="text-muted-foreground">Anything to keep in mind? <span className="opacity-70">Optional</span></span>
-          <textarea
-            className="min-h-20 resize-y rounded-md border border-input bg-background px-3 py-2.5 text-foreground placeholder:text-muted-foreground"
+          <input
+            className="h-12 resize-none rounded-lg border border-input bg-background/80 px-3 py-3 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
             maxLength={500}
             name="brief"
-            placeholder="e.g. Focus on our new product launch, or leave blank and we'll figure it out."
+            placeholder="e.g. Focus on our new product launch"
+            type="text"
           />
         </label>
       </div>
@@ -96,11 +86,13 @@ export function ProjectIntakeForm() {
       </details>
 
       {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
-      <Button className="h-11 w-full sm:w-fit" disabled={!isHydrated || isSubmitting} type="submit">
-        {isSubmitting ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Sparkles className="size-4" aria-hidden="true" />}
-        {isSubmitting ? "Setting up your project…" : "Create project & Brand Kit"}
-      </Button>
-      <p className="text-xs text-muted-foreground">You can review, edit, and regenerate the Brand Kit before creating your reel.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs leading-5 text-muted-foreground">Review and refine your Brand Kit before anything is produced.</p>
+        <Button className="h-11 w-full rounded-lg px-5 sm:w-fit" disabled={!isHydrated || isSubmitting} type="submit">
+          {isSubmitting ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Sparkles className="size-4" aria-hidden="true" />}
+          {isSubmitting ? "Setting up your project…" : "Create project & Brand Kit"}
+        </Button>
+      </div>
     </form>
   );
 }
@@ -110,7 +102,7 @@ function useHydrationStatus() {
 }
 
 function Field({ label, name, placeholder, type = "text", required = false }: { label: string; name: string; placeholder: string; type?: string; required?: boolean }) {
-  return <label className="grid gap-1.5 text-sm"><span className="text-muted-foreground">{label}</span><input className="h-10 rounded-md border border-input bg-background px-3 text-foreground placeholder:text-muted-foreground" name={name} placeholder={placeholder} required={required} type={type} /></label>;
+  return <label className="grid gap-1.5 text-sm"><span className="text-muted-foreground">{label}</span><input className="h-12 rounded-lg border border-input bg-background/80 px-3 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary/60 focus:ring-2 focus:ring-primary/10" name={name} placeholder={placeholder} required={required} type={type} /></label>;
 }
 
 function Select({ label, name, options, defaultValue }: { label: string; name: string; options: string[][]; defaultValue?: string }) {

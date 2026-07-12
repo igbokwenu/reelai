@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const localArtifactRoot = path.join(process.cwd(), ".data", "artifacts");
@@ -74,6 +74,44 @@ export async function readLocalObject(key: string) {
   }
 
   return readFile(path.join(localArtifactRoot, key));
+}
+
+export async function deleteStoredObject(key: string) {
+  if (key.includes("..") || !key.startsWith("projects/")) {
+    throw new Error("Invalid artifact key");
+  }
+
+  if (hasOssConfig()) {
+    await deleteFromOss(key);
+    return;
+  }
+
+  try {
+    await unlink(path.join(localArtifactRoot, key));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+}
+
+async function deleteFromOss(key: string) {
+  const region = process.env.OSS_REGION;
+  const bucket = process.env.OSS_BUCKET;
+  const accessKeyId = process.env.OSS_ACCESS_KEY_ID;
+  const accessKeySecret = process.env.OSS_ACCESS_KEY_SECRET;
+  if (!region || !bucket || !accessKeyId || !accessKeySecret) {
+    throw new Error("OSS configuration is incomplete");
+  }
+
+  const date = new Date().toUTCString();
+  const canonicalResource = `/${bucket}/${key}`;
+  const signature = crypto.createHmac("sha1", accessKeySecret).update(["DELETE", "", "", date, canonicalResource].join("\n")).digest("base64");
+  const response = await fetch(`https://${bucket}.${region}.aliyuncs.com/${key}`, {
+    method: "DELETE",
+    headers: { Authorization: `OSS ${accessKeyId}:${signature}`, Date: date },
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`OSS delete failed with status ${response.status}`);
+  }
 }
 
 async function uploadToOss({
