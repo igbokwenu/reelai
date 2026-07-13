@@ -12,7 +12,7 @@ import {
   PlayCircle,
   type LucideIcon,
 } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -54,94 +54,83 @@ export function ProjectWorkflow({
   productionComplete: boolean;
   finalComplete: boolean;
 }) {
-  const stages = useMemo<Stage[]>(() => {
-    const storyboardComplete = storyboardStatus === "APPROVED";
-
-    return [
-      {
-        id: "brand",
-        eyebrow: "01 · Foundation",
-        label: "Brand",
-        description: "Define the voice, visual language, and safe claims.",
-        icon: Palette,
-        content: brand,
-        state: hasBrandKit ? "complete" : "current",
-      },
-      {
-        id: "concepts",
-        eyebrow: "02 · Direction",
-        label: "Concepts",
-        description: "Compare three creative routes and choose one.",
-        icon: LayoutTemplate,
-        content: concepts,
-        state: hasSelectedConcept
-          ? "complete"
-          : hasBrandKit
-            ? "current"
-            : "upcoming",
-      },
-      {
-        id: "storyboard",
-        eyebrow: "03 · Plan",
-        label: "Storyboard",
-        description: "Shape the script, scenes, pacing, and approvals.",
-        icon: Clapperboard,
-        content: storyboard,
-        state: storyboardComplete
-          ? "complete"
-          : hasSelectedConcept
-            ? "current"
-            : "upcoming",
-      },
-      {
-        id: "production",
-        eyebrow: "04 · Create",
-        label: "Production",
-        description: "Generate, compare, and select keyframes and clips.",
-        icon: ImagePlus,
-        content: production,
-        state: productionComplete
-          ? "complete"
-          : storyboardComplete
-            ? "current"
-            : "upcoming",
-      },
-      {
-        id: "final",
-        eyebrow: "05 · Deliver",
-        label: "Final",
-        description: "Add narration and export the finished vertical reel.",
-        icon: PlayCircle,
-        content: final,
-        state: finalComplete
-          ? "complete"
-          : productionComplete
-            ? "current"
-            : "upcoming",
-      },
-      {
-        id: "assets",
-        eyebrow: "Project library",
-        label: "Assets",
-        description: "Manage source material and generated artifacts.",
-        icon: FolderOpen,
-        content: assets,
-        state: "available",
-      },
-    ];
-  }, [
-    assets,
-    brand,
-    concepts,
-    final,
-    finalComplete,
-    hasBrandKit,
-    hasSelectedConcept,
-    production,
-    productionComplete,
-    storyboard,
-    storyboardStatus,
-  ]);
+  // These entries intentionally stay outside a memoization boundary. Their
+  // content is streamed from Server Components and may receive a new fiber
+  // tree after router.refresh(). Memoizing those React nodes can leave React
+  // DevTools reconciling changed virtual children against a reused collection.
+  const storyboardComplete = storyboardStatus === "APPROVED";
+  const stages: Stage[] = [
+    {
+      id: "brand",
+      eyebrow: "01 · Foundation",
+      label: "Brand",
+      description: "Define the voice, visual language, and safe claims.",
+      icon: Palette,
+      content: brand,
+      state: hasBrandKit ? "complete" : "current",
+    },
+    {
+      id: "concepts",
+      eyebrow: "02 · Direction",
+      label: "Concepts",
+      description: "Compare three creative routes and choose one.",
+      icon: LayoutTemplate,
+      content: concepts,
+      state: hasSelectedConcept
+        ? "complete"
+        : hasBrandKit
+          ? "current"
+          : "upcoming",
+    },
+    {
+      id: "storyboard",
+      eyebrow: "03 · Plan",
+      label: "Storyboard",
+      description: "Shape the script, scenes, pacing, and approvals.",
+      icon: Clapperboard,
+      content: storyboard,
+      state: storyboardComplete
+        ? "complete"
+        : hasSelectedConcept
+          ? "current"
+          : "upcoming",
+    },
+    {
+      id: "production",
+      eyebrow: "04 · Create",
+      label: "Production",
+      description: "Generate, compare, and select keyframes and clips.",
+      icon: ImagePlus,
+      content: production,
+      state: productionComplete
+        ? "complete"
+        : storyboardComplete
+          ? "current"
+          : "upcoming",
+    },
+    {
+      id: "final",
+      eyebrow: "05 · Deliver",
+      label: "Final",
+      description: "Add narration and export the finished vertical reel.",
+      icon: PlayCircle,
+      content: final,
+      state: finalComplete
+        ? "complete"
+        : productionComplete
+          ? "current"
+          : "upcoming",
+    },
+    {
+      id: "assets",
+      eyebrow: "Project library",
+      label: "Assets",
+      description: "Manage source material and generated artifacts.",
+      icon: FolderOpen,
+      content: assets,
+      state: "available",
+    },
+  ];
 
   const suggestedStage =
     stages.find((stage) => stage.state === "current")?.id ??
