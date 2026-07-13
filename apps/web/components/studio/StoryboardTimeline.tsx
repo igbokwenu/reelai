@@ -15,6 +15,7 @@ import {
   Palette,
   RefreshCw,
   Save,
+  ShieldCheck,
   Sparkles,
   UserRoundCheck,
 } from "lucide-react";
@@ -55,6 +56,12 @@ type Artifact = {
   mimeType: string;
 };
 
+type GroundingCapabilities = {
+  hasLogoReference: boolean;
+  hasProductReference: boolean;
+  hasUiReference: boolean;
+};
+
 type Job = {
   id: string;
   type: string;
@@ -71,11 +78,20 @@ type PolicyWarning = {
   mitigation: string;
 };
 
+type GroundingRecovery = {
+  attempted: boolean;
+  recovered: boolean;
+  method: "PREFLIGHT_ADAPTATION" | "REGENERATED" | "SAFE_TEXT_FALLBACK";
+  initialViolations: string[];
+  omittedCapabilities: string[];
+};
+
 export function StoryboardTimeline({
   projectId,
   selectedConcept,
   storyboard,
   artifacts,
+  groundingCapabilities,
   latestStoryboardJob,
   latestPolicyJob,
 }: {
@@ -83,6 +99,7 @@ export function StoryboardTimeline({
   selectedConcept: Concept | null;
   storyboard: Storyboard | null;
   artifacts: Artifact[];
+  groundingCapabilities: GroundingCapabilities | null;
   latestStoryboardJob: Job | null;
   latestPolicyJob: Job | null;
 }) {
@@ -106,12 +123,23 @@ export function StoryboardTimeline({
     () => extractWarnings(latestPolicyJob?.output ?? job?.output),
     [job?.output, latestPolicyJob?.output],
   );
+  const groundingRecovery = useMemo(
+    () => extractGroundingRecovery(job?.output),
+    [job?.output],
+  );
   const totalDuration =
     draft?.scenes.reduce((sum, scene) => sum + scene.durationSec, 0) ?? 0;
   const artifactIds = useMemo(
     () => new Set(artifacts.map((artifact) => artifact.id)),
     [artifacts],
   );
+  const missingVisualReferences = useMemo(() => {
+    const missing: string[] = [];
+    if (!groundingCapabilities?.hasLogoReference) missing.push("logo");
+    if (!groundingCapabilities?.hasProductReference) missing.push("product");
+    if (!groundingCapabilities?.hasUiReference) missing.push("interface");
+    return missing;
+  }, [groundingCapabilities]);
   const generatedFrameCount =
     draft?.scenes.reduce(
       (count, scene) =>
@@ -285,7 +313,11 @@ export function StoryboardTimeline({
       </div>
 
       {selectedConcept ? (
-        <ConceptNorthStar concept={selectedConcept} artifacts={artifacts} />
+        <ConceptNorthStar
+          artifacts={artifacts}
+          concept={selectedConcept}
+          missingVisualReferences={missingVisualReferences}
+        />
       ) : (
         <div className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
           Select one concept first. Its strategy and visual style become the
@@ -316,6 +348,30 @@ export function StoryboardTimeline({
             aria-hidden="true"
           />
           <span>{error}</span>
+        </div>
+      ) : null}
+
+      {groundingRecovery?.recovered ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-primary/25 bg-primary/[0.07] p-4 sm:flex-row sm:items-start">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+            <ShieldCheck className="size-4" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">Storyboard auto-recovered</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              The selected direction asked for visuals that were not supported
+              by the current source material, so Reel AI preserved the story and
+              adapted the execution to safe, unbranded imagery. No upload was
+              required.
+            </p>
+            {groundingRecovery.omittedCapabilities.length > 0 ? (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Adapted around:{" "}
+                {groundingRecovery.omittedCapabilities.join(", ")}. You can
+                still add these later to enable exact visual reproduction.
+              </p>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -527,9 +583,11 @@ export function StoryboardTimeline({
 function ConceptNorthStar({
   concept,
   artifacts,
+  missingVisualReferences,
 }: {
   concept: Concept;
   artifacts: Artifact[];
+  missingVisualReferences: string[];
 }) {
   const hasPreview = Boolean(
     concept.previewArtifactId &&
@@ -568,6 +626,13 @@ function ConceptNorthStar({
         {concept.strategy ? (
           <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
             {concept.strategy}
+          </p>
+        ) : null}
+        {missingVisualReferences.length > 0 ? (
+          <p className="mt-2 flex items-center gap-1.5 text-[11px] text-primary/80">
+            <ShieldCheck className="size-3.5 shrink-0" aria-hidden="true" />
+            Asset-safe mode: missing {missingVisualReferences.join(", ")}{" "}
+            references will be adapted automatically—no upload required.
           </p>
         ) : null}
       </div>
@@ -844,6 +909,34 @@ function extractWarnings(value: unknown): PolicyWarning[] {
       } satisfies PolicyWarning;
     })
     .filter((warning): warning is PolicyWarning => Boolean(warning));
+}
+
+function extractGroundingRecovery(value: unknown): GroundingRecovery | null {
+  if (!value || typeof value !== "object") return null;
+  const recovery = (value as Record<string, unknown>).groundingRecovery;
+  if (!recovery || typeof recovery !== "object") return null;
+
+  const item = recovery as Record<string, unknown>;
+  const method = String(item.method);
+  if (
+    method !== "PREFLIGHT_ADAPTATION" &&
+    method !== "REGENERATED" &&
+    method !== "SAFE_TEXT_FALLBACK"
+  ) {
+    return null;
+  }
+
+  return {
+    attempted: item.attempted === true,
+    recovered: item.recovered === true,
+    method,
+    initialViolations: Array.isArray(item.initialViolations)
+      ? item.initialViolations.map(String)
+      : [],
+    omittedCapabilities: Array.isArray(item.omittedCapabilities)
+      ? item.omittedCapabilities.map(String)
+      : [],
+  };
 }
 
 function formatEnum(value: string) {

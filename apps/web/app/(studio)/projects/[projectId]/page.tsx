@@ -12,6 +12,7 @@ import { ProjectList } from "@/components/studio/ProjectList";
 import { ProjectWorkflow } from "@/components/studio/ProjectWorkflow";
 import { SourceUploader } from "@/components/studio/SourceUploader";
 import { StoryboardTimeline } from "@/components/studio/StoryboardTimeline";
+import { getGroundingCapabilities } from "@/lib/brand/grounding";
 import { prisma } from "@/lib/prisma";
 import { getProjectGraph } from "@/lib/projects/graph";
 
@@ -66,6 +67,9 @@ export default async function ProjectPage({ params }: PageProps) {
   const finalComplete = project.renders.some(
     (render) => render.status === "COMPLETE" && render.artifactId,
   );
+  const storyboardGrounding = project.brandKit
+    ? getGroundingCapabilities(project.sources, project.brandKit)
+    : null;
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -275,6 +279,7 @@ export default async function ProjectPage({ params }: PageProps) {
               storyboard={
                 <StoryboardTimeline
                   artifacts={project.artifacts}
+                  groundingCapabilities={storyboardGrounding}
                   key={
                     project.storyboard
                       ? `${project.storyboard.id}-${project.storyboard.updatedAt.toISOString()}`

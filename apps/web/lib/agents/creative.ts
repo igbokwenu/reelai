@@ -12,11 +12,15 @@ import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
 import {
   buildGroundingInstructions,
+  buildGroundingRecoveryInstructions,
   findConceptGroundingViolations,
   getGroundingCapabilities,
   hardenImagePrompt,
+  omittedGroundingCapabilities,
+  recoverGroundedCreativeOutput,
   safeVisualMotifs,
   type GroundingCapabilities,
+  type GroundingRecoverySummary,
 } from "@/lib/brand/grounding";
 import { QWEN_STRUCTURED_MODEL, sanitizeQwenError } from "@/lib/qwen/client";
 import { generateImageWithQwen } from "@/lib/qwen/image";
@@ -355,36 +359,97 @@ export async function generateStoryboardForProject(projectId: string) {
     );
   }
 
-  const result = await generateStructuredWithQwen({
-    operation: "storyboard_generation",
+  const storyboardGrounding = getGroundingCapabilities(
+    project.sources,
+    project.brandKit,
+  );
+  const preflightViolations = findConceptGroundingViolations(
+    [selectedConcept],
+    storyboardGrounding,
+  );
+  const firstResult = await generateStructuredWithQwen({
+    operation:
+      preflightViolations.length > 0
+        ? "storyboard_generation_with_preflight_adaptation"
+        : "storyboard_generation",
     schema: storyboardSchema,
     schemaName: "reel_ai_storyboard",
     jsonSchema: storyboardJsonSchema,
     model: QWEN_STRUCTURED_MODEL,
     parse: parseStoryboardOutput,
     system: storyboardSystemPrompt,
-    user: buildStoryboardPrompt(project, selectedConcept),
+    user: buildStoryboardPrompt(project, selectedConcept, preflightViolations),
   });
-  const storyboardGrounding = getGroundingCapabilities(
-    project.sources,
-    project.brandKit,
-  );
-  const storyboardViolations = findConceptGroundingViolations(
-    [result.data],
+  let output = firstResult.data;
+  let activeResult = firstResult;
+  let recoveryResult: typeof firstResult | null = null;
+  let storyboardViolations = findConceptGroundingViolations(
+    [output],
     storyboardGrounding,
   );
+  const initialViolations = [
+    ...new Set([...preflightViolations, ...storyboardViolations]),
+  ];
+  let recoveryMethod: GroundingRecoverySummary["method"] =
+    preflightViolations.length > 0 ? "PREFLIGHT_ADAPTATION" : null;
+
   if (storyboardViolations.length > 0) {
-    throw new Error(
-      `Storyboard grounding check failed: ${storyboardViolations.slice(0, 3).join(" ")} Revise the direction or upload the referenced brand materials.`,
+    recoveryResult = await generateStructuredWithQwen({
+      operation: "storyboard_grounding_recovery",
+      schema: storyboardSchema,
+      schemaName: "reel_ai_storyboard_grounding_recovery",
+      jsonSchema: storyboardJsonSchema,
+      model: QWEN_STRUCTURED_MODEL,
+      parse: parseStoryboardOutput,
+      system: storyboardSystemPrompt,
+      user: buildStoryboardRecoveryPrompt({
+        project,
+        concept: selectedConcept,
+        rejected: output,
+        violations: storyboardViolations,
+        grounding: storyboardGrounding,
+      }),
+    });
+    output = recoveryResult.data;
+    activeResult = recoveryResult;
+    recoveryMethod = "REGENERATED";
+    storyboardViolations = findConceptGroundingViolations(
+      [output],
+      storyboardGrounding,
     );
   }
+
+  if (storyboardViolations.length > 0) {
+    output = recoverGroundedCreativeOutput(output, storyboardGrounding);
+    recoveryMethod = "SAFE_TEXT_FALLBACK";
+    storyboardViolations = findConceptGroundingViolations(
+      [output],
+      storyboardGrounding,
+    );
+  }
+
+  if (storyboardViolations.length > 0) {
+    throw new Error(
+      `Storyboard grounding check failed after automatic recovery: ${storyboardViolations.slice(0, 3).join(" ")} The remaining issue requires human review.`,
+    );
+  }
+  const groundingRecovery: GroundingRecoverySummary = {
+    attempted: initialViolations.length > 0,
+    recovered: initialViolations.length > 0,
+    method: recoveryMethod,
+    initialViolations,
+    omittedCapabilities:
+      initialViolations.length > 0
+        ? omittedGroundingCapabilities(storyboardGrounding)
+        : [],
+  };
   const storyboard = await saveStoryboard({
     projectId,
     conceptId: selectedConcept.id,
     brandKit: project.brandKit,
-    output: result.data,
+    output,
   });
-  const warnings = reviewStoryboardClaims(project.brandKit, result.data);
+  const warnings = reviewStoryboardClaims(project.brandKit, output);
 
   await prisma.generationJob.create({
     data: {
@@ -405,10 +470,14 @@ export async function generateStoryboardForProject(projectId: string) {
   return {
     storyboard,
     warnings,
-    model: result.model,
-    providerRequestId: result.providerRequestId,
-    elapsedMs: result.elapsedMs,
-    usage: result.usage,
+    groundingRecovery,
+    model: activeResult.model,
+    providerRequestId: activeResult.providerRequestId,
+    elapsedMs: firstResult.elapsedMs + (recoveryResult?.elapsedMs ?? 0),
+    usage: {
+      initial: firstResult.usage,
+      recovery: recoveryResult?.usage ?? null,
+    },
   };
 }
 
@@ -419,7 +488,9 @@ export function getCreativeGenerationError(error: unknown) {
 
   if (
     error instanceof Error &&
-    /^(Creative|Storyboard) grounding check failed:/.test(error.message)
+    /^(Creative|Storyboard) grounding check failed(?: after automatic recovery)?:/.test(
+      error.message,
+    )
   ) {
     return error.message;
   }
@@ -840,6 +911,7 @@ function summarizeWebsiteEvidence(text: string) {
 function buildStoryboardPrompt(
   project: Project & { brandKit: BrandKit | null; sources: BrandSource[] },
   concept: CreativeConcept,
+  preflightViolations: string[] = [],
 ) {
   const brandKit = project.brandKit;
   const grounding = getGroundingCapabilities(project.sources, brandKit!);
@@ -869,6 +941,15 @@ Policy risks: ${JSON.stringify(brandKit?.policyRisks)}
 Palette: ${JSON.stringify(brandKit?.palette)}
 Visual motifs: ${JSON.stringify(safeVisualMotifs(brandKit?.visualMotifs, grounding))}
 
+${
+  preflightViolations.length > 0
+    ? `Automatic capability adaptation:
+The selected concept contains execution details that are not supported by the currently available references. Do not stop or request an upload. Preserve the strategy and automatically reframe those details using this recovery plan:
+${buildGroundingRecoveryInstructions(preflightViolations, grounding)}
+`
+    : ""
+}
+
 Requirements:
 - Use 2 to 4 scenes total.
 - Total duration must be 15 to 30 seconds.
@@ -888,6 +969,30 @@ Requirements:
 - Do not create unsupported performance, medical, financial, or legal claims.
 - ${buildGroundingInstructions(grounding)}
 - Captions and logos are composited later; never ask image or video generation to draw readable text or brand marks.`;
+}
+
+function buildStoryboardRecoveryPrompt({
+  project,
+  concept,
+  rejected,
+  violations,
+  grounding,
+}: {
+  project: Project & { brandKit: BrandKit | null; sources: BrandSource[] };
+  concept: CreativeConcept;
+  rejected: StoryboardOutput;
+  violations: string[];
+  grounding: GroundingCapabilities;
+}) {
+  return `${buildStoryboardPrompt(project, concept, violations)}
+
+The previous storyboard candidate below was rejected by deterministic grounding validation. Return a complete replacement storyboard, not commentary and not a patch. Keep all safe story decisions, but rewrite every rejected visual or claim.
+
+Rejected candidate:
+${JSON.stringify(rejected)}
+
+Mandatory recovery plan:
+${buildGroundingRecoveryInstructions(violations, grounding)}`;
 }
 
 const conceptSystemPrompt = `You are Reel AI's Creative Director Agent. You pitch divergent, brand-safe ad strategies for business reels. Return strict JSON only.`;

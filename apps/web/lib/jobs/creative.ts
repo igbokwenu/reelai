@@ -184,6 +184,7 @@ async function runStoryboardJob(jobId: string) {
           storyboardId: result.storyboard.id,
           sceneCount: result.storyboard.scenes.length,
           warnings: result.warnings,
+          groundingRecovery: result.groundingRecovery,
           elapsedMs: result.elapsedMs,
           usage: toJsonValue(result.usage),
         },

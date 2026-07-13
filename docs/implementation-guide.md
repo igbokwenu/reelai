@@ -848,6 +848,9 @@ Exit checklist:
 - [ ] Regenerating a selected concept preserves its identity and selection but returns its storyboard and scenes to draft review.
 - [ ] User can select exactly one concept.
 - [ ] Storyboard generation requires a selected concept.
+- [ ] Missing logo, product, or interface references automatically reframe unsupported execution instead of sending the user to Assets.
+- [ ] Grounding validation distinguishes negative constraints such as “no logo” from affirmative visual requests.
+- [ ] Auto-recovery is bounded, revalidated before persistence, and visible to the user in the storyboard editor.
 - [ ] Storyboard contains 2 to 4 scenes for MVP.
 - [ ] Each scene has duration, caption, voiceover text, start/end frame prompts, motion prompt, and continuity notes.
 - [ ] The storyboard has explicit product, character, and visual-world continuity locks.

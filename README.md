@@ -15,6 +15,7 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Reusable Brand Kit with value props, palette, claims, policy risks, locked style language, and citations.
 - Multi-page website evidence collection covering metadata, visible copy, CSS color candidates, logos/social images, and QwenCloud visual analysis.
 - Evidence-capability guardrails: website-only projects cannot manufacture product UI, logos, branded uniforms, badges, packaging, or unsupported trust claims.
+- Storyboard grounding auto-recovery: missing logo, product, or interface references do not block creation. Reel AI preserves the selected strategy, adapts unsupported execution to source-safe unbranded storytelling, validates the replacement, and explains the adaptation in the editor.
 - Pre-spend concept validation and post-generation visual grounding review; previews that fail review are replaced with an honest local concept card.
 - Exactly three creative concepts before full generation spend, with optional note-guided regeneration of one direction without replacing the other two.
 - Visual 2 to 4 scene storyboard filmstrip with side-by-side first/last frames, explicit stitch transitions, a product/character/visual-world continuity bible, and a human approval loop.
