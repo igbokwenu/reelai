@@ -4,6 +4,8 @@ const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1";
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  globalSetup: "./tests/e2e/project-cleanup.ts",
+  globalTeardown: "./tests/e2e/project-cleanup.ts",
   timeout: 30_000,
   expect: { timeout: 8_000 },
   use: {

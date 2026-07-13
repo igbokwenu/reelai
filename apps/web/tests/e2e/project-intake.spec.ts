@@ -1,21 +1,42 @@
 import { expect, test } from "@playwright/test";
 
-test("creates a URL-first project and starts Brand Kit research", async ({
+import { E2E_PROJECT_PREFIX } from "./project-cleanup";
+
+test("creates and navigates a URL-first project", async ({
   page,
 }) => {
+  const projectName = `${E2E_PROJECT_PREFIX} URL intake ${Date.now()} reel`;
+  await page.route("**/api/projects", async (route) => {
+    const request = route.request();
+
+    if (request.method() !== "POST") {
+      await route.continue();
+      return;
+    }
+
+    // Keep browser tests deterministic and immediately deletable. Brand Kit
+    // generation calls an external model and is intentionally kept outside
+    // this project-intake and workflow-navigation smoke test.
+    const payload = request.postDataJSON() as Record<string, unknown>;
+    await route.continue({
+      postData: JSON.stringify({ ...payload, generateBrandKit: false }),
+    });
+  });
   await page.goto("/");
 
   await page.getByLabel("Company website").fill("https://example.com");
   await page
     .getByLabel("Anything to keep in mind? Optional")
     .fill("Keep the tone direct and practical.");
+  await page.getByText("Customize project settings").click();
+  await page.getByLabel("Project name").fill(projectName);
   await page
     .getByRole("button", { name: "Create project & Brand Kit" })
     .click();
 
   await expect(page).toHaveURL(/\/projects\/.+/);
   await expect(
-    page.getByRole("heading", { level: 1, name: /reel$/ }),
+    page.getByRole("heading", { level: 1, name: projectName }),
   ).toBeVisible();
   await page.getByRole("button", { name: /^Brand/ }).click();
   await expect(page.getByText("Brand Kit Agent")).toBeVisible();
@@ -58,7 +79,7 @@ test("requires confirmation before deleting a project", async ({
   page,
   request,
 }) => {
-  const name = `Disposable project ${Date.now()}`;
+  const name = `${E2E_PROJECT_PREFIX} Disposable project ${Date.now()}`;
   const response = await request.post("/api/projects", {
     data: { name, businessName: "Disposable Brand", generateBrandKit: false },
   });

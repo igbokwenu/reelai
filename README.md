@@ -55,7 +55,7 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
-The project workflow and per-concept regeneration update introduce no database schema changes. After pulling the changes, restart `pnpm dev` so the new route is loaded reliably. You do **not** need to run `pnpm db:migrate` or `pnpm db:generate` for this update.
+Application-only updates that do not add a Prisma migration require only a restart of `pnpm dev`; do not run `pnpm db:migrate` or `pnpm db:generate` unless the change includes an update under `prisma/migrations` or `prisma/schema.prisma`.
 
 The seed creates:
 
@@ -109,6 +109,8 @@ pnpm test
 pnpm e2e
 pnpm format
 ```
+
+The Playwright suite may reuse an existing `pnpm dev` server and therefore its configured database. Browser-test projects are named with the `[ReelAI E2E]` prefix and are removed through the application API at both the start and end of every run, including their stored artifacts. This works for local and deployed smoke tests and prevents fixtures such as `example.com` from appearing in the Projects list. Do not use that reserved prefix for projects you want to keep. If a dev server or test runner is interrupted mid-generation, jobs abandoned for more than 10 minutes no longer prevent their project from being deleted.
 
 Inside a selected project, use the horizontal stage rail or the Previous/Next controls to move through the workflow. Brand Kit essentials (summary, audience, tone, value props, and palette) remain visible by default; visual motifs, approved claims, policy risks, and citations are grouped into expandable guardrail panels. Project uploads and generated artifacts live in the Assets stage.
 
