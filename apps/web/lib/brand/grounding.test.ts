@@ -4,6 +4,7 @@ import {
   findConceptGroundingViolations,
   getGroundingCapabilities,
   hardenImagePrompt,
+  safeVisualMotifs,
 } from "./grounding";
 
 describe("creative grounding", () => {
@@ -19,7 +20,7 @@ describe("creative grounding", () => {
     expect(prompt).toContain("do not render a logo");
   });
 
-  it("rejects fabricated UI and unsupported trust badges before image spend", () => {
+  it("rejects fabricated UI and logos while allowing ordinary trust language", () => {
     const violations = findConceptGroundingViolations(
       [
         {
@@ -29,7 +30,34 @@ describe("creative grounding", () => {
       ],
       websiteOnly,
     );
-    expect(violations).toHaveLength(3);
+    expect(violations).toHaveLength(2);
+  });
+
+  it("allows plain trust descriptors but requires evidence for accreditation claims", () => {
+    expect(
+      findConceptGroundingViolations(
+        [{ strategy: "Introduce vetted, verified, certified caregivers" }],
+        websiteOnly,
+      ),
+    ).toEqual([]);
+    expect(
+      findConceptGroundingViolations(
+        [{ strategy: "Introduce licensed and background-checked caregivers" }],
+        websiteOnly,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("removes product motifs and rejects product close-ups without a reference", () => {
+    expect(
+      safeVisualMotifs(["clean product detail", "human workflow context"], websiteOnly),
+    ).not.toContain("clean product detail");
+    expect(
+      findConceptGroundingViolations(
+        [{ previewPrompt: "A cinematic product close-up" }],
+        websiteOnly,
+      ),
+    ).toHaveLength(1);
   });
 
   it("allows referenced UI and supported claims", () => {

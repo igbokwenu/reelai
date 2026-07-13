@@ -69,7 +69,7 @@ ReelAI distinguishes knowing that a product or service exists from having permis
 - A `LOGO` upload authorizes logo-aware direction; absent that source, image generation cannot draw logos, wordmarks, branded uniforms, or badges.
 - A `PRODUCT_IMAGE` upload authorizes referenced product depiction; absent it, visuals remain generic and unbranded.
 - A `REFERENCE_AD` or clearly labeled UI/screenshot upload authorizes interface-aware direction; absent it, concepts cannot use phones, dashboards, profiles, buttons, or booking flows.
-- Certifications, vetting, availability, pricing, and outcome claims must also appear in supported Brand Kit claims.
+- Plain-language trust descriptors such as vetted, verified, and certified are permitted in concept copy, but cannot be visualized as official seals, badges, accreditations, or government endorsement. Higher-assurance claims—licensed/licenced, accredited, bonded, insured, government-approved, background-checked, police-checked, medical credentials, and named compliance certifications—must appear in supported Brand Kit claims. Specific availability, pricing, guarantees, testimonials, and quantified outcomes also require source support.
 
 These restrictions are enforced in prompts, deterministic validation, preview metadata, selection APIs, and storyboard validation rather than relying on model instructions alone.
 

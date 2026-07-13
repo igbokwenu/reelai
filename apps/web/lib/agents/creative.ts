@@ -9,6 +9,7 @@ import {
   findConceptGroundingViolations,
   getGroundingCapabilities,
   hardenImagePrompt,
+  safeVisualMotifs,
   type GroundingCapabilities,
 } from "@/lib/brand/grounding";
 import { QWEN_STRUCTURED_MODEL, sanitizeQwenError } from "@/lib/qwen/client";
@@ -534,7 +535,7 @@ Value props: ${JSON.stringify(brandKit?.valueProps)}
 Claims: ${JSON.stringify(brandKit?.claims)}
 Policy risks: ${JSON.stringify(brandKit?.policyRisks)}
 Palette: ${JSON.stringify(brandKit?.palette)}
-Visual motifs: ${JSON.stringify(brandKit?.visualMotifs)}
+Visual motifs: ${JSON.stringify(safeVisualMotifs(brandKit?.visualMotifs, grounding))}
 
 Verified website evidence:
 ${websiteEvidence || "No clean website text was retained. Do not infer additional service or product details."}
@@ -596,7 +597,7 @@ Value props: ${JSON.stringify(brandKit?.valueProps)}
 Claims: ${JSON.stringify(brandKit?.claims)}
 Policy risks: ${JSON.stringify(brandKit?.policyRisks)}
 Palette: ${JSON.stringify(brandKit?.palette)}
-Visual motifs: ${JSON.stringify(brandKit?.visualMotifs)}
+Visual motifs: ${JSON.stringify(safeVisualMotifs(brandKit?.visualMotifs, grounding))}
 
 Requirements:
 - Use 2 to 4 scenes total.

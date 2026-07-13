@@ -392,6 +392,7 @@ function enrichBrandKitFromProject(
     brandKit.audience ||
     "customers described in the supplied sources";
   const business = project.businessName;
+  const normalizedAudience = audience.replace(/[.!?]+$/, "");
   const hasFallbackSummary = brandKit.summary.startsWith(
     "Brand summary was not provided.",
   );
@@ -411,9 +412,9 @@ function enrichBrandKitFromProject(
   return brandKitOutputSchema.parse({
     ...brandKit,
     summary: hasFallbackSummary
-      ? `${business} serves ${audience}. ${positioning} Creative work should remain source-grounded and avoid presenting unverified product or brand visuals as authentic.`
+      ? `${business} serves ${normalizedAudience}. ${positioning} Creative work should remain source-grounded and avoid presenting unverified product or brand visuals as authentic.`
       : brandKit.summary,
-    audience: brandKit.audience ?? audience,
+    audience: normalizedAudience,
     valueProps: replaceFallbackValueProps(
       brandKit.valueProps,
       positioning,
@@ -431,7 +432,23 @@ function enrichBrandKitFromProject(
       contexts,
     ),
     policyRisks: policyRisks.slice(0, 8),
+    visualMotifs: sanitizeVisualMotifs(
+      brandKit.visualMotifs,
+      hasUploadedVisualEvidence,
+    ),
+    lockedStyle:
+      brandKit.lockedStyle === "Clean vertical ad style with restrained captions."
+        ? "Realistic documentary-style vertical imagery with natural light, authentic home environments, unbranded wardrobe, human connection, and restrained captions added in post."
+        : brandKit.lockedStyle,
   });
+}
+
+function sanitizeVisualMotifs(motifs: string[], hasUploadedVisualEvidence: boolean) {
+  if (hasUploadedVisualEvidence) return motifs;
+  const safe = motifs.filter(
+    (motif) => !/\b(product|app|interface|screen|logo|packag|uniform|badge)\b/i.test(motif),
+  );
+  return [...new Set([...safe, "authentic human connection", "natural home environment"])].slice(0, 8);
 }
 
 function replaceFallbackValueProps(
