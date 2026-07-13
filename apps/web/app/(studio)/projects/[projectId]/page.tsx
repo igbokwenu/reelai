@@ -269,6 +269,7 @@ export default async function ProjectPage({ params }: PageProps) {
               production={
                 <GenerationConsole
                   artifacts={project.artifacts}
+                  conceptTitle={selectedConcept?.title ?? null}
                   latestKeyframeJob={latestKeyframeJob}
                   latestVideoJob={latestVideoJob}
                   projectId={project.id}

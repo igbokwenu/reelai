@@ -2,27 +2,37 @@
 
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
   Clapperboard,
   ImagePlus,
   Loader2,
+  PackageCheck,
+  Palette,
   RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  UserRoundCheck,
   Video,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  TakeCompare,
-  type TakeArtifact,
-  type TakeCompareScene,
-} from "@/components/studio/TakeCompare";
+  KeyframeStoryFlow,
+  type ProductionScene,
+} from "@/components/studio/KeyframeStoryFlow";
+import type { TakeArtifact } from "@/components/studio/TakeCompare";
 import { Button } from "@/components/ui/button";
 
 type Storyboard = {
   id: string;
+  title: string;
   status: string;
-  scenes: TakeCompareScene[];
+  productContinuity: string;
+  characterContinuity: string;
+  visualContinuity: string;
+  scenes: ProductionScene[];
 };
 
 type Job = {
@@ -37,12 +47,14 @@ type Job = {
 
 export function GenerationConsole({
   projectId,
+  conceptTitle,
   storyboard,
   artifacts,
   latestKeyframeJob,
   latestVideoJob,
 }: {
   projectId: string;
+  conceptTitle: string | null;
   storyboard: Storyboard | null;
   artifacts: TakeArtifact[];
   latestKeyframeJob: Job | null;
@@ -52,6 +64,7 @@ export function GenerationConsole({
   const [keyframeJob, setKeyframeJob] = useState<Job | null>(latestKeyframeJob);
   const [videoJob, setVideoJob] = useState<Job | null>(latestVideoJob);
   const [starting, setStarting] = useState<"keyframes" | "videos" | null>(null);
+  const [savingSceneId, setSavingSceneId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(
     latestKeyframeJob?.error ?? latestVideoJob?.error ?? null,
   );
@@ -59,36 +72,65 @@ export function GenerationConsole({
     ["QUEUED", "RUNNING", "WAITING_PROVIDER"].includes(job?.status ?? ""),
   );
   const scenes = storyboard?.scenes ?? [];
-  const approvedScenes = scenes.filter((scene) => scene.status === "APPROVED");
-  const hasSelectedKeyframes =
-    approvedScenes.length > 0 &&
-    approvedScenes.every((scene) => scene.selectedKeyframeTakeId);
+  const productionScenes = scenes.filter((scene) =>
+    ["APPROVED", "COMPLETE"].includes(scene.status),
+  );
+  const hasRecommendedFrames =
+    productionScenes.length > 0 &&
+    productionScenes.every((scene) => {
+      const selectedLegacyTake = scene.takes.find(
+        (take) => take.id === scene.selectedKeyframeTakeId,
+      );
+      const start = scene.takes.find(
+        (take) =>
+          take.id === scene.selectedKeyframeTakeId &&
+          take.kind === "KEYFRAME_START" &&
+          take.status === "COMPLETE" &&
+          take.artifactId,
+      );
+      const legacyStart =
+        selectedLegacyTake?.kind === "KEYFRAME_END" &&
+        scene.takes.find(
+          (take) =>
+            take.kind === "KEYFRAME_START" &&
+            take.status === "COMPLETE" &&
+            take.artifactId,
+        );
+      const end = scene.takes.find(
+        (take) =>
+          take.id === scene.selectedEndFrameTakeId &&
+          take.kind === "KEYFRAME_END" &&
+          take.status === "COMPLETE" &&
+          take.artifactId,
+      );
+      const legacyEnd =
+        scene.selectedKeyframeTakeId &&
+        scene.takes.find(
+          (take) =>
+            take.kind === "KEYFRAME_END" &&
+            take.status === "COMPLETE" &&
+            take.artifactId,
+        );
+      return Boolean((start || legacyStart) && (end || legacyEnd));
+    });
+  const completedClips = productionScenes.filter(
+    (scene) => scene.selectedVideoTakeId,
+  ).length;
   const runDetails = useMemo(
     () => [keyframeJob, videoJob].filter(Boolean) as Job[],
     [keyframeJob, videoJob],
   );
 
   useEffect(() => {
-    if (!activeJob) {
-      return;
-    }
+    if (!activeJob) return;
 
     const interval = window.setInterval(async () => {
       const response = await fetch(`/api/jobs/${activeJob.id}`);
-
-      if (!response.ok) {
-        return;
-      }
+      if (!response.ok) return;
 
       const data = (await response.json()) as { job: Job };
-
-      if (data.job.type === "KEYFRAME") {
-        setKeyframeJob(data.job);
-      }
-
-      if (data.job.type === "VIDEO") {
-        setVideoJob(data.job);
-      }
+      if (data.job.type === "KEYFRAME") setKeyframeJob(data.job);
+      if (data.job.type === "VIDEO") setVideoJob(data.job);
 
       if (data.job.status === "COMPLETE") {
         setError(null);
@@ -114,7 +156,6 @@ export function GenerationConsole({
         : `/api/projects/${projectId}/videos`;
     const response = await fetch(endpoint, { method: "POST" });
     const data = (await response.json()) as { job?: Job; error?: string };
-
     setStarting(null);
 
     if (!response.ok || !data.job) {
@@ -122,155 +163,275 @@ export function GenerationConsole({
       return;
     }
 
-    if (kind === "keyframes") {
-      setKeyframeJob(data.job);
-    } else {
-      setVideoJob(data.job);
-    }
+    if (kind === "keyframes") setKeyframeJob(data.job);
+    else setVideoJob(data.job);
 
     if (data.job.status === "FAILED") {
       setError(data.job.error ?? "Generation failed.");
     }
+    router.refresh();
+  }
+
+  async function saveScene(scene: ProductionScene) {
+    if (!storyboard) return false;
+
+    setSavingSceneId(scene.id);
+    setError(null);
+    const response = await fetch(`/api/storyboards/${storyboard.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenes: [
+          {
+            id: scene.id,
+            durationSec: scene.durationSec,
+            captionText: scene.captionText,
+            voiceoverText: scene.voiceoverText,
+            startFramePrompt: scene.startFramePrompt,
+            endFramePrompt: scene.endFramePrompt,
+            videoMotionPrompt: scene.videoMotionPrompt,
+            continuityNotes: scene.continuityNotes,
+            continuityMode: scene.continuityMode,
+          },
+        ],
+      }),
+    });
+    const data = (await response.json()) as { error?: string };
+    setSavingSceneId(null);
+
+    if (!response.ok) {
+      setError(data.error ?? "Scene tuning could not be saved.");
+      return false;
+    }
 
     router.refresh();
+    return true;
   }
 
   if (!storyboard) {
     return (
-      <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-        Generate and save an approved storyboard before opening production.
+      <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+        Generate and approve a storyboard before opening production.
       </div>
     );
   }
 
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium">Generation Console</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Additive production: regenerating creates new takes and keeps prior artifacts.
-          </p>
+    <div className="grid gap-5">
+      <section className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/[0.1] via-card to-card">
+        <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div>
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+              <Sparkles className="size-4" aria-hidden="true" />
+              Your recommended production plan
+            </div>
+            <h3 className="mt-2 text-xl font-semibold tracking-tight">
+              {storyboard.title}
+            </h3>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              Built from{" "}
+              {conceptTitle ? `“${conceptTitle}”` : "your selected concept"}.
+              Reel AI has already chosen the visual sequence; review how it
+              stitches together, fine-tune only what matters, then create the
+              clips.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 lg:justify-end">
+            <Button
+              disabled={
+                storyboard.status !== "APPROVED" ||
+                productionScenes.length < 2 ||
+                productionScenes.length > 4 ||
+                starting !== null ||
+                Boolean(activeJob)
+              }
+              onClick={() => startGeneration("keyframes")}
+              size="sm"
+              variant={hasRecommendedFrames ? "outline" : "default"}
+            >
+              {starting === "keyframes" ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : hasRecommendedFrames ? (
+                <RefreshCw className="size-4" aria-hidden="true" />
+              ) : (
+                <ImagePlus className="size-4" aria-hidden="true" />
+              )}
+              {hasRecommendedFrames
+                ? "Refresh story frames"
+                : "Create story frames"}
+            </Button>
+            <Button
+              disabled={
+                !hasRecommendedFrames || starting !== null || Boolean(activeJob)
+              }
+              onClick={() => startGeneration("videos")}
+              size="sm"
+            >
+              {starting === "videos" ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : completedClips === productionScenes.length ? (
+                <RefreshCw className="size-4" aria-hidden="true" />
+              ) : (
+                <Video className="size-4" aria-hidden="true" />
+              )}
+              {completedClips === productionScenes.length
+                ? "Recreate scene clips"
+                : "Create scene clips"}
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            disabled={
-              storyboard.status !== "APPROVED" ||
-              approvedScenes.length < 2 ||
-              approvedScenes.length > 4 ||
-              starting !== null ||
-              Boolean(activeJob)
-            }
-            onClick={() => startGeneration("keyframes")}
-            size="sm"
-          >
-            {starting === "keyframes" ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <ImagePlus className="size-4" aria-hidden="true" />
-            )}
-            Generate Keyframes
-          </Button>
-          <Button
-            disabled={
-              !hasSelectedKeyframes ||
-              starting !== null ||
-              Boolean(activeJob)
-            }
-            onClick={() => startGeneration("videos")}
-            size="sm"
-          >
-            {starting === "videos" ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <Video className="size-4" aria-hidden="true" />
-            )}
-            Submit I2V Clips
-          </Button>
-        </div>
-      </div>
 
-      <div className="grid gap-2 rounded-md border border-border bg-background/60 p-3 text-sm md:grid-cols-4">
-        <StatusTile label="Storyboard" value={formatEnum(storyboard.status)} />
-        <StatusTile label="Scenes" value={`${approvedScenes.length}/4 approved`} />
-        <StatusTile
-          label="Keyframes"
-          value={hasSelectedKeyframes ? "Selected" : "Needed"}
+        <div className="grid border-t border-border bg-background/35 sm:grid-cols-3">
+          <ProgressStep
+            complete={storyboard.status === "APPROVED"}
+            label="Story approved"
+            step="1"
+          />
+          <ProgressStep
+            complete={hasRecommendedFrames}
+            label="Endpoints ready"
+            step="2"
+          />
+          <ProgressStep
+            complete={completedClips === productionScenes.length}
+            label={`${completedClips}/${productionScenes.length} clips ready`}
+            step="3"
+          />
+        </div>
+      </section>
+
+      <section className="grid gap-3 rounded-xl border border-border bg-card/55 p-4 lg:grid-cols-3">
+        <ContinuityLock
+          icon={PackageCheck}
+          label="Product identity"
+          text={storyboard.productContinuity}
         />
-        <StatusTile
-          label="Video Polling"
-          value={videoJob?.status ? formatEnum(videoJob.status) : "Not started"}
+        <ContinuityLock
+          icon={UserRoundCheck}
+          label="Character identity"
+          text={storyboard.characterContinuity}
         />
-      </div>
+        <ContinuityLock
+          icon={Palette}
+          label="Visual world"
+          text={storyboard.visualContinuity}
+        />
+      </section>
 
       {error ? (
-        <div className="flex gap-2 rounded-md border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <div className="flex gap-2 rounded-xl border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertTriangle
+            className="mt-0.5 size-4 shrink-0"
+            aria-hidden="true"
+          />
           <span>{error}</span>
         </div>
       ) : null}
 
-      {runDetails.length > 0 ? (
-        <div className="grid gap-2 rounded-md border border-border bg-background/60 p-3">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Clapperboard className="size-4 text-primary" aria-hidden="true" />
-            Run details
-          </div>
-          {runDetails.map((job) => (
-            <div
-              className="grid gap-2 rounded-md border border-border bg-card p-3 text-sm md:grid-cols-[120px_120px_minmax(0,1fr)]"
-              key={job.id}
-            >
-              <span className="font-medium">{formatEnum(job.type)}</span>
-              <span className="text-muted-foreground">
-                {formatEnum(job.status)}
-              </span>
-              <span className="break-all text-muted-foreground">
-                Model {job.model ?? "pending"} · Task{" "}
-                {job.providerTaskId ?? job.id}
-              </span>
-              {job.status === "COMPLETE" ? (
-                <CheckCircle2 className="size-4 text-primary" aria-hidden="true" />
-              ) : job.status === "WAITING_PROVIDER" || job.status === "RUNNING" ? (
-                <RefreshCw className="size-4 animate-spin text-primary" aria-hidden="true" />
-              ) : null}
-            </div>
-          ))}
-        </div>
-      ) : null}
+      <KeyframeStoryFlow
+        artifacts={artifacts}
+        onSaveScene={saveScene}
+        savingSceneId={savingSceneId}
+        scenes={scenes}
+      />
 
-      <div className="grid gap-4">
-        {scenes.map((scene) => (
-          <div
-            className="rounded-md border border-border bg-background/50 p-4"
-            key={scene.id}
-          >
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium">Scene {scene.index}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {scene.captionText}
-                </p>
+      {runDetails.length > 0 ? (
+        <details className="group rounded-xl border border-border bg-background/50">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-2">
+              <Clapperboard
+                className="size-4 text-primary"
+                aria-hidden="true"
+              />
+              Generation details
+            </span>
+            <span className="text-xs font-normal text-muted-foreground">
+              Models, tasks, and status
+            </span>
+          </summary>
+          <div className="grid gap-2 border-t border-border p-3">
+            {runDetails.map((job) => (
+              <div
+                className="grid gap-2 rounded-lg border border-border bg-card p-3 text-xs sm:grid-cols-[100px_120px_minmax(0,1fr)_auto] sm:items-center"
+                key={job.id}
+              >
+                <span className="font-medium">{formatEnum(job.type)}</span>
+                <span className="text-muted-foreground">
+                  {formatEnum(job.status)}
+                </span>
+                <span className="break-all text-muted-foreground">
+                  {job.model ?? "Model pending"} ·{" "}
+                  {job.providerTaskId ?? job.id}
+                </span>
+                {job.status === "COMPLETE" ? (
+                  <CheckCircle2
+                    className="size-4 text-primary"
+                    aria-hidden="true"
+                  />
+                ) : ["WAITING_PROVIDER", "RUNNING", "QUEUED"].includes(
+                    job.status,
+                  ) ? (
+                  <RefreshCw
+                    className="size-4 animate-spin text-primary"
+                    aria-hidden="true"
+                  />
+                ) : null}
               </div>
-              <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
-                {formatEnum(scene.status)}
-              </span>
-            </div>
-            <TakeCompare artifacts={artifacts} scene={scene} />
+            ))}
           </div>
-        ))}
-      </div>
+        </details>
+      ) : null}
     </div>
   );
 }
 
-function StatusTile({ label, value }: { label: string; value: string }) {
+function ProgressStep({
+  step,
+  label,
+  complete,
+}: {
+  step: string;
+  label: string;
+  complete: boolean;
+}) {
   return (
-    <div>
-      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+    <div className="flex items-center gap-2 border-border px-4 py-3 text-xs sm:border-r sm:last:border-r-0">
+      <span
+        className={`flex size-6 items-center justify-center rounded-full border text-[10px] font-semibold ${
+          complete
+            ? "border-primary/30 bg-primary/15 text-primary"
+            : "border-border text-muted-foreground"
+        }`}
+      >
+        {complete ? <Check className="size-3.5" aria-hidden="true" /> : step}
+      </span>
+      <span className={complete ? "text-foreground" : "text-muted-foreground"}>
         {label}
-      </p>
-      <p className="mt-1 font-medium">{value}</p>
+      </span>
+    </div>
+  );
+}
+
+function ContinuityLock({
+  icon: Icon,
+  label,
+  text,
+}: {
+  icon: typeof ShieldCheck;
+  label: string;
+  text: string;
+}) {
+  return (
+    <div className="flex gap-3">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <Icon className="size-4" aria-hidden="true" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold">{label} locked</p>
+        <p className="mt-1 line-clamp-3 text-[11px] leading-5 text-muted-foreground">
+          {text}
+        </p>
+      </div>
     </div>
   );
 }

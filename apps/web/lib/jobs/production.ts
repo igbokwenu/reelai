@@ -85,15 +85,14 @@ export async function selectTake(takeId: string) {
   const sceneUpdate =
     take.kind === "VIDEO"
       ? { selectedVideoTakeId: take.id }
-      : { selectedKeyframeTakeId: take.id };
+      : take.kind === "KEYFRAME_END"
+        ? { selectedEndFrameTakeId: take.id, selectedVideoTakeId: null }
+        : { selectedKeyframeTakeId: take.id, selectedVideoTakeId: null };
 
-  const siblingTakeFilter: Prisma.TakeWhereInput =
-    take.kind === "VIDEO"
-      ? { sceneId: take.sceneId, kind: "VIDEO" }
-      : {
-          sceneId: take.sceneId,
-          kind: { in: ["KEYFRAME_START", "KEYFRAME_END"] },
-        };
+  const siblingTakeFilter: Prisma.TakeWhereInput = {
+    sceneId: take.sceneId,
+    kind: take.kind,
+  };
 
   await prisma.$transaction([
     prisma.take.updateMany({
@@ -108,6 +107,14 @@ export async function selectTake(takeId: string) {
       where: { id: take.sceneId },
       data: sceneUpdate,
     }),
+    ...(take.kind === "VIDEO"
+      ? []
+      : [
+          prisma.take.updateMany({
+            where: { sceneId: take.sceneId, kind: "VIDEO" },
+            data: { selected: false },
+          }),
+        ]),
   ]);
 
   return prisma.take.findUniqueOrThrow({ where: { id: take.id } });
@@ -174,12 +181,24 @@ export async function advanceVideoJob(jobId: string) {
             data: {
               artifactId: artifact.id,
               status: "COMPLETE",
+              selected: true,
               notes: "Completed QwenCloud image-to-video take.",
             },
           }),
+          prisma.take.updateMany({
+            where: {
+              sceneId: sceneTask.sceneId,
+              kind: "VIDEO",
+              id: { not: sceneTask.takeId },
+            },
+            data: { selected: false },
+          }),
           prisma.scene.update({
             where: { id: sceneTask.sceneId },
-            data: { status: "COMPLETE" },
+            data: {
+              status: "COMPLETE",
+              selectedVideoTakeId: sceneTask.takeId,
+            },
           }),
         ]);
 
@@ -278,9 +297,6 @@ async function runKeyframeJob(jobId: string) {
         ].slice(0, 3),
       });
       previousEndReferenceUrl = endTake.providerImageUrl;
-      const selectedKeyframeTakeId =
-        scene.selectedKeyframeTakeId ?? startTake.take.id;
-
       created.push(startTake.take, endTake.take);
       await prisma.$transaction([
         prisma.take.updateMany({
@@ -290,15 +306,21 @@ async function runKeyframeJob(jobId: string) {
           },
           data: { selected: false },
         }),
-        prisma.take.update({
-          where: { id: selectedKeyframeTakeId },
+        prisma.take.updateMany({
+          where: { id: { in: [startTake.take.id, endTake.take.id] } },
           data: { selected: true },
+        }),
+        prisma.take.updateMany({
+          where: { sceneId: scene.id, kind: "VIDEO" },
+          data: { selected: false },
         }),
         prisma.scene.update({
           where: { id: scene.id },
           data: {
             status: "APPROVED",
-            selectedKeyframeTakeId,
+            selectedKeyframeTakeId: startTake.take.id,
+            selectedEndFrameTakeId: endTake.take.id,
+            selectedVideoTakeId: null,
           },
         }),
       ]);
@@ -344,11 +366,11 @@ async function runVideoSubmissionJob(jobId: string) {
     const submitted = [];
 
     for (const scene of scenes) {
-      const selectedImage = await getSelectedKeyframeArtifact(scene);
+      const selectedFrames = await getSelectedKeyframeArtifacts(scene);
 
-      if (!selectedImage) {
+      if (!selectedFrames) {
         throw new Error(
-          "Generate and select keyframes before submitting video clips.",
+          "Generate the recommended first and last frames before creating video clips.",
         );
       }
 
@@ -367,7 +389,8 @@ async function runVideoSubmissionJob(jobId: string) {
         operation: "scene_i2v",
         model: job.model ?? QWEN_I2V_MODEL,
         prompt: take.prompt,
-        imageUrl: artifactUrl(selectedImage),
+        imageUrl: artifactUrl(selectedFrames.start),
+        lastFrameUrl: artifactUrl(selectedFrames.end),
         durationSec: scene.durationSec,
       });
 
@@ -508,8 +531,8 @@ async function getApprovedScenes(projectId: string) {
     throw new Error("Save and approve the storyboard before generation.");
   }
 
-  const scenes = storyboard.scenes.filter(
-    (scene) => scene.status === "APPROVED",
+  const scenes = storyboard.scenes.filter((scene) =>
+    ["APPROVED", "COMPLETE"].includes(scene.status),
   );
 
   if (scenes.length < 2 || scenes.length > 4) {
@@ -563,21 +586,44 @@ async function getGroundingReferenceUrls(projectId: string) {
     .slice(0, 3);
 }
 
-async function getSelectedKeyframeArtifact(scene: ProductionScene) {
-  const selectedTake =
-    scene.takes.find((take) => take.id === scene.selectedKeyframeTakeId) ??
+async function getSelectedKeyframeArtifacts(scene: ProductionScene) {
+  const startTake =
+    scene.takes.find(
+      (take) =>
+        take.id === scene.selectedKeyframeTakeId &&
+        take.kind === "KEYFRAME_START" &&
+        take.status === "COMPLETE",
+    ) ??
     scene.takes.find(
       (take) =>
         take.kind === "KEYFRAME_START" &&
         take.status === "COMPLETE" &&
         take.artifactId,
     );
+  const endTake =
+    scene.takes.find(
+      (take) =>
+        take.id === scene.selectedEndFrameTakeId &&
+        take.kind === "KEYFRAME_END" &&
+        take.status === "COMPLETE",
+    ) ??
+    scene.takes.find(
+      (take) =>
+        take.kind === "KEYFRAME_END" &&
+        take.status === "COMPLETE" &&
+        take.artifactId,
+    );
 
-  if (!selectedTake?.artifactId) {
+  if (!startTake?.artifactId || !endTake?.artifactId) {
     return null;
   }
 
-  return prisma.artifact.findUnique({ where: { id: selectedTake.artifactId } });
+  const [start, end] = await Promise.all([
+    prisma.artifact.findUnique({ where: { id: startTake.artifactId! } }),
+    prisma.artifact.findUnique({ where: { id: endTake.artifactId! } }),
+  ]);
+
+  return start && end ? { start, end } : null;
 }
 
 function artifactUrl(artifact: Artifact) {
@@ -619,7 +665,7 @@ Use a vertical 9:16 composition, brand palette fidelity, consistent product/char
 function buildVideoPrompt(scene: ProductionScene) {
   return `${scene.videoMotionPrompt}
 
-Animate from the selected scene keyframe for ${scene.durationSec} seconds.
+Animate from the approved opening frame to the approved closing frame over ${scene.durationSec} seconds. Arrive cleanly at the closing composition; do not introduce a different ending.
 Locked brand style: ${scene.lockedStyleLanguage}
 Product continuity: ${scene.storyboard.productContinuity}
 Character continuity: ${scene.storyboard.characterContinuity}

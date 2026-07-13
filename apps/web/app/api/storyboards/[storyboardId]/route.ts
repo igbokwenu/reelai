@@ -83,6 +83,7 @@ export async function PATCH(request: Request, context: RouteContext) {
             continuityNotes: scene.continuityNotes,
             continuityMode: scene.continuityMode,
             selectedKeyframeTakeId: imageChanged ? null : undefined,
+            selectedEndFrameTakeId: imageChanged ? null : undefined,
             selectedVideoTakeId: videoChanged ? null : undefined,
             status: "APPROVED",
           },

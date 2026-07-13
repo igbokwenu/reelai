@@ -91,7 +91,8 @@ export function ProjectWorkflow({
       id: "production",
       eyebrow: "04 · Create",
       label: "Production",
-      description: "Generate, compare, and select keyframes and clips.",
+      description:
+        "Review the recommended visual flow, tune scenes, and create clips.",
       icon: ImagePlus,
       state: productionComplete
         ? "complete"

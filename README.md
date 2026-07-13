@@ -20,7 +20,8 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Exactly three creative concepts before full generation spend, with optional note-guided regeneration of one direction without replacing the other two.
 - Visual 2 to 4 scene storyboard filmstrip with side-by-side first/last frames, explicit stitch transitions, a product/character/visual-world continuity bible, and a human approval loop.
 - Continuity-aware keyframes reuse uploaded visual references when available and chain generated scene endpoints across continuous or match-cut transitions; plot-required intentional changes remain explicit.
-- Additive keyframe/video takes with selection instead of destructive regeneration.
+- A recommended Production story flow shows every scene's opening and closing frame in sequence, auto-selects the newest coherent frame pair and clip, keeps prior generations as optional history, and supports inline scene tuning.
+- Wan 2.7 first-and-last-frame video generation makes each clip travel between the approved visual endpoints instead of relying on a first frame alone.
 - Remotion final render path for 9:16 MP4 export.
 - Alibaba OSS-compatible artifact storage with a local dev fallback.
 - Dockerfile, Docker Compose, deploy runbook, seed fixture, and Playwright smoke tests.
@@ -57,7 +58,7 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
-Application-only updates that do not add a Prisma migration require only a restart of `pnpm dev`; do not run `pnpm db:migrate` or `pnpm db:generate` unless the change includes an update under `prisma/migrations` or `prisma/schema.prisma`. The storyboard continuity-bible update does include a migration, so existing local checkouts must run `pnpm db:migrate` once and then restart `pnpm dev`.
+Application-only updates that do not add a Prisma migration require only a restart of `pnpm dev`; do not run `pnpm db:migrate` or `pnpm db:generate` unless the change includes an update under `prisma/migrations` or `prisma/schema.prisma`. The storyboard continuity and recommended opening/closing-frame updates include migrations, so existing local checkouts must run `pnpm db:migrate` once and then restart `pnpm dev`.
 
 The seed creates:
 
@@ -83,6 +84,7 @@ Optional:
 - `REDIS_URL`: reserved for a future queue upgrade.
 - `QWEN_BASE_URL`: structured text endpoint override. Defaults in code to `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`.
 - `QWEN_VIDEO_BASE_URL`, `QWEN_IMAGE_BASE_URL`, `QWEN_TTS_BASE_URL`: media endpoint overrides. Default in code to `https://dashscope-intl.aliyuncs.com/api/v1`.
+- `QWEN_I2V_MODEL`: scene-video model override. Defaults to `wan2.7-i2v`; set a dated Wan 2.7 ID if that is what your QwenCloud region exposes.
 - `SENTRY_DSN`: production error monitoring.
 
 ## QwenCloud Usage
@@ -97,7 +99,7 @@ Model defaults used by the MVP:
 
 - Structured Brand Kit, concepts, storyboard, and policy review: `qwen3.6-plus`.
 - Image/keyframe generation: `wan2.7-image-pro`.
-- Image-to-video scene generation: `happyhorse-1.1-i2v` or the configured supported i2v model.
+- First-and-last-frame scene generation: `wan2.7-i2v` by default; override with `QWEN_I2V_MODEL` when a region requires a dated Wan 2.7 model ID or a legacy first-frame-only model.
 - Narration: `qwen3-tts-flash`.
 
 Secrets, raw private uploads, and full prompts must not be logged in production.

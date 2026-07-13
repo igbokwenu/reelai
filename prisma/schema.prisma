@@ -114,6 +114,7 @@ model Scene {
   safeZonePreset         SafeZonePreset @default(TIKTOK_REELS)
   status                 SceneStatus    @default(DRAFT)
   selectedKeyframeTakeId String?
+  selectedEndFrameTakeId String?
   selectedVideoTakeId    String?
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt

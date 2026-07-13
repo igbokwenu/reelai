@@ -1,6 +1,6 @@
 # Reel AI Architecture
 
-Updated: July 12, 2026
+Updated: July 13, 2026
 
 This document describes the target MVP architecture. The implementation source of truth is `docs/implementation-guide.md`.
 
@@ -55,8 +55,8 @@ flowchart TB
 6. Preview prompts receive the same grounding constraints. Each generated preview is reviewed by QwenCloud vision; rejected or unavailable previews fall back to a clearly designed local concept card instead of presenting fabricated imagery as grounded output. Single-concept replacement is atomic from the user's perspective: the retained concepts keep their IDs and previews, the replacement keeps its concept ID and selection state, and only its superseded preview is cleaned up after persistence. If it drives a storyboard, that storyboard and its scenes return to draft review while prior production artifacts remain durable.
 7. User selects a concept. Legacy previews without grounding metadata cannot advance until regenerated.
 8. Storyboard generation begins with a capability preflight against the selected concept. Missing visual references are treated as adaptation constraints, not upload blockers: the first prompt preserves strategy while replacing unsupported logos, products, or interfaces with unbranded human/environmental storytelling. Deterministic validation is negation-aware, so instructions such as “no logo” are not mistaken for asset requests. If a candidate still violates grounding, one bounded model recovery pass rewrites it; a deterministic safe-text fallback removes any residual unsupported visual or claim language before final validation. Only a candidate that still fails after all recovery layers stops for human review. The successful recovery method and omitted capabilities are persisted in the storyboard job output and explained in the editor. The resulting storyboard creates separate product/character/visual-world continuity locks, classifies every transition as continuous, match-cut, or intentional change, and renders as a first/last-frame filmstrip.
-9. Keyframe jobs generate and store start/end scene images in OSS. When provider-accessible uploaded product/logo/reference imagery exists it is supplied as visual grounding. Within a scene the generated start frame guides the end frame; across continuous and match-cut scenes, the prior end frame guides the next start frame. Intentional-change transitions deliberately break that frame chain while retaining the shared continuity bible in the prompt.
-10. Video job submits i2v tasks and polls QwenCloud until clips are complete.
+9. Keyframe jobs generate and store an explicit recommended opening/closing pair for every scene in OSS. When provider-accessible uploaded product/logo/reference imagery exists it is supplied as visual grounding. Within a scene the generated opening guides the closing frame; across continuous and match-cut scenes, the prior closing frame guides the next opening frame. Intentional-change transitions deliberately break that frame chain while retaining the shared continuity bible in the prompt. The Production UI presents these pairs as one stitched story flow; prior attempts remain available as low-emphasis history instead of requiring another round of horizontal choices.
+10. Video jobs submit each approved opening/closing pair through the Wan 2.7 unified i2v protocol and poll QwenCloud until clips are complete. The newest successful clip becomes the recommended selection automatically. Legacy model overrides retain the older first-frame request shape.
 11. TTS job generates narration audio.
 12. Render job uses Remotion to produce the final 9:16 MP4 and thumbnail.
 13. Final artifacts are stored in OSS and displayed in the studio.
@@ -77,7 +77,7 @@ These restrictions are enforced in prompts, deterministic validation, preview me
 
 - Concepts support both full-set regeneration and note-guided single replacement. Only one concept-generation job may mutate a project at a time.
 - Storyboards are fully editable field by field after generation, including their global continuity bible and per-scene transition modes, but AI regeneration currently replaces the whole 2-to-4-scene plan. Per-scene note-guided regeneration is the next high-value modular addition; it must include adjacent-scene continuity and invalidate only downstream takes for that scene.
-- Production is already additive and modular: keyframe and video attempts create takes rather than destructively replacing prior artifacts. Saving a changed image/continuity brief clears stale keyframe and video selections; motion-only changes clear stale video selection while retaining the valid keyframe. Historical takes remain visible for comparison.
+- Production is additive and modular without making history the primary workflow: keyframe and video attempts create takes rather than destructively replacing prior artifacts, while the newest complete opening/closing pair and clip become the recommended path automatically. Saving a changed image/continuity brief clears stale endpoint and video selections; motion-only changes clear only the stale video selection. Historical takes remain visible in a collapsed archive.
 - Brand Kits can be regenerated but not field-edited. A future editor should distinguish source-backed claims/citations from user-owned tone, palette, and style overrides instead of exposing an unsafe generic JSON edit.
 - Narration and final render are appropriately project-level operations today because their timing and composition depend on the complete approved storyboard.
 

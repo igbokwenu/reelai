@@ -3,14 +3,15 @@ import "server-only";
 import { performance } from "node:perf_hooks";
 
 import { qwenEndpoint } from "@/lib/qwen/endpoints";
+import { buildVideoSubmissionBody } from "@/lib/qwen/video-request";
 
-export const QWEN_VIDEO_BASE_URL =
-  qwenEndpoint(
-    process.env.QWEN_VIDEO_BASE_URL,
-    "https://dashscope-intl.aliyuncs.com/api/v1",
-  );
+export const QWEN_VIDEO_BASE_URL = qwenEndpoint(
+  process.env.QWEN_VIDEO_BASE_URL,
+  "https://dashscope-intl.aliyuncs.com/api/v1",
+);
 
-export const QWEN_I2V_MODEL = "wan2.6-i2v-flash";
+export const QWEN_I2V_MODEL =
+  process.env.QWEN_I2V_MODEL?.trim() || "wan2.7-i2v";
 
 export type VideoTaskSubmission = {
   taskId: string;
@@ -32,12 +33,14 @@ export async function submitImageToVideoTask({
   model = QWEN_I2V_MODEL,
   prompt,
   imageUrl,
+  lastFrameUrl,
   durationSec,
 }: {
   operation: string;
   model?: string;
   prompt: string;
   imageUrl: string;
+  lastFrameUrl?: string;
   durationSec: number;
 }): Promise<VideoTaskSubmission> {
   const apiKey = getQwenApiKey();
@@ -51,19 +54,15 @@ export async function submitImageToVideoTask({
         "Content-Type": "application/json",
         "X-DashScope-Async": "enable",
       },
-      body: JSON.stringify({
-        model,
-        input: {
+      body: JSON.stringify(
+        buildVideoSubmissionBody({
+          model,
           prompt,
-          img_url: imageUrl,
-        },
-        parameters: {
-          duration: Math.max(2, Math.min(15, durationSec)),
-          resolution: "720P",
-          prompt_extend: true,
-          audio: false,
-        },
-      }),
+          imageUrl,
+          lastFrameUrl,
+          durationSec,
+        }),
+      ),
     },
   );
   const elapsedMs = Math.round(performance.now() - startedAt);
@@ -102,9 +101,7 @@ export async function submitImageToVideoTask({
   return { taskId, providerRequestId, elapsedMs, model };
 }
 
-export async function pollVideoTask(
-  taskId: string,
-): Promise<VideoTaskStatus> {
+export async function pollVideoTask(taskId: string): Promise<VideoTaskStatus> {
   const apiKey = getQwenApiKey();
   const response = await fetch(`${QWEN_VIDEO_BASE_URL}/tasks/${taskId}`, {
     headers: { Authorization: `Bearer ${apiKey}` },

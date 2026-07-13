@@ -880,7 +880,9 @@ Exit checklist:
 - [ ] User can generate start/end keyframes for approved scenes.
 - [ ] Keyframe outputs are copied to OSS and saved as `Artifact` rows.
 - [ ] Regenerating a keyframe creates a new `Take`; it does not overwrite the previous take.
-- [ ] User can select the preferred keyframe take.
+- [ ] Production presents one recommended story flow with each scene's opening and closing frame visible together; the user is not required to select among parallel keyframe takes.
+- [ ] The recommended opening and closing frame IDs are persisted independently, and both are supplied to Wan 2.7 video generation.
+- [ ] The newest successful frame pair and video clip are selected automatically while prior attempts remain available as history.
 - [ ] User can submit 2 to 4 scenes for i2v generation.
 - [ ] Video provider task IDs are stored on jobs.
 - [ ] Video polling survives page refresh.
