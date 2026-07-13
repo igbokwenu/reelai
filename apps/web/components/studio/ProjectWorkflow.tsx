@@ -12,7 +12,7 @@ import {
   PlayCircle,
   type LucideIcon,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { memo, type ReactNode, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -25,7 +25,6 @@ type Stage = {
   label: string;
   description: string;
   icon: LucideIcon;
-  content: ReactNode;
   state: "complete" | "current" | "upcoming" | "available";
 };
 
@@ -54,10 +53,6 @@ export function ProjectWorkflow({
   productionComplete: boolean;
   finalComplete: boolean;
 }) {
-  // These entries intentionally stay outside a memoization boundary. Their
-  // content is streamed from Server Components and may receive a new fiber
-  // tree after router.refresh(). Memoizing those React nodes can leave React
-  // DevTools reconciling changed virtual children against a reused collection.
   const storyboardComplete = storyboardStatus === "APPROVED";
   const stages: Stage[] = [
     {
@@ -66,7 +61,6 @@ export function ProjectWorkflow({
       label: "Brand",
       description: "Define the voice, visual language, and safe claims.",
       icon: Palette,
-      content: brand,
       state: hasBrandKit ? "complete" : "current",
     },
     {
@@ -75,7 +69,6 @@ export function ProjectWorkflow({
       label: "Concepts",
       description: "Compare three creative routes and choose one.",
       icon: LayoutTemplate,
-      content: concepts,
       state: hasSelectedConcept
         ? "complete"
         : hasBrandKit
@@ -88,7 +81,6 @@ export function ProjectWorkflow({
       label: "Storyboard",
       description: "Shape the script, scenes, pacing, and approvals.",
       icon: Clapperboard,
-      content: storyboard,
       state: storyboardComplete
         ? "complete"
         : hasSelectedConcept
@@ -101,7 +93,6 @@ export function ProjectWorkflow({
       label: "Production",
       description: "Generate, compare, and select keyframes and clips.",
       icon: ImagePlus,
-      content: production,
       state: productionComplete
         ? "complete"
         : storyboardComplete
@@ -114,7 +105,6 @@ export function ProjectWorkflow({
       label: "Final",
       description: "Add narration and export the finished vertical reel.",
       icon: PlayCircle,
-      content: final,
       state: finalComplete
         ? "complete"
         : productionComplete
@@ -127,7 +117,6 @@ export function ProjectWorkflow({
       label: "Assets",
       description: "Manage source material and generated artifacts.",
       icon: FolderOpen,
-      content: assets,
       state: "available",
     },
   ];
@@ -154,6 +143,7 @@ export function ProjectWorkflow({
       <nav
         aria-label="Project workflow"
         className="workflow-rail overflow-x-auto rounded-2xl border border-border/80 bg-card/70 p-2 shadow-2xl shadow-black/20 backdrop-blur-xl"
+        role="tablist"
       >
         <div className="grid min-w-[760px] grid-cols-6 gap-1">
           {stages.map((stage) => {
@@ -161,14 +151,18 @@ export function ProjectWorkflow({
             const isActive = stage.id === activeStage.id;
             return (
               <button
+                aria-controls={`workflow-panel-${stage.id}`}
                 aria-current={isActive ? "step" : undefined}
+                aria-selected={isActive}
                 className={`group relative min-w-0 rounded-xl px-3 py-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   isActive
                     ? "bg-primary text-primary-foreground shadow-lg shadow-primary/10"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
                 key={stage.id}
+                id={`workflow-tab-${stage.id}`}
                 onClick={() => selectStage(stage.id)}
+                role="tab"
                 type="button"
               >
                 <span className="flex items-center gap-2">
@@ -232,12 +226,18 @@ export function ProjectWorkflow({
           </div>
         </header>
 
-        <div className="p-4 sm:p-7">
-          {stages.map((stage) => (
-            <div hidden={stage.id !== activeStage.id} key={stage.id}>
-              {stage.content}
-            </div>
-          ))}
+        <div
+          className="workflow-panels p-4 sm:p-7"
+          data-active-stage={activeStage.id}
+        >
+          <StagePanels
+            assets={assets}
+            brand={brand}
+            concepts={concepts}
+            final={final}
+            production={production}
+            storyboard={storyboard}
+          />
         </div>
 
         <footer className="flex items-center justify-between gap-3 border-t border-border bg-background/30 px-4 py-3 sm:px-7">
@@ -263,6 +263,46 @@ export function ProjectWorkflow({
           </Button>
         </footer>
       </section>
+    </div>
+  );
+}
+
+const StagePanels = memo(function StagePanels({
+  brand,
+  concepts,
+  storyboard,
+  production,
+  final,
+  assets,
+}: {
+  brand: ReactNode;
+  concepts: ReactNode;
+  storyboard: ReactNode;
+  production: ReactNode;
+  final: ReactNode;
+  assets: ReactNode;
+}) {
+  return (
+    <>
+      <WorkflowPanel id="brand">{brand}</WorkflowPanel>
+      <WorkflowPanel id="concepts">{concepts}</WorkflowPanel>
+      <WorkflowPanel id="storyboard">{storyboard}</WorkflowPanel>
+      <WorkflowPanel id="production">{production}</WorkflowPanel>
+      <WorkflowPanel id="final">{final}</WorkflowPanel>
+      <WorkflowPanel id="assets">{assets}</WorkflowPanel>
+    </>
+  );
+});
+
+function WorkflowPanel({ id, children }: { id: StageId; children: ReactNode }) {
+  return (
+    <div
+      aria-labelledby={`workflow-tab-${id}`}
+      data-workflow-panel={id}
+      id={`workflow-panel-${id}`}
+      role="tabpanel"
+    >
+      {children}
     </div>
   );
 }

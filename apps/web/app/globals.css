@@ -59,3 +59,19 @@ body {
 * {
   border-color: var(--border);
 }
+
+.workflow-panels > [data-workflow-panel] {
+  display: none;
+}
+
+.workflow-panels[data-active-stage="brand"] > [data-workflow-panel="brand"],
+.workflow-panels[data-active-stage="concepts"]
+  > [data-workflow-panel="concepts"],
+.workflow-panels[data-active-stage="storyboard"]
+  > [data-workflow-panel="storyboard"],
+.workflow-panels[data-active-stage="production"]
+  > [data-workflow-panel="production"],
+.workflow-panels[data-active-stage="final"] > [data-workflow-panel="final"],
+.workflow-panels[data-active-stage="assets"] > [data-workflow-panel="assets"] {
+  display: block;
+}
