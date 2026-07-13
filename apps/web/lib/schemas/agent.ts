@@ -81,6 +81,7 @@ export const storyboardSceneSchema = z.object({
   endFramePrompt: z.string().min(20).max(1200),
   videoMotionPrompt: z.string().min(20).max(1200),
   continuityNotes: z.string().min(6).max(700),
+  continuityMode: z.enum(["CONTINUOUS", "MATCH_CUT", "INTENTIONAL_CHANGE"]),
 });
 
 export const storyboardSchema = z
@@ -91,6 +92,11 @@ export const storyboardSchema = z
       enabled: z.boolean(),
       preset: z.string().min(2).max(80),
       prompt: z.string().min(4).max(400),
+    }),
+    continuityBible: z.object({
+      product: z.string().min(6).max(700),
+      characters: z.string().min(6).max(700),
+      visualWorld: z.string().min(6).max(700),
     }),
     scenes: z.array(storyboardSceneSchema).min(2).max(4),
   })
@@ -112,7 +118,7 @@ export const storyboardSchema = z
 export const storyboardJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["title", "script", "bgm", "scenes"],
+  required: ["title", "script", "bgm", "continuityBible", "scenes"],
   properties: {
     title: { type: "string", minLength: 3, maxLength: 100 },
     script: { type: "string", minLength: 20, maxLength: 2400 },
@@ -124,6 +130,16 @@ export const storyboardJsonSchema = {
         enabled: { type: "boolean" },
         preset: { type: "string", minLength: 2, maxLength: 80 },
         prompt: { type: "string", minLength: 4, maxLength: 400 },
+      },
+    },
+    continuityBible: {
+      type: "object",
+      additionalProperties: false,
+      required: ["product", "characters", "visualWorld"],
+      properties: {
+        product: { type: "string", minLength: 6, maxLength: 700 },
+        characters: { type: "string", minLength: 6, maxLength: 700 },
+        visualWorld: { type: "string", minLength: 6, maxLength: 700 },
       },
     },
     scenes: {
@@ -142,6 +158,7 @@ export const storyboardJsonSchema = {
           "endFramePrompt",
           "videoMotionPrompt",
           "continuityNotes",
+          "continuityMode",
         ],
         properties: {
           index: { type: "integer", minimum: 1, maximum: 4 },
@@ -168,6 +185,10 @@ export const storyboardJsonSchema = {
             minLength: 6,
             maxLength: 700,
           },
+          continuityMode: {
+            type: "string",
+            enum: ["CONTINUOUS", "MATCH_CUT", "INTENTIONAL_CHANGE"],
+          },
         },
       },
     },
@@ -179,6 +200,9 @@ export const storyboardPatchSchema = z.object({
   script: z.string().min(20).max(2400).optional(),
   bgmEnabled: z.boolean().optional(),
   bgmPrompt: z.string().max(400).nullable().optional(),
+  productContinuity: z.string().min(1).max(700).optional(),
+  characterContinuity: z.string().min(1).max(700).optional(),
+  visualContinuity: z.string().min(1).max(700).optional(),
   scenes: z
     .array(
       z.object({
@@ -190,6 +214,11 @@ export const storyboardPatchSchema = z.object({
         endFramePrompt: z.string().min(20).max(1200),
         videoMotionPrompt: z.string().min(20).max(1200),
         continuityNotes: z.string().min(1).max(700),
+        continuityMode: z.enum([
+          "CONTINUOUS",
+          "MATCH_CUT",
+          "INTENTIONAL_CHANGE",
+        ]),
       }),
     )
     .min(1)
@@ -300,6 +329,12 @@ export function parseStoryboardOutput(value: unknown): StoryboardOutput {
       max: 2400,
     }),
     bgm: normalizeBgm(record.bgm ?? record.music ?? record.backgroundMusic),
+    continuityBible: normalizeContinuityBible(
+      record.continuityBible ??
+        record.continuity_bible ??
+        record.consistencyBible ??
+        record.consistency_bible,
+    ),
     scenes,
   });
 }
@@ -549,7 +584,67 @@ function normalizeStoryboardScene(value: unknown, index: number) {
         max: 700,
       },
     ),
+    continuityMode: normalizeContinuityMode(
+      record.continuityMode ??
+        record.continuity_mode ??
+        record.transitionMode ??
+        record.transition_mode,
+    ),
   };
+}
+
+function normalizeContinuityBible(value: unknown) {
+  const record = asRecord(value) ?? {};
+
+  return {
+    product: text(
+      record.product ?? record.productContinuity ?? record.product_continuity,
+      {
+        fallback:
+          "Keep every recurring product's shape, materials, colors, and proportions stable across scenes.",
+        min: 6,
+        max: 700,
+      },
+    ),
+    characters: text(
+      record.characters ??
+        record.character ??
+        record.characterContinuity ??
+        record.character_continuity,
+      {
+        fallback:
+          "Keep recurring characters' identity, wardrobe, age, hair, and defining features stable across scenes.",
+        min: 6,
+        max: 700,
+      },
+    ),
+    visualWorld: text(
+      record.visualWorld ??
+        record.visual_world ??
+        record.visualContinuity ??
+        record.visual_continuity ??
+        record.environment,
+      {
+        fallback:
+          "Preserve the established palette, lighting direction, lens language, texture, and time of day.",
+        min: 6,
+        max: 700,
+      },
+    ),
+  };
+}
+
+function normalizeContinuityMode(value: unknown) {
+  const normalized = String(value ?? "CONTINUOUS")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+  if (normalized === "MATCH_CUT" || normalized === "INTENTIONAL_CHANGE") {
+    return normalized;
+  }
+
+  return "CONTINUOUS" as const;
 }
 
 function normalizeBgm(value: unknown) {

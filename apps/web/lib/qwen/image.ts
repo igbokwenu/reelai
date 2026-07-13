@@ -4,11 +4,10 @@ import { performance } from "node:perf_hooks";
 
 import { qwenEndpoint } from "@/lib/qwen/endpoints";
 
-export const QWEN_IMAGE_BASE_URL =
-  qwenEndpoint(
-    process.env.QWEN_IMAGE_BASE_URL,
-    "https://dashscope-intl.aliyuncs.com/api/v1",
-  );
+export const QWEN_IMAGE_BASE_URL = qwenEndpoint(
+  process.env.QWEN_IMAGE_BASE_URL,
+  "https://dashscope-intl.aliyuncs.com/api/v1",
+);
 
 export type QwenImageResult = {
   imageUrl: string;
@@ -21,11 +20,13 @@ export async function generateImageWithQwen({
   operation,
   model,
   prompt,
+  imageUrls = [],
   size = "720*1280",
 }: {
   operation: string;
   model: string;
   prompt: string;
+  imageUrls?: string[];
   size?: string;
 }): Promise<QwenImageResult> {
   const apiKey = getQwenApiKey();
@@ -44,7 +45,10 @@ export async function generateImageWithQwen({
           messages: [
             {
               role: "user",
-              content: [{ text: prompt }],
+              content: [
+                ...imageUrls.slice(0, 3).map((image) => ({ image })),
+                { text: prompt },
+              ],
             },
           ],
         },

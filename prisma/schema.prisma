@@ -80,16 +80,19 @@ model CreativeConcept {
 }
 
 model Storyboard {
-  id         String           @id @default(cuid())
-  projectId  String           @unique
-  conceptId  String
-  title      String
-  script     String
-  bgmPrompt  String?
-  bgmEnabled Boolean          @default(true)
-  status     StoryboardStatus @default(DRAFT)
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+  id                  String           @id @default(cuid())
+  projectId           String           @unique
+  conceptId           String
+  title               String
+  script              String
+  productContinuity   String           @default("Preserve recurring product shape, materials, colors, proportions, and identifying details across scenes.")
+  characterContinuity String           @default("Preserve recurring character identity, wardrobe, hair, age, and defining features across scenes.")
+  visualContinuity    String           @default("Preserve the locked brand palette, lighting, lens language, texture, and time of day across scenes.")
+  bgmPrompt           String?
+  bgmEnabled          Boolean          @default(true)
+  status              StoryboardStatus @default(DRAFT)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   scenes  Scene[]
@@ -106,6 +109,7 @@ model Scene {
   endFramePrompt         String
   videoMotionPrompt      String
   continuityNotes        String         @default("")
+  continuityMode         ContinuityMode @default(CONTINUOUS)
   lockedStyleLanguage    String
   safeZonePreset         SafeZonePreset @default(TIKTOK_REELS)
   status                 SceneStatus    @default(DRAFT)
@@ -224,6 +228,12 @@ enum SafeZonePreset {
   TIKTOK_REELS
   YOUTUBE_SHORTS
   NONE
+}
+
+enum ContinuityMode {
+  CONTINUOUS
+  MATCH_CUT
+  INTENTIONAL_CHANGE
 }
 
 enum TakeKind {

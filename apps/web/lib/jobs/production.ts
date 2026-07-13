@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Artifact, Prisma, Scene, Take } from "@prisma/client";
+import type { Artifact, Prisma, Scene, Storyboard, Take } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { generateImageWithQwen } from "@/lib/qwen/image";
@@ -14,7 +14,13 @@ import { createArtifactFromUrl } from "@/lib/media/artifacts";
 
 export const QWEN_KEYFRAME_IMAGE_MODEL = "wan2.7-image-pro";
 
-type ProductionScene = Scene & { takes: Take[] };
+type ProductionScene = Scene & {
+  takes: Take[];
+  storyboard: Pick<
+    Storyboard,
+    "productContinuity" | "characterContinuity" | "visualContinuity"
+  >;
+};
 type VideoJobOutput = {
   scenes: Array<{
     sceneId: string;
@@ -200,13 +206,19 @@ export async function advanceVideoJob(jobId: string) {
   const hasWaiting = nextScenes.some(
     (sceneTask) => sceneTask.status === "WAITING_PROVIDER",
   );
-  const hasFailed = nextScenes.some((sceneTask) => sceneTask.status === "FAILED");
+  const hasFailed = nextScenes.some(
+    (sceneTask) => sceneTask.status === "FAILED",
+  );
   const completed = !hasWaiting && !hasFailed;
 
   return prisma.generationJob.update({
     where: { id: jobId },
     data: {
-      status: completed ? "COMPLETE" : hasFailed ? "FAILED" : "WAITING_PROVIDER",
+      status: completed
+        ? "COMPLETE"
+        : hasFailed
+          ? "FAILED"
+          : "WAITING_PROVIDER",
       output: { scenes: nextScenes },
       error: hasFailed
         ? "One or more scene video tasks failed. Retry failed scenes from the Generation console."
@@ -232,7 +244,11 @@ async function runKeyframeJob(jobId: string) {
     });
 
     const scenes = await getApprovedScenes(job.projectId);
+    const groundingReferenceUrls = await getGroundingReferenceUrls(
+      job.projectId,
+    );
     const created = [];
+    let previousEndReferenceUrl: string | null = null;
 
     for (const scene of scenes) {
       await prisma.scene.update({
@@ -245,16 +261,27 @@ async function runKeyframeJob(jobId: string) {
         scene,
         kind: "KEYFRAME_START",
         prompt: buildKeyframePrompt(scene, "start"),
+        referenceImageUrls:
+          previousEndReferenceUrl &&
+          scene.continuityMode !== "INTENTIONAL_CHANGE"
+            ? [previousEndReferenceUrl, ...groundingReferenceUrls].slice(0, 3)
+            : groundingReferenceUrls,
       });
       const endTake = await createKeyframeTake({
         projectId: job.projectId,
         scene,
         kind: "KEYFRAME_END",
         prompt: buildKeyframePrompt(scene, "end"),
+        referenceImageUrls: [
+          startTake.providerImageUrl,
+          ...groundingReferenceUrls,
+        ].slice(0, 3),
       });
-      const selectedKeyframeTakeId = scene.selectedKeyframeTakeId ?? startTake.id;
+      previousEndReferenceUrl = endTake.providerImageUrl;
+      const selectedKeyframeTakeId =
+        scene.selectedKeyframeTakeId ?? startTake.take.id;
 
-      created.push(startTake, endTake);
+      created.push(startTake.take, endTake.take);
       await prisma.$transaction([
         prisma.take.updateMany({
           where: {
@@ -346,7 +373,10 @@ async function runVideoSubmissionJob(jobId: string) {
 
       await prisma.take.update({
         where: { id: take.id },
-        data: { status: "RUNNING", notes: `Provider task ${submission.taskId}` },
+        data: {
+          status: "RUNNING",
+          notes: `Provider task ${submission.taskId}`,
+        },
       });
 
       submitted.push({
@@ -377,11 +407,13 @@ async function createKeyframeTake({
   scene,
   kind,
   prompt,
+  referenceImageUrls,
 }: {
   projectId: string;
   scene: ProductionScene;
   kind: "KEYFRAME_START" | "KEYFRAME_END";
   prompt: string;
+  referenceImageUrls: string[];
 }) {
   const queued = await createQueuedTake({ sceneId: scene.id, kind, prompt });
 
@@ -390,6 +422,7 @@ async function createKeyframeTake({
       operation: "scene_keyframe",
       model: QWEN_KEYFRAME_IMAGE_MODEL,
       prompt,
+      imageUrls: referenceImageUrls,
     });
     const artifact = await createArtifactFromUrl({
       projectId,
@@ -403,12 +436,13 @@ async function createKeyframeTake({
         providerImageUrl: generated.imageUrl,
         providerRequestId: generated.providerRequestId,
         prompt,
+        referenceImageCount: referenceImageUrls.length,
         sceneId: scene.id,
         takeId: queued.id,
       },
     });
 
-    return prisma.take.update({
+    const take = await prisma.take.update({
       where: { id: queued.id },
       data: {
         status: "COMPLETE",
@@ -416,6 +450,8 @@ async function createKeyframeTake({
         notes: "Completed QwenCloud keyframe.",
       },
     });
+
+    return { take, providerImageUrl: generated.imageUrl };
   } catch (error) {
     const safeError =
       error instanceof Error
@@ -472,13 +508,59 @@ async function getApprovedScenes(projectId: string) {
     throw new Error("Save and approve the storyboard before generation.");
   }
 
-  const scenes = storyboard.scenes.filter((scene) => scene.status === "APPROVED");
+  const scenes = storyboard.scenes.filter(
+    (scene) => scene.status === "APPROVED",
+  );
 
   if (scenes.length < 2 || scenes.length > 4) {
     throw new Error("Phase 5 supports 2 to 4 approved scenes.");
   }
 
-  return scenes;
+  return scenes.map((scene) => ({
+    ...scene,
+    storyboard: {
+      productContinuity: storyboard.productContinuity,
+      characterContinuity: storyboard.characterContinuity,
+      visualContinuity: storyboard.visualContinuity,
+    },
+  }));
+}
+
+async function getGroundingReferenceUrls(projectId: string) {
+  const sources = await prisma.brandSource.findMany({
+    where: {
+      projectId,
+      artifactId: { not: null },
+      type: { in: ["PRODUCT_IMAGE", "LOGO", "REFERENCE_AD", "UPLOAD"] },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  const artifactIds = sources
+    .map((source) => source.artifactId)
+    .filter((id): id is string => Boolean(id));
+
+  if (artifactIds.length === 0) return [];
+
+  const artifacts = await prisma.artifact.findMany({
+    where: {
+      id: { in: artifactIds },
+      mimeType: { startsWith: "image/" },
+    },
+  });
+  const artifactById = new Map(
+    artifacts.map((artifact) => [artifact.id, artifact]),
+  );
+
+  return sources
+    .map((source) =>
+      source.artifactId ? artifactById.get(source.artifactId) : null,
+    )
+    .filter((artifact): artifact is Artifact => Boolean(artifact))
+    .map((artifact) => artifact.publicUrl)
+    .filter((url): url is string =>
+      Boolean(url?.startsWith("https://") || url?.startsWith("http://")),
+    )
+    .slice(0, 3);
 }
 
 async function getSelectedKeyframeArtifact(scene: ProductionScene) {
@@ -515,7 +597,7 @@ function artifactUrl(artifact: Artifact) {
 }
 
 function buildKeyframePrompt(
-  scene: Scene,
+  scene: ProductionScene,
   position: "start" | "end",
 ) {
   const basePrompt =
@@ -524,16 +606,25 @@ function buildKeyframePrompt(
   return `${basePrompt}
 
 Locked brand style: ${scene.lockedStyleLanguage}
+Product continuity: ${scene.storyboard.productContinuity}
+Character continuity: ${scene.storyboard.characterContinuity}
+Visual-world continuity: ${scene.storyboard.visualContinuity}
+Transition mode: ${scene.continuityMode}
 Scene continuity: ${scene.continuityNotes}
 Caption context: ${scene.captionText}
+${scene.continuityMode === "INTENTIONAL_CHANGE" ? "Honor only the explicitly described plot change; preserve every other locked identity and style attribute." : "Treat supplied reference imagery as identity and composition guidance; do not redesign recurring products or characters."}
 Use a vertical 9:16 composition, brand palette fidelity, consistent product/character styling, ad-safe commercial polish, no extra text unless requested.`;
 }
 
-function buildVideoPrompt(scene: Scene) {
+function buildVideoPrompt(scene: ProductionScene) {
   return `${scene.videoMotionPrompt}
 
 Animate from the selected scene keyframe for ${scene.durationSec} seconds.
 Locked brand style: ${scene.lockedStyleLanguage}
+Product continuity: ${scene.storyboard.productContinuity}
+Character continuity: ${scene.storyboard.characterContinuity}
+Visual-world continuity: ${scene.storyboard.visualContinuity}
+Transition mode: ${scene.continuityMode}
 Continuity notes: ${scene.continuityNotes}
 Caption context: ${scene.captionText}
 Keep motion smooth, vertical 9:16, commercial social ad pacing, no unsupported claims, no new logos or text overlays beyond the approved storyboard copy.`;

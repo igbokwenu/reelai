@@ -17,7 +17,8 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Evidence-capability guardrails: website-only projects cannot manufacture product UI, logos, branded uniforms, badges, packaging, or unsupported trust claims.
 - Pre-spend concept validation and post-generation visual grounding review; previews that fail review are replaced with an honest local concept card.
 - Exactly three creative concepts before full generation spend, with optional note-guided regeneration of one direction without replacing the other two.
-- Editable 2 to 4 scene storyboard and human approval loop.
+- Visual 2 to 4 scene storyboard filmstrip with side-by-side first/last frames, explicit stitch transitions, a product/character/visual-world continuity bible, and a human approval loop.
+- Continuity-aware keyframes reuse uploaded visual references when available and chain generated scene endpoints across continuous or match-cut transitions; plot-required intentional changes remain explicit.
 - Additive keyframe/video takes with selection instead of destructive regeneration.
 - Remotion final render path for 9:16 MP4 export.
 - Alibaba OSS-compatible artifact storage with a local dev fallback.
@@ -55,7 +56,7 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
-Application-only updates that do not add a Prisma migration require only a restart of `pnpm dev`; do not run `pnpm db:migrate` or `pnpm db:generate` unless the change includes an update under `prisma/migrations` or `prisma/schema.prisma`.
+Application-only updates that do not add a Prisma migration require only a restart of `pnpm dev`; do not run `pnpm db:migrate` or `pnpm db:generate` unless the change includes an update under `prisma/migrations` or `prisma/schema.prisma`. The storyboard continuity-bible update does include a migration, so existing local checkouts must run `pnpm db:migrate` once and then restart `pnpm dev`.
 
 The seed creates:
 

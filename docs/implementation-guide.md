@@ -850,6 +850,9 @@ Exit checklist:
 - [ ] Storyboard generation requires a selected concept.
 - [ ] Storyboard contains 2 to 4 scenes for MVP.
 - [ ] Each scene has duration, caption, voiceover text, start/end frame prompts, motion prompt, and continuity notes.
+- [ ] The storyboard has explicit product, character, and visual-world continuity locks.
+- [ ] The filmstrip shows every first/last frame brief (and generated image when available) in final stitch order.
+- [ ] Every inter-scene handoff is marked continuous, match-cut, or intentional change.
 - [ ] User can edit scene caption, voiceover, prompts, duration, and BGM settings.
 - [ ] Storyboard edits persist after refresh.
 - [ ] Policy/claims warnings are visible before generation.

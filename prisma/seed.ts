@@ -158,6 +158,12 @@ async function main() {
       title: "Northstar Desk Ritual",
       script:
         "A fast, warm vertical reel that turns an ordinary team morning into a repeatable cold brew ritual.",
+      productContinuity:
+        "Use the same clear glass cold-brew bottle, black label geometry, amber liquid level, and condensation treatment in every product appearance.",
+      characterContinuity:
+        "Keep the same three-person creative team, their neutral workwear, hair, and accessories consistent across the office scenes.",
+      visualContinuity:
+        "Warm morning light from camera left, black/amber/oat palette, realistic 35mm lifestyle photography, and shallow depth of field throughout.",
       bgmEnabled: true,
       bgmPrompt: "light percussive indie beat, optimistic but not cheesy",
       status: "DRAFT",
@@ -178,6 +184,7 @@ async function main() {
               "Slow push-in from desk clutter to the clean bottle reveal.",
             continuityNotes:
               "Keep amber highlights and black label styling consistent.",
+            continuityMode: "CONTINUOUS",
             lockedStyleLanguage:
               "Realistic vertical lifestyle footage, warm morning light, sharp product closeups.",
             status: "APPROVED",
@@ -197,6 +204,7 @@ async function main() {
               "Match cut from fridge door opening to coffee pouring over ice.",
             continuityNotes:
               "Use the same bottle shape and amber/oat palette from scene one.",
+            continuityMode: "MATCH_CUT",
             lockedStyleLanguage:
               "Realistic vertical lifestyle footage, warm morning light, sharp product closeups.",
             status: "APPROVED",
@@ -216,6 +224,7 @@ async function main() {
               "Gentle handheld team moment ending on a stable product hero shot.",
             continuityNotes:
               "End with readable label space and safe caption zone.",
+            continuityMode: "CONTINUOUS",
             lockedStyleLanguage:
               "Realistic vertical lifestyle footage, warm morning light, sharp product closeups.",
             status: "APPROVED",

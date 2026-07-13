@@ -471,6 +471,9 @@ async function saveStoryboard({
       script: output.script,
       bgmEnabled: output.bgm.enabled,
       bgmPrompt: `${output.bgm.preset}: ${output.bgm.prompt}`,
+      productContinuity: output.continuityBible.product,
+      characterContinuity: output.continuityBible.characters,
+      visualContinuity: output.continuityBible.visualWorld,
       status: "DRAFT",
       scenes: {
         create: output.scenes.map((scene, index) => ({
@@ -482,6 +485,7 @@ async function saveStoryboard({
           endFramePrompt: scene.endFramePrompt,
           videoMotionPrompt: scene.videoMotionPrompt,
           continuityNotes: scene.continuityNotes,
+          continuityMode: scene.continuityMode,
           lockedStyleLanguage: brandKit.lockedStyle,
         })),
       },
@@ -493,6 +497,9 @@ async function saveStoryboard({
       script: output.script,
       bgmEnabled: output.bgm.enabled,
       bgmPrompt: `${output.bgm.preset}: ${output.bgm.prompt}`,
+      productContinuity: output.continuityBible.product,
+      characterContinuity: output.continuityBible.characters,
+      visualContinuity: output.continuityBible.visualWorld,
       status: "DRAFT",
       scenes: {
         create: output.scenes.map((scene, index) => ({
@@ -504,6 +511,7 @@ async function saveStoryboard({
           endFramePrompt: scene.endFramePrompt,
           videoMotionPrompt: scene.videoMotionPrompt,
           continuityNotes: scene.continuityNotes,
+          continuityMode: scene.continuityMode,
           lockedStyleLanguage: brandKit.lockedStyle,
         })),
       },
@@ -868,9 +876,13 @@ Requirements:
 - Do not drift into a different concept, a generic ad, or a list of disconnected scenes.
 - Voiceover text must be 600 characters or less per scene.
 - Each scene needs caption, voiceover, start/end frame prompts, motion prompt, and continuity notes.
+- Build a continuityBible before the scenes. Separately lock recurring product attributes, recurring character identity/wardrobe, and the shared visual world. If a category is absent, explicitly say that no recurring product or character is required.
+- Set continuityMode on every scene: CONTINUOUS for a seamless handoff, MATCH_CUT when the composition/action intentionally bridges from the prior scene, or INTENTIONAL_CHANGE only when the plot requires a different character, location, time, or visual world.
 - startFramePrompt, endFramePrompt, videoMotionPrompt, and continuityNotes must be specific, visual, and production-ready.
 - Do not leave any required field blank or generic.
-- Prompts must keep visual continuity and respect the locked brand style.
+- A CONTINUOUS or MATCH_CUT scene must name the invariant product, character, wardrobe, palette, lighting, and spatial details it inherits from the previous scene. INTENTIONAL_CHANGE must name exactly what changes and what still remains visually consistent.
+- The end frame of scene N and start frame of scene N+1 must describe a plausible stitch point. For MATCH_CUT, align subject position, scale, motion direction, and dominant color across the cut.
+- Prompts must keep product and character identity stable and respect the locked brand style unless INTENTIONAL_CHANGE explicitly justifies the difference.
 - Use the brand palette colors and visual motifs in scene descriptions.
 - Match the ${project.style === "THREE_D_ANIMATION" ? "3D animation" : "realistic"} visual style.
 - Do not create unsupported performance, medical, financial, or legal claims.

@@ -274,6 +274,7 @@ export default async function ProjectPage({ params }: PageProps) {
               productionComplete={productionComplete}
               storyboard={
                 <StoryboardTimeline
+                  artifacts={project.artifacts}
                   key={
                     project.storyboard
                       ? `${project.storyboard.id}-${project.storyboard.updatedAt.toISOString()}`

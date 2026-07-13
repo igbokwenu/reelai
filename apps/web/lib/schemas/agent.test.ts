@@ -55,6 +55,7 @@ describe("Phase 4 agent schemas", () => {
         "Slow camera move across the product while captions remain in safe zones.",
       continuityNotes:
         "Keep the same palette, lighting, product shape, and caption placement.",
+      continuityMode: index === 2 ? "MATCH_CUT" : "CONTINUOUS",
     });
 
     expect(
@@ -66,6 +67,14 @@ describe("Phase 4 agent schemas", () => {
           enabled: true,
           preset: "warm pulse",
           prompt: "Light upbeat percussion with restrained synth texture.",
+        },
+        continuityBible: {
+          product:
+            "Keep the same product shape, finish, proportions, and color.",
+          characters:
+            "Keep the same cast, wardrobe, hair, and defining features.",
+          visualWorld:
+            "Keep warm side light, a restrained palette, and the same lens language.",
         },
         scenes: [scene(1), scene(2), scene(3)],
       }).success,
@@ -79,6 +88,14 @@ describe("Phase 4 agent schemas", () => {
           enabled: true,
           preset: "warm pulse",
           prompt: "Light upbeat percussion with restrained synth texture.",
+        },
+        continuityBible: {
+          product:
+            "Keep the same product shape, finish, proportions, and color.",
+          characters:
+            "Keep the same cast, wardrobe, hair, and defining features.",
+          visualWorld:
+            "Keep warm side light, a restrained palette, and the same lens language.",
         },
         scenes: [scene(1)],
       }).success,
@@ -214,6 +231,8 @@ describe("Phase 4 agent schemas", () => {
     expect(parsed.scenes).toHaveLength(3);
     expect(parsed.scenes[0]?.durationSec).toBe(8);
     expect(parsed.bgm.preset).toBe("warm pulse");
+    expect(parsed.continuityBible.product).toContain("recurring product");
+    expect(parsed.scenes[0]?.continuityMode).toBe("CONTINUOUS");
   });
 
   it("rejects incomplete storyboards instead of filling generic scene prompts", () => {
@@ -253,6 +272,8 @@ describe("Phase 4 agent schemas", () => {
     expect(scenes.maxItems).toBe(4);
     expect(scenes.items.required).toContain("startFramePrompt");
     expect(scenes.items.required).toContain("videoMotionPrompt");
+    expect(scenes.items.required).toContain("continuityMode");
     expect(scenes.items.properties.continuityNotes.minLength).toBe(6);
+    expect(storyboardJsonSchema.required).toContain("continuityBible");
   });
 });

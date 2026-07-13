@@ -29,6 +29,33 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
+    const continuityChanged =
+      (body.productContinuity !== undefined &&
+        body.productContinuity !== storyboard.productContinuity) ||
+      (body.characterContinuity !== undefined &&
+        body.characterContinuity !== storyboard.characterContinuity) ||
+      (body.visualContinuity !== undefined &&
+        body.visualContinuity !== storyboard.visualContinuity);
+    const existingSceneById = new Map(
+      storyboard.scenes.map((scene) => [scene.id, scene]),
+    );
+    const sceneChanges = (body.scenes ?? []).map((scene) => {
+      const existing = existingSceneById.get(scene.id)!;
+      const imageChanged =
+        continuityChanged ||
+        scene.startFramePrompt !== existing.startFramePrompt ||
+        scene.endFramePrompt !== existing.endFramePrompt ||
+        scene.continuityNotes !== existing.continuityNotes ||
+        scene.continuityMode !== existing.continuityMode;
+      const videoChanged =
+        imageChanged ||
+        scene.durationSec !== existing.durationSec ||
+        scene.captionText !== existing.captionText ||
+        scene.videoMotionPrompt !== existing.videoMotionPrompt;
+
+      return { scene, imageChanged, videoChanged };
+    });
+
     await prisma.$transaction([
       prisma.storyboard.update({
         where: { id: storyboardId },
@@ -37,10 +64,13 @@ export async function PATCH(request: Request, context: RouteContext) {
           script: body.script,
           bgmEnabled: body.bgmEnabled,
           bgmPrompt: body.bgmPrompt,
+          productContinuity: body.productContinuity,
+          characterContinuity: body.characterContinuity,
+          visualContinuity: body.visualContinuity,
           status: "APPROVED",
         },
       }),
-      ...(body.scenes ?? []).map((scene) =>
+      ...sceneChanges.map(({ scene, imageChanged, videoChanged }) =>
         prisma.scene.update({
           where: { id: scene.id },
           data: {
@@ -51,10 +81,26 @@ export async function PATCH(request: Request, context: RouteContext) {
             endFramePrompt: scene.endFramePrompt,
             videoMotionPrompt: scene.videoMotionPrompt,
             continuityNotes: scene.continuityNotes,
+            continuityMode: scene.continuityMode,
+            selectedKeyframeTakeId: imageChanged ? null : undefined,
+            selectedVideoTakeId: videoChanged ? null : undefined,
             status: "APPROVED",
           },
         }),
       ),
+      ...sceneChanges
+        .filter(
+          ({ imageChanged, videoChanged }) => imageChanged || videoChanged,
+        )
+        .map(({ scene, imageChanged }) =>
+          prisma.take.updateMany({
+            where: {
+              sceneId: scene.id,
+              ...(imageChanged ? {} : { kind: "VIDEO" as const }),
+            },
+            data: { selected: false },
+          }),
+        ),
     ]);
 
     const updated = await prisma.storyboard.findUniqueOrThrow({
