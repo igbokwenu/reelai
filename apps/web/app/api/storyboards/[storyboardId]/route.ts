@@ -1,6 +1,7 @@
 import { handleRoute, notFound, ok } from "@/lib/http/responses";
 import { prisma } from "@/lib/prisma";
 import { storyboardPatchSchema } from "@/lib/schemas/agent";
+import { planContinuityInvalidation } from "@/lib/storyboards/continuity-invalidation";
 
 type RouteContext = {
   params: Promise<{ storyboardId: string }>;
@@ -39,22 +40,32 @@ export async function PATCH(request: Request, context: RouteContext) {
     const existingSceneById = new Map(
       storyboard.scenes.map((scene) => [scene.id, scene]),
     );
-    const sceneChanges = (body.scenes ?? []).map((scene) => {
+    const invalidation = planContinuityInvalidation(
+      storyboard.scenes,
+      body.scenes ?? [],
+      continuityChanged,
+    );
+    const patchBySceneId = new Map(
+      (body.scenes ?? []).map((scene) => [scene.id, scene]),
+    );
+    const sceneOutputChanged = (body.scenes ?? []).some((scene) => {
       const existing = existingSceneById.get(scene.id)!;
-      const imageChanged =
-        continuityChanged ||
-        scene.startFramePrompt !== existing.startFramePrompt ||
-        scene.endFramePrompt !== existing.endFramePrompt ||
-        scene.continuityNotes !== existing.continuityNotes ||
-        scene.continuityMode !== existing.continuityMode;
-      const videoChanged =
-        imageChanged ||
+      return (
         scene.durationSec !== existing.durationSec ||
         scene.captionText !== existing.captionText ||
-        scene.videoMotionPrompt !== existing.videoMotionPrompt;
-
-      return { scene, imageChanged, videoChanged };
+        scene.voiceoverText !== existing.voiceoverText ||
+        scene.anchorFramePrompt !== existing.anchorFramePrompt ||
+        scene.transitionOutPrompt !== existing.transitionOutPrompt ||
+        scene.videoMotionPrompt !== existing.videoMotionPrompt ||
+        scene.continuityNotes !== existing.continuityNotes ||
+        scene.continuityMode !== existing.continuityMode
+      );
     });
+    const narrationChanged = (body.scenes ?? []).some((scene) => {
+      const existing = existingSceneById.get(scene.id)!;
+      return scene.voiceoverText !== existing.voiceoverText;
+    });
+    const renderChanged = sceneOutputChanged || continuityChanged;
 
     await prisma.$transaction([
       prisma.storyboard.update({
@@ -70,38 +81,83 @@ export async function PATCH(request: Request, context: RouteContext) {
           status: "APPROVED",
         },
       }),
-      ...sceneChanges.map(({ scene, imageChanged, videoChanged }) =>
-        prisma.scene.update({
-          where: { id: scene.id },
+      ...storyboard.scenes.map((existing) => {
+        const scene = patchBySceneId.get(existing.id);
+        const stale = invalidation.get(existing.id)!;
+        return prisma.scene.update({
+          where: { id: existing.id },
           data: {
-            durationSec: scene.durationSec,
-            captionText: scene.captionText,
-            voiceoverText: scene.voiceoverText,
-            startFramePrompt: scene.startFramePrompt,
-            endFramePrompt: scene.endFramePrompt,
-            videoMotionPrompt: scene.videoMotionPrompt,
-            continuityNotes: scene.continuityNotes,
-            continuityMode: scene.continuityMode,
-            selectedKeyframeTakeId: imageChanged ? null : undefined,
-            selectedEndFrameTakeId: imageChanged ? null : undefined,
-            selectedVideoTakeId: videoChanged ? null : undefined,
-            status: "APPROVED",
+            durationSec: scene?.durationSec,
+            captionText: scene?.captionText,
+            voiceoverText: scene?.voiceoverText,
+            anchorFramePrompt: scene?.anchorFramePrompt,
+            transitionOutPrompt: scene?.transitionOutPrompt,
+            videoMotionPrompt: scene?.videoMotionPrompt,
+            continuityNotes: scene?.continuityNotes,
+            continuityMode: scene?.continuityMode,
+            selectedKeyframeTakeId: stale.anchor ? null : undefined,
+            selectedVideoTakeId: stale.video ? null : undefined,
+            status:
+              existing.status === "DRAFT" || stale.video
+                ? "APPROVED"
+                : undefined,
           },
-        }),
-      ),
-      ...sceneChanges
-        .filter(
-          ({ imageChanged, videoChanged }) => imageChanged || videoChanged,
-        )
-        .map(({ scene, imageChanged }) =>
-          prisma.take.updateMany({
+        });
+      }),
+      ...storyboard.scenes
+        .filter((scene) => {
+          const stale = invalidation.get(scene.id)!;
+          return stale.anchor || stale.video;
+        })
+        .map((scene) => {
+          const stale = invalidation.get(scene.id)!;
+          return prisma.take.updateMany({
             where: {
               sceneId: scene.id,
-              ...(imageChanged ? {} : { kind: "VIDEO" as const }),
+              ...(stale.anchor
+                ? { kind: { in: ["KEYFRAME_START", "VIDEO"] as const } }
+                : { kind: "VIDEO" as const }),
             },
             data: { selected: false },
-          }),
-        ),
+          });
+        }),
+      ...(narrationChanged
+        ? [
+            prisma.generationJob.updateMany({
+              where: {
+                projectId: storyboard.projectId,
+                type: "TTS",
+                status: "COMPLETE",
+              },
+              data: {
+                status: "CANCELLED",
+                error: "Storyboard narration changed; regenerate narration.",
+              },
+            }),
+          ]
+        : []),
+      ...(renderChanged
+        ? [
+            prisma.generationJob.updateMany({
+              where: {
+                projectId: storyboard.projectId,
+                type: "RENDER",
+                status: "COMPLETE",
+              },
+              data: {
+                status: "CANCELLED",
+                error: "Storyboard changed; create a fresh final export.",
+              },
+            }),
+            prisma.render.updateMany({
+              where: {
+                projectId: storyboard.projectId,
+                status: "COMPLETE",
+              },
+              data: { status: "FAILED" },
+            }),
+          ]
+        : []),
     ]);
 
     const updated = await prisma.storyboard.findUniqueOrThrow({

@@ -111,7 +111,7 @@ Differentiators:
 
 - Parallel creative directions, not one script: the Creative Director Agent pitches three genuinely different concepts with cheap preview frames before any full storyboard or video spend.
 - Optional consistent AI spokesperson: using reference-to-video, the same character can hold their face, outfit, and presence across the reel. Treat this as the main visual wow path when generation quality is stable enough.
-- Continuity-first storyboard: each scene has start and end keyframes, not just a text prompt.
+- Continuity-first storyboard: each scene has one visual anchor, a motion brief, and a natural-exit handoff that informs the next scene's anchor without forcing a closing still.
 - Brand-aware creative director: website and documents become a reusable Brand Kit, not a one-time analysis.
 - Take-compare editing: every regeneration is additive; the user chooses between takes like an editor.
 - Token-budget planner: the agent proposes a low-cost draft path and a high-quality render path, with a live generation ticker.
@@ -194,7 +194,7 @@ The planned MVP is supported by the current QwenCloud platform, with a few scope
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Brand research, scriptwriting, concepts, storyboard JSON | Text generation models such as `qwen3.6-plus` support long-context structured text and multimodal planning workflows.                 | Use `qwen3.6-plus` for Brand Kit, three concept pitches, storyboard JSON, claims review, and policy review.                                                                                  |
 | Website and brand material understanding                 | Visual understanding models support image/video analysis, OCR-style extraction, structured output, and long-context multimodal input. | Fetch website content in our backend, render/parse uploads, then send text/images to Qwen for structured Brand Kit extraction. Do not depend on opaque browsing as the only source of truth. |
-| Preview frames and storyboard keyframes                  | `wan2.7-image-pro` supports text rendering, brand color control, multi-image references, consistent image sets, and image editing.    | Generate one cheap preview frame per creative concept, then start/end keyframes for approved storyboard scenes.                                                                              |
+| Preview frames and storyboard keyframes                  | `wan2.7-image-pro` supports text rendering, brand color control, multi-image references, consistent image sets, and image editing.    | Generate one cheap preview frame per creative concept, then one continuity-aware anchor for each approved storyboard scene.                                                                  |
 | Video generation                                         | HappyHorse/Wan support t2v, i2v, r2v, video editing, 720P/1080P, audio-capable clips, and 3 to 15 second segments depending on model. | Use image-to-video as the default continuity path. Generate 2 to 4 scenes for MVP and stitch into a 15 to 30 second reel first; 60 seconds is a final/stretch render path.                   |
 | Consistent spokesperson                                  | `happyhorse-1.1-r2v` supports consistent characters from 1 to 9 reference images; Wan r2v supports richer reference inputs.           | Keep as optional “spokesperson mode” after the default product/story ad flow works. Do not make this a blocker for the main submission.                                                      |
 | Narration                                                | Qwen non-realtime TTS supports content-production voiceover, audio URLs, multiple languages, and instruction control.                 | Generate narrative voiceover chunks; skip lip sync for MVP.                                                                                                                                  |
@@ -410,8 +410,8 @@ Important scene fields:
 - `index`
 - `durationSeconds`
 - `visualStyle`
-- `startFramePrompt`
-- `endFramePrompt`
+- `anchorFramePrompt`
+- `transitionOutPrompt`
 - `videoMotionPrompt`
 - `voiceoverText`
 - `captionText`
@@ -632,7 +632,7 @@ Do not print these values in logs or docs.
 
 ### Phase 2: Keyframes
 
-- Generate start/end keyframes per scene.
+- Generate one continuity-aware anchor keyframe per scene, with every later anchor designed from the preceding action and exit brief.
 - Store images in OSS.
 - Add regenerate/lock controls.
 - Add visual consistency prompt memory.

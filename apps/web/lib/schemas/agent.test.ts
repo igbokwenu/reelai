@@ -47,10 +47,10 @@ describe("Phase 4 agent schemas", () => {
       durationSec: 8,
       captionText: `Scene ${index}`,
       voiceoverText: "A concise narration chunk for the scene.",
-      startFramePrompt:
-        "Vertical branded opening frame with product detail and clean safe-zone composition.",
-      endFramePrompt:
-        "Vertical branded ending frame with continuity from the opening image.",
+      anchorFramePrompt:
+        "Vertical branded scene anchor with product detail and clean safe-zone composition.",
+      transitionOutPrompt:
+        "Continue the product motion naturally toward a clean rightward edit point.",
       videoMotionPrompt:
         "Slow camera move across the product while captions remain in safe zones.",
       continuityNotes:
@@ -230,6 +230,8 @@ describe("Phase 4 agent schemas", () => {
 
     expect(parsed.scenes).toHaveLength(3);
     expect(parsed.scenes[0]?.durationSec).toBe(8);
+    expect(parsed.scenes[0]?.anchorFramePrompt).toContain("opening frame");
+    expect(parsed.scenes[0]?.transitionOutPrompt).toContain("ending frame");
     expect(parsed.bgm.preset).toBe("warm pulse");
     expect(parsed.continuityBible.product).toContain("recurring product");
     expect(parsed.scenes[0]?.continuityMode).toBe("CONTINUOUS");
@@ -270,7 +272,8 @@ describe("Phase 4 agent schemas", () => {
     expect(storyboardJsonSchema.additionalProperties).toBe(false);
     expect(scenes.minItems).toBe(2);
     expect(scenes.maxItems).toBe(4);
-    expect(scenes.items.required).toContain("startFramePrompt");
+    expect(scenes.items.required).toContain("anchorFramePrompt");
+    expect(scenes.items.required).toContain("transitionOutPrompt");
     expect(scenes.items.required).toContain("videoMotionPrompt");
     expect(scenes.items.required).toContain("continuityMode");
     expect(scenes.items.properties.continuityNotes.minLength).toBe(6);

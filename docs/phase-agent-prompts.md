@@ -8,16 +8,16 @@ Use one prompt per implementation phase. Give the agent only the phase you want 
 
 Agents must update this tracker at the end of each phase. A phase is not truly complete until both implementation completion and human sign-off are checked.
 
-| Phase | Name                                             | Implementation done | Human tested and signed off | Notes                                                                   |
-| ----- | ------------------------------------------------ | ------------------- | --------------------------- | ----------------------------------------------------------------------- |
-| 1     | Foundation And Open-Source Repo                  | [x]                 | [x]                         | Implemented and human-approved on 2026-07-05.                           |
-| 2     | Data Model, Project Intake, And Artifact Storage | [x]                 | [x]                         | Implemented, automated checks passed, and human-approved on 2026-07-05. |
-| 3     | QwenCloud Client And Brand Kit Agent             | [x]                 | [x]                         | Implemented, automated checks passed, and human-approved on 2026-07-05. |
-| 4     | Creative Concepts And Storyboard Editor          | [x]                 | [x]                         | Implemented, automated checks passed, and human-approved on 2026-07-06. |
-| 5     | Keyframes, Video Generation, And Take Compare    | [x]                 | [x]                         | Implemented, automated checks passed, and human-approved with OSS-backed video artifacts on 2026-07-07. |
-| 6     | Narration, Composition, And Final Export         | [x]                 | [x]                         | Implemented with automated checks passing and human-approved on 2026-07-07. |
+| Phase | Name                                             | Implementation done | Human tested and signed off | Notes                                                                                                                                       |
+| ----- | ------------------------------------------------ | ------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | Foundation And Open-Source Repo                  | [x]                 | [x]                         | Implemented and human-approved on 2026-07-05.                                                                                               |
+| 2     | Data Model, Project Intake, And Artifact Storage | [x]                 | [x]                         | Implemented, automated checks passed, and human-approved on 2026-07-05.                                                                     |
+| 3     | QwenCloud Client And Brand Kit Agent             | [x]                 | [x]                         | Implemented, automated checks passed, and human-approved on 2026-07-05.                                                                     |
+| 4     | Creative Concepts And Storyboard Editor          | [x]                 | [x]                         | Implemented, automated checks passed, and human-approved on 2026-07-06.                                                                     |
+| 5     | Keyframes, Video Generation, And Take Compare    | [x]                 | [x]                         | Implemented, automated checks passed, and human-approved with OSS-backed video artifacts on 2026-07-07.                                     |
+| 6     | Narration, Composition, And Final Export         | [x]                 | [x]                         | Implemented with automated checks passing and human-approved on 2026-07-07.                                                                 |
 | 7     | Deployment, Documentation, And Judging Package   | [x]                 | [x]                         | Implemented, deployed to ECS, proof screenshots added, and human-approved on 2026-07-12. Demo video moved to post-Phase 8 final submission. |
-| 8     | Post-MVP Polish And Reusability                  | [ ]                 | [ ]                         |                                                                         |
+| 8     | Post-MVP Polish And Reusability                  | [ ]                 | [ ]                         |                                                                                                                                             |
 
 ## Universal Agent Instructions
 
@@ -309,7 +309,7 @@ QwenCloud requirements:
 
 Exit only when all Phase 5 checklist items pass:
 
-- User can generate start/end keyframes for approved scenes.
+- User can generate one continuity-aware anchor keyframe for each approved scene; later anchors build on the prior scene's action and exit brief.
 - Keyframe outputs are copied to OSS and saved as `Artifact` rows.
 - Regenerating a keyframe creates a new `Take`; it does not overwrite the previous take.
 - User can select the preferred keyframe take.

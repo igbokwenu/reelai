@@ -275,8 +275,8 @@ model Scene {
   durationSec          Int
   captionText          String
   voiceoverText        String
-  startFramePrompt     String
-  endFramePrompt       String
+  anchorFramePrompt    String
+  transitionOutPrompt  String
   videoMotionPrompt    String
   lockedStyleLanguage  String
   safeZonePreset       SafeZonePreset @default(TIKTOK_REELS)
@@ -515,8 +515,8 @@ export const StoryboardSchema = z.object({
         durationSec: z.number().int().min(4).max(15),
         captionText: z.string(),
         voiceoverText: z.string().max(600),
-        startFramePrompt: z.string(),
-        endFramePrompt: z.string(),
+        anchorFramePrompt: z.string(),
+        transitionOutPrompt: z.string(),
         videoMotionPrompt: z.string(),
         continuityNotes: z.string(),
       }),
@@ -544,7 +544,8 @@ Implementation:
 - For Qwen async tasks, set `WAITING_PROVIDER` with `providerTaskId`.
 - Poll provider tasks from an API-triggered worker loop for MVP.
 - Claim each polling pass before contacting the provider. A failed scene must not stop healthy sibling tasks from polling, and transient provider/download errors must remain `WAITING_PROVIDER` until the bounded processing window expires.
-- Preflight every selected start/end frame before submitting any video task. Preserve the currently selected keyframe pair or clip until a full replacement succeeds.
+- Preflight every selected scene anchor before submitting any video task. Submit no closing-frame constraint. Preserve the currently selected anchor or clip until a full replacement succeeds.
+- Treat anchors as an ordered dependency chain: visual/continuity changes invalidate the edited and downstream anchors; motion/exit changes invalidate the current clip and downstream anchors; timing-only changes invalidate only the current clip.
 - Expose a scene-level video retry for missing or failed clips. The retry creates a new take for only that scene and must not resubmit completed sibling scenes.
 - Store all generated files as `Artifact` rows after upload/download to OSS.
 - UI polls `/api/jobs/[jobId]` every 2 seconds until terminal.
@@ -870,7 +871,7 @@ Goal: generate durable scene assets and make regeneration additive instead of de
 Build:
 
 - Keyframe generation endpoint.
-- Image generation wrapper for preview/start/end frames.
+- Image generation wrapper for previews and one anchor frame per scene.
 - `Take` creation for keyframes.
 - `TakeCompare` for keyframe takes.
 - Video generation endpoint using i2v.
@@ -880,12 +881,12 @@ Build:
 
 Exit checklist:
 
-- [ ] User can generate start/end keyframes for approved scenes.
+- [ ] User can generate one continuity-aware anchor keyframe for each approved scene.
 - [ ] Keyframe outputs are copied to OSS and saved as `Artifact` rows.
 - [ ] Regenerating a keyframe creates a new `Take`; it does not overwrite the previous take.
-- [ ] Production presents one recommended story flow with each scene's opening and closing frame visible together; the user is not required to select among parallel keyframe takes.
-- [ ] The recommended opening and closing frame IDs are persisted independently, and both are supplied to Wan 2.7 video generation.
-- [ ] The newest successful frame pair and video clip are selected automatically while prior attempts remain available as history.
+- [ ] Production presents one recommended story flow with each scene's anchor and natural-exit brief visible together; the user is not required to select among parallel keyframe takes.
+- [ ] The recommended anchor ID is persisted and supplied as the sole Wan 2.7 image constraint; no last-frame image is sent.
+- [ ] The newest successful anchor and video clip are selected automatically while prior attempts, including legacy closing frames, remain available as history.
 - [ ] User can submit 2 to 4 scenes for i2v generation.
 - [ ] Video provider task IDs are stored on jobs.
 - [ ] Video polling survives page refresh.

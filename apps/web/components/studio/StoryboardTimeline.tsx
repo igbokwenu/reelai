@@ -144,15 +144,16 @@ export function StoryboardTimeline({
     draft?.scenes.reduce(
       (count, scene) =>
         count +
-        (["KEYFRAME_START", "KEYFRAME_END"] as const).filter((kind) =>
-          scene.takes?.some(
-            (take) =>
-              take.kind === kind &&
-              take.status === "COMPLETE" &&
-              take.artifactId &&
-              artifactIds.has(take.artifactId),
-          ),
-        ).length,
+        (scene.takes?.some(
+          (take) =>
+            take.id === scene.selectedKeyframeTakeId &&
+            take.kind === "KEYFRAME_START" &&
+            take.status === "COMPLETE" &&
+            take.artifactId &&
+            artifactIds.has(take.artifactId),
+        )
+          ? 1
+          : 0),
       0,
     ) ?? 0;
 
@@ -273,8 +274,8 @@ export function StoryboardTimeline({
             See the whole reel before you generate it
           </h3>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            Review every first and last frame, then define how each cut carries
-            product, character, and visual details into the next scene.
+            Review each scene anchor, then define how every cut carries product,
+            character, space, and motion into the next scene.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -495,8 +496,8 @@ export function StoryboardTimeline({
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {draft.scenes.length} scenes · {totalDuration}s ·{" "}
-                  {generatedFrameCount}/{draft.scenes.length * 2} generated
-                  frames
+                  {generatedFrameCount}/{draft.scenes.length} generated scene
+                  anchors
                 </p>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -545,7 +546,7 @@ export function StoryboardTimeline({
                 </p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
                   Saving approves all scenes and makes their continuity-aware
-                  first and last frame briefs available to keyframe generation.
+                  anchor and natural-exit briefs available to production.
                 </p>
               </div>
             </div>
@@ -572,7 +573,7 @@ export function StoryboardTimeline({
           </p>
           <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-muted-foreground">
             Generate a storyboard from the selected concept to create a
-            continuity-aware first-to-last-frame plan.
+            continuity-aware anchor-to-anchor scene plan.
           </p>
         </div>
       )}
@@ -700,19 +701,16 @@ function SceneFilmCard({
           {scene.durationSec}s
         </span>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <FramePreview
-          artifacts={artifacts}
-          label="First"
-          position="KEYFRAME_START"
-          scene={scene}
-        />
-        <FramePreview
-          artifacts={artifacts}
-          label="Last"
-          position="KEYFRAME_END"
-          scene={scene}
-        />
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-2">
+        <FramePreview artifacts={artifacts} label="Anchor" scene={scene} />
+        <div className="flex aspect-[9/14] flex-col rounded-lg border border-border bg-background/70 p-2.5">
+          <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-primary">
+            Natural exit
+          </span>
+          <p className="mt-auto line-clamp-6 text-[9px] leading-3.5 text-muted-foreground">
+            {scene.transitionOutPrompt}
+          </p>
+        </div>
       </div>
       <p className="mt-3 line-clamp-2 min-h-10 text-sm font-medium leading-5">
         {scene.captionText}
@@ -726,26 +724,22 @@ function SceneFilmCard({
 
 function FramePreview({
   scene,
-  position,
   label,
   artifacts,
 }: {
   scene: EditableScene;
-  position: "KEYFRAME_START" | "KEYFRAME_END";
   label: string;
   artifacts: Set<string>;
 }) {
   const take = scene.takes?.find(
     (candidate) =>
-      candidate.kind === position &&
+      candidate.id === scene.selectedKeyframeTakeId &&
+      candidate.kind === "KEYFRAME_START" &&
       candidate.status === "COMPLETE" &&
       candidate.artifactId &&
       artifacts.has(candidate.artifactId),
   );
-  const prompt =
-    position === "KEYFRAME_START"
-      ? scene.startFramePrompt
-      : scene.endFramePrompt;
+  const prompt = scene.anchorFramePrompt;
 
   return (
     <div className="relative aspect-[9/14] overflow-hidden rounded-lg border border-border bg-gradient-to-br from-muted via-background to-primary/10">

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowRight,
   Check,
   ChevronDown,
   Clock3,
@@ -25,12 +24,11 @@ import { Button } from "@/components/ui/button";
 export type ProductionScene = TakeCompareScene & {
   durationSec: number;
   voiceoverText: string;
-  startFramePrompt: string;
-  endFramePrompt: string;
+  anchorFramePrompt: string;
+  transitionOutPrompt: string;
   videoMotionPrompt: string;
   continuityNotes: string;
   continuityMode: "CONTINUOUS" | "MATCH_CUT" | "INTENTIONAL_CHANGE";
-  selectedEndFrameTakeId: string | null;
 };
 
 export function KeyframeStoryFlow({
@@ -63,8 +61,8 @@ export function KeyframeStoryFlow({
             Recommended story flow
           </div>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Each scene travels from its opening frame to its closing frame, then
-            hands the visual thread to the next scene.
+            One anchor starts each scene. Motion exits naturally, and the next
+            anchor continues the visual thread without forcing an ending still.
           </p>
         </div>
         <span className="w-fit rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">
@@ -75,8 +73,7 @@ export function KeyframeStoryFlow({
       <div className="overflow-x-auto p-4">
         <div className="flex min-w-max items-stretch gap-3">
           {scenes.map((scene, index) => {
-            const startTake = getCurrentFrame(scene, "KEYFRAME_START");
-            const endTake = getCurrentFrame(scene, "KEYFRAME_END");
+            const anchorTake = getCurrentAnchor(scene);
             const selectedVideo = scene.takes.find(
               (take) =>
                 take.id === scene.selectedVideoTakeId &&
@@ -87,9 +84,7 @@ export function KeyframeStoryFlow({
             const failedVideo = scene.takes.find(
               (take) => take.kind === "VIDEO" && take.status === "FAILED",
             );
-            const isReady = Boolean(
-              startTake?.artifactId && endTake?.artifactId,
-            );
+            const isReady = Boolean(anchorTake?.artifactId);
             const needsVideo = isReady && !selectedVideo;
 
             return (
@@ -127,23 +122,20 @@ export function KeyframeStoryFlow({
                   </span>
                 </div>
 
-                <div className="relative mt-3 grid grid-cols-2 gap-2">
+                <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-2">
                   <FramePreview
                     artifactById={artifactById}
-                    label="Opens"
-                    take={startTake}
+                    label="Scene anchor"
+                    take={anchorTake}
                   />
-                  <FramePreview
-                    artifactById={artifactById}
-                    label="Closes"
-                    take={endTake}
-                  />
-                  <span className="absolute left-1/2 top-[42%] z-10 flex size-7 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card shadow-lg">
-                    <ArrowRight
-                      className="size-3.5 text-primary"
-                      aria-hidden="true"
-                    />
-                  </span>
+                  <div className="flex aspect-[9/16] flex-col rounded-lg border border-border bg-background/70 p-2.5">
+                    <span className="text-[9px] font-semibold uppercase tracking-[0.13em] text-primary">
+                      Natural exit
+                    </span>
+                    <p className="mt-auto line-clamp-7 text-[10px] leading-4 text-muted-foreground">
+                      {scene.transitionOutPrompt}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="mt-3 flex items-center justify-between gap-2 text-xs">
@@ -159,7 +151,7 @@ export function KeyframeStoryFlow({
                     ) : (
                       <ImageIcon className="size-3.5" aria-hidden="true" />
                     )}
-                    {isReady ? "Endpoints ready" : "Frames not generated"}
+                    {isReady ? "Anchor ready" : "Anchor not generated"}
                   </span>
                   <span className="text-muted-foreground">
                     {formatEnum(scene.status)}
@@ -219,7 +211,7 @@ export function KeyframeStoryFlow({
                   artifactById={artifactById}
                   currentIds={
                     new Set(
-                      [startTake?.id, endTake?.id, selectedVideo?.id].filter(
+                      [anchorTake?.id, selectedVideo?.id].filter(
                         (id): id is string => Boolean(id),
                       ),
                     )
@@ -303,25 +295,25 @@ function SceneTuner({
         <ChevronDown className="size-3.5 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
       <div className="grid gap-3 border-t border-border p-3">
-        <TuningField label="Opening frame direction">
+        <TuningField label="Scene anchor direction">
           <textarea
             className="min-h-24 w-full rounded-md border border-border bg-background px-2.5 py-2 text-xs leading-5 outline-none focus:border-primary/60"
-            value={draft.startFramePrompt}
+            value={draft.anchorFramePrompt}
             onChange={(event) =>
-              setDraft({ ...draft, startFramePrompt: event.target.value })
+              setDraft({ ...draft, anchorFramePrompt: event.target.value })
             }
           />
         </TuningField>
-        <TuningField label="Closing frame direction">
+        <TuningField label="Natural exit / next edit point">
           <textarea
             className="min-h-24 w-full rounded-md border border-border bg-background px-2.5 py-2 text-xs leading-5 outline-none focus:border-primary/60"
-            value={draft.endFramePrompt}
+            value={draft.transitionOutPrompt}
             onChange={(event) =>
-              setDraft({ ...draft, endFramePrompt: event.target.value })
+              setDraft({ ...draft, transitionOutPrompt: event.target.value })
             }
           />
         </TuningField>
-        <TuningField label="Motion between frames">
+        <TuningField label="Camera & subject motion">
           <textarea
             className="min-h-20 w-full rounded-md border border-border bg-background px-2.5 py-2 text-xs leading-5 outline-none focus:border-primary/60"
             value={draft.videoMotionPrompt}
@@ -372,7 +364,7 @@ function SceneTuner({
         </TuningField>
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] leading-4 text-muted-foreground">
-            Frame edits mark this scene for a fresh recommended generation.
+            Anchor or handoff edits also invalidate dependent downstream scenes.
           </p>
           <Button disabled={isSaving} onClick={save} size="sm" type="button">
             {isSaving ? (
@@ -456,40 +448,12 @@ function TuningField({
   );
 }
 
-function getCurrentFrame(
-  scene: ProductionScene,
-  kind: "KEYFRAME_START" | "KEYFRAME_END",
-) {
-  const selectedId =
-    kind === "KEYFRAME_START"
-      ? scene.selectedKeyframeTakeId
-      : scene.selectedEndFrameTakeId;
-  const explicitlySelected = scene.takes.find(
-    (take) =>
-      take.id === selectedId &&
-      take.kind === kind &&
-      take.status === "COMPLETE" &&
-      take.artifactId,
-  );
-
-  if (explicitlySelected) return explicitlySelected;
-
-  // Compatibility for projects created before opening/closing selections were split.
-  const legacyPointer = scene.takes.find(
-    (take) =>
-      take.id === scene.selectedKeyframeTakeId &&
-      take.status === "COMPLETE" &&
-      take.artifactId,
-  );
-  if (!legacyPointer) return null;
-
-  if (legacyPointer.kind === kind) return legacyPointer;
-
+function getCurrentAnchor(scene: ProductionScene) {
   return (
     scene.takes.find(
       (take) =>
-        take.kind === kind &&
-        take.attempt === legacyPointer.attempt &&
+        take.id === scene.selectedKeyframeTakeId &&
+        take.kind === "KEYFRAME_START" &&
         take.status === "COMPLETE" &&
         take.artifactId,
     ) ?? null

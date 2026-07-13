@@ -3,7 +3,6 @@
 import {
   AbsoluteFill,
   Audio,
-  interpolate,
   OffthreadVideo,
   Sequence,
   spring,
@@ -21,7 +20,10 @@ export function ReelComposition(input: ReelCompositionInput) {
     <AbsoluteFill style={{ backgroundColor: "#080b10" }}>
       {input.scenes.map((scene, index) => {
         const from = Math.round(scene.startTimeSec * fps);
-        const durationInFrames = Math.max(1, Math.round(scene.durationSec * fps));
+        const durationInFrames = Math.max(
+          1,
+          Math.round(scene.durationSec * fps),
+        );
 
         return (
           <Sequence
@@ -29,7 +31,11 @@ export function ReelComposition(input: ReelCompositionInput) {
             from={from}
             key={`${scene.videoUrl}-${index}`}
           >
-            <SceneLayer caption={scene.captionText} scene={scene} safeZonePreset={input.safeZonePreset} />
+            <SceneLayer
+              caption={scene.captionText}
+              scene={scene}
+              safeZonePreset={input.safeZonePreset}
+            />
           </Sequence>
         );
       })}
@@ -54,9 +60,6 @@ function SceneLayer({
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const opacity = interpolate(frame, [0, fps * 0.35], [0, 1], {
-    extrapolateRight: "clamp",
-  });
   const scale = spring({
     frame,
     fps,
@@ -71,7 +74,6 @@ function SceneLayer({
         style={{
           height: "100%",
           objectFit: "cover",
-          opacity,
           width: "100%",
         }}
       />
@@ -117,7 +119,12 @@ function BrandWatermark({
         <img
           alt=""
           src={watermark.logoUrl}
-          style={{ borderRadius: 10, height: 52, objectFit: "contain", width: 52 }}
+          style={{
+            borderRadius: 10,
+            height: 52,
+            objectFit: "contain",
+            width: 52,
+          }}
         />
       ) : null}
       {watermark.text ? <span>{watermark.text}</span> : null}

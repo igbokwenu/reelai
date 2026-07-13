@@ -80,39 +80,16 @@ export function GenerationConsole({
     productionScenes.length >= 2 &&
     productionScenes.length <= 4 &&
     productionScenes.every((scene) => scene.status !== "DRAFT");
-  const hasRecommendedFrames =
+  const hasRecommendedAnchors =
     hasApprovedStory &&
     productionScenes.every((scene) => {
-      const selectedStartPointer = scene.takes.find(
+      const selectedAnchor = scene.takes.find(
         (take) => take.id === scene.selectedKeyframeTakeId,
       );
-      if (!isUsableFrame(selectedStartPointer)) return false;
-
-      const start =
-        selectedStartPointer.kind === "KEYFRAME_START"
-          ? selectedStartPointer
-          : scene.takes.find(
-              (take) =>
-                take.kind === "KEYFRAME_START" &&
-                take.attempt === selectedStartPointer.attempt &&
-                isUsableFrame(take),
-            );
-      const end = scene.selectedEndFrameTakeId
-        ? scene.takes.find(
-            (take) =>
-              take.id === scene.selectedEndFrameTakeId &&
-              take.kind === "KEYFRAME_END" &&
-              isUsableFrame(take),
-          )
-        : selectedStartPointer.kind === "KEYFRAME_END"
-          ? selectedStartPointer
-          : scene.takes.find(
-              (take) =>
-                take.kind === "KEYFRAME_END" &&
-                take.attempt === selectedStartPointer.attempt &&
-                isUsableFrame(take),
-            );
-      return Boolean(start && end);
+      return Boolean(
+        selectedAnchor?.kind === "KEYFRAME_START" &&
+        isUsableFrame(selectedAnchor),
+      );
     });
   const completedClips = productionScenes.filter(
     (scene) =>
@@ -208,8 +185,8 @@ export function GenerationConsole({
             durationSec: scene.durationSec,
             captionText: scene.captionText,
             voiceoverText: scene.voiceoverText,
-            startFramePrompt: scene.startFramePrompt,
-            endFramePrompt: scene.endFramePrompt,
+            anchorFramePrompt: scene.anchorFramePrompt,
+            transitionOutPrompt: scene.transitionOutPrompt,
             videoMotionPrompt: scene.videoMotionPrompt,
             continuityNotes: scene.continuityNotes,
             continuityMode: scene.continuityMode,
@@ -302,21 +279,21 @@ export function GenerationConsole({
               }
               onClick={() => startGeneration("keyframes")}
               size="sm"
-              variant={hasRecommendedFrames ? "outline" : "default"}
+              variant={hasRecommendedAnchors ? "outline" : "default"}
             >
               {starting === "keyframes" ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              ) : hasRecommendedFrames ? (
+              ) : hasRecommendedAnchors ? (
                 <RefreshCw className="size-4" aria-hidden="true" />
               ) : (
                 <ImagePlus className="size-4" aria-hidden="true" />
               )}
-              {hasRecommendedFrames
-                ? "Refresh story frames"
-                : "Create story frames"}
+              {hasRecommendedAnchors
+                ? "Refresh scene anchors"
+                : "Create scene anchors"}
             </Button>
             <Button
-              disabled={!hasRecommendedFrames || productionBusy}
+              disabled={!hasRecommendedAnchors || productionBusy}
               onClick={() => startGeneration("videos")}
               size="sm"
             >
@@ -343,8 +320,8 @@ export function GenerationConsole({
             step="1"
           />
           <ProgressStep
-            complete={hasRecommendedFrames}
-            label="Endpoints ready"
+            complete={hasRecommendedAnchors}
+            label="Anchors ready"
             step="2"
           />
           <ProgressStep
@@ -448,7 +425,7 @@ function isUsableFrame(
 ): take is ProductionScene["takes"][number] {
   return Boolean(
     take &&
-    (take.kind === "KEYFRAME_START" || take.kind === "KEYFRAME_END") &&
+    take.kind === "KEYFRAME_START" &&
     take.status === "COMPLETE" &&
     take.artifactId,
   );

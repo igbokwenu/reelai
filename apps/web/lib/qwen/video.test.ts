@@ -4,23 +4,19 @@ import { isRetryableVideoSubmissionError } from "./video-retry";
 import { buildVideoSubmissionBody } from "./video-request";
 
 describe("buildVideoSubmissionBody", () => {
-  it("locks Wan 2.7 generation to the approved first and last frames", () => {
+  it("uses one approved scene anchor without a forced closing frame", () => {
     expect(
       buildVideoSubmissionBody({
         model: "wan2.7-i2v",
         prompt: "A smooth product reveal",
         imageUrl: "https://example.test/open.png",
-        lastFrameUrl: "https://example.test/close.png",
         durationSec: 8,
       }),
     ).toEqual({
       model: "wan2.7-i2v",
       input: {
         prompt: "A smooth product reveal",
-        media: [
-          { type: "first_frame", url: "https://example.test/open.png" },
-          { type: "last_frame", url: "https://example.test/close.png" },
-        ],
+        media: [{ type: "first_frame", url: "https://example.test/open.png" }],
       },
       parameters: {
         duration: 8,

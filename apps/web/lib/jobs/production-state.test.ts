@@ -4,7 +4,6 @@ import {
   isStalePollClaim,
   hasExactSceneCoverage,
   parseVideoJobOutput,
-  resolveSelectedFrameTakes,
   selectRequestedScenes,
   selectVideoGenerationTargets,
   stableSceneStatus,
@@ -60,42 +59,6 @@ describe("production state", () => {
     );
   });
 
-  it("does not silently reuse stale frames after an edit clears selections", () => {
-    expect(
-      resolveSelectedFrameTakes({
-        selectedStartTakeId: null,
-        selectedEndTakeId: null,
-        takes: [frameTake("start", "KEYFRAME_START", 1)],
-      }),
-    ).toBeNull();
-  });
-
-  it("reads a legacy matched pair without mixing generation attempts", () => {
-    const start = frameTake("start-2", "KEYFRAME_START", 2);
-    const end = frameTake("end-2", "KEYFRAME_END", 2);
-
-    expect(
-      resolveSelectedFrameTakes({
-        selectedStartTakeId: start.id,
-        selectedEndTakeId: null,
-        takes: [frameTake("end-3", "KEYFRAME_END", 3), end, start],
-      }),
-    ).toEqual({ start, end });
-  });
-
-  it("rejects an invalid explicit end selection instead of falling back", () => {
-    expect(
-      resolveSelectedFrameTakes({
-        selectedStartTakeId: "start",
-        selectedEndTakeId: "missing-end",
-        takes: [
-          frameTake("start", "KEYFRAME_START", 1),
-          frameTake("other-end", "KEYFRAME_END", 1),
-        ],
-      }),
-    ).toBeNull();
-  });
-
   it("requires persisted tasks to cover the whole storyboard exactly once", () => {
     const tasks = [
       { sceneId: "scene-1", takeId: "take-1", status: "FAILED" as const },
@@ -129,20 +92,6 @@ describe("production state", () => {
     expect(selectVideoGenerationTargets([complete])).toEqual([complete]);
   });
 });
-
-function frameTake(
-  id: string,
-  kind: "KEYFRAME_START" | "KEYFRAME_END",
-  attempt: number,
-) {
-  return {
-    id,
-    kind,
-    attempt,
-    status: "COMPLETE",
-    artifactId: `${id}-artifact`,
-  };
-}
 
 function videoScene(id: string, complete: boolean) {
   const takeId = `${id}-video`;

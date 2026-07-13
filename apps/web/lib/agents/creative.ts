@@ -552,8 +552,8 @@ async function saveStoryboard({
           durationSec: scene.durationSec,
           captionText: scene.captionText,
           voiceoverText: scene.voiceoverText,
-          startFramePrompt: scene.startFramePrompt,
-          endFramePrompt: scene.endFramePrompt,
+          anchorFramePrompt: scene.anchorFramePrompt,
+          transitionOutPrompt: scene.transitionOutPrompt,
           videoMotionPrompt: scene.videoMotionPrompt,
           continuityNotes: scene.continuityNotes,
           continuityMode: scene.continuityMode,
@@ -578,8 +578,8 @@ async function saveStoryboard({
           durationSec: scene.durationSec,
           captionText: scene.captionText,
           voiceoverText: scene.voiceoverText,
-          startFramePrompt: scene.startFramePrompt,
-          endFramePrompt: scene.endFramePrompt,
+          anchorFramePrompt: scene.anchorFramePrompt,
+          transitionOutPrompt: scene.transitionOutPrompt,
           videoMotionPrompt: scene.videoMotionPrompt,
           continuityNotes: scene.continuityNotes,
           continuityMode: scene.continuityMode,
@@ -956,13 +956,16 @@ Requirements:
 - The storyboard must clearly execute the selected concept's strategy, narrative arc, and visual style.
 - Do not drift into a different concept, a generic ad, or a list of disconnected scenes.
 - Voiceover text must be 600 characters or less per scene.
-- Each scene needs caption, voiceover, start/end frame prompts, motion prompt, and continuity notes.
+- Each scene needs a caption, voiceover, one anchor-frame prompt, a motion prompt, a transition-out prompt, and continuity notes.
 - Build a continuityBible before the scenes. Separately lock recurring product attributes, recurring character identity/wardrobe, and the shared visual world. If a category is absent, explicitly say that no recurring product or character is required.
 - Set continuityMode on every scene: CONTINUOUS for a seamless handoff, MATCH_CUT when the composition/action intentionally bridges from the prior scene, or INTENTIONAL_CHANGE only when the plot requires a different character, location, time, or visual world.
-- startFramePrompt, endFramePrompt, videoMotionPrompt, and continuityNotes must be specific, visual, and production-ready.
+- anchorFramePrompt, transitionOutPrompt, videoMotionPrompt, and continuityNotes must be specific, visual, and production-ready.
 - Do not leave any required field blank or generic.
 - A CONTINUOUS or MATCH_CUT scene must name the invariant product, character, wardrobe, palette, lighting, and spatial details it inherits from the previous scene. INTENTIONAL_CHANGE must name exactly what changes and what still remains visually consistent.
-- The end frame of scene N and start frame of scene N+1 must describe a plausible stitch point. For MATCH_CUT, align subject position, scale, motion direction, and dominant color across the cut.
+- Do not design or request a closing image for any scene. anchorFramePrompt is the only generated still for a scene.
+- For every scene after the first, design anchorFramePrompt as the plausible next edit point after the preceding scene's motion and transitionOutPrompt. For MATCH_CUT, align subject position, scale, motion direction, eyeline, camera side, and dominant color across the cut.
+- transitionOutPrompt describes the natural moving exit state of the clip, not a still that the model must hit. Intermediate scenes should end on clean editorial motion with no forced pose, morph, deceleration, freeze, or artificial hold. The final scene should resolve naturally on a stable product/character beat with a brief edit-safe tail, without requiring an exact final image.
+- Preserve screen direction and the 180-degree line unless continuityMode explicitly calls for an intentional change. Avoid jump cuts caused by near-identical framing; vary shot size deliberately while retaining identity and spatial logic.
 - Prompts must keep product and character identity stable and respect the locked brand style unless INTENTIONAL_CHANGE explicitly justifies the difference.
 - Use the brand palette colors and visual motifs in scene descriptions.
 - Match the ${project.style === "THREE_D_ANIMATION" ? "3D animation" : "realistic"} visual style.

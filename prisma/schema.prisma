@@ -105,8 +105,8 @@ model Scene {
   durationSec            Int
   captionText            String
   voiceoverText          String
-  startFramePrompt       String
-  endFramePrompt         String
+  anchorFramePrompt      String
+  transitionOutPrompt    String
   videoMotionPrompt      String
   continuityNotes        String         @default("")
   continuityMode         ContinuityMode @default(CONTINUOUS)
@@ -114,7 +114,6 @@ model Scene {
   safeZonePreset         SafeZonePreset @default(TIKTOK_REELS)
   status                 SceneStatus    @default(DRAFT)
   selectedKeyframeTakeId String?
-  selectedEndFrameTakeId String?
   selectedVideoTakeId    String?
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt

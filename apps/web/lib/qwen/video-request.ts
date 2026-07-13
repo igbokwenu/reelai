@@ -26,7 +26,8 @@ export function buildVideoSubmissionBody({
       parameters: {
         duration,
         resolution: "720P",
-        // Preserve the approved endpoint composition and motion brief.
+        // Keep the approved anchor exact; production intentionally omits a
+        // last_frame so the clip can exit with natural motion.
         prompt_extend: false,
         watermark: false,
       },

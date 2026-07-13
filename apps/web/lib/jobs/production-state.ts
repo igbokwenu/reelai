@@ -11,14 +11,6 @@ export type VideoJobOutput = {
   scenes: VideoSceneTask[];
 };
 
-type FrameTake = {
-  id: string;
-  kind: "KEYFRAME_START" | "KEYFRAME_END" | string;
-  status: "COMPLETE" | string;
-  artifactId: string | null;
-  attempt: number;
-};
-
 type SceneWithVideoTakes = {
   selectedVideoTakeId: string | null;
   takes: Array<{
@@ -28,55 +20,6 @@ type SceneWithVideoTakes = {
     artifactId: string | null;
   }>;
 };
-
-export function resolveSelectedFrameTakes<T extends FrameTake>({
-  takes,
-  selectedStartTakeId,
-  selectedEndTakeId,
-}: {
-  takes: T[];
-  selectedStartTakeId: string | null;
-  selectedEndTakeId: string | null;
-}): { start: T; end: T } | null {
-  if (!selectedStartTakeId) return null;
-
-  const selectedStartPointer = takes.find(
-    (take) => take.id === selectedStartTakeId,
-  );
-  if (!isUsableFrameTake(selectedStartPointer)) return null;
-
-  // Older builds stored an end-frame selection in selectedKeyframeTakeId.
-  // Keep that data readable, but never choose an unrelated "latest" take.
-  const start =
-    selectedStartPointer.kind === "KEYFRAME_START"
-      ? selectedStartPointer
-      : selectedStartPointer.kind === "KEYFRAME_END"
-        ? takes.find(
-            (take) =>
-              take.kind === "KEYFRAME_START" &&
-              take.attempt === selectedStartPointer.attempt &&
-              isUsableFrameTake(take),
-          )
-        : null;
-
-  const end = selectedEndTakeId
-    ? takes.find(
-        (take) =>
-          take.id === selectedEndTakeId &&
-          take.kind === "KEYFRAME_END" &&
-          isUsableFrameTake(take),
-      )
-    : selectedStartPointer.kind === "KEYFRAME_END"
-      ? selectedStartPointer
-      : takes.find(
-          (take) =>
-            take.kind === "KEYFRAME_END" &&
-            take.attempt === selectedStartPointer.attempt &&
-            isUsableFrameTake(take),
-        );
-
-  return start && end ? { start, end } : null;
-}
 
 export function parseVideoJobOutput(value: unknown): VideoJobOutput | null {
   if (!isRecord(value) || !Array.isArray(value.scenes)) return null;
@@ -187,17 +130,6 @@ export function isStalePollClaim(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function isUsableFrameTake<T extends FrameTake>(
-  take: T | undefined,
-): take is T {
-  return Boolean(
-    take &&
-    take.status === "COMPLETE" &&
-    take.artifactId &&
-    (take.kind === "KEYFRAME_START" || take.kind === "KEYFRAME_END"),
-  );
 }
 
 function isTaskStatus(value: unknown): value is VideoSceneTask["status"] {

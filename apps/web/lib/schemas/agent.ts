@@ -77,8 +77,8 @@ export const storyboardSceneSchema = z.object({
   durationSec: z.number().int().min(4).max(15),
   captionText: z.string().min(1).max(140),
   voiceoverText: z.string().min(1).max(600),
-  startFramePrompt: z.string().min(20).max(1200),
-  endFramePrompt: z.string().min(20).max(1200),
+  anchorFramePrompt: z.string().min(20).max(1200),
+  transitionOutPrompt: z.string().min(20).max(1200),
   videoMotionPrompt: z.string().min(20).max(1200),
   continuityNotes: z.string().min(6).max(700),
   continuityMode: z.enum(["CONTINUOUS", "MATCH_CUT", "INTENTIONAL_CHANGE"]),
@@ -154,8 +154,8 @@ export const storyboardJsonSchema = {
           "durationSec",
           "captionText",
           "voiceoverText",
-          "startFramePrompt",
-          "endFramePrompt",
+          "anchorFramePrompt",
+          "transitionOutPrompt",
           "videoMotionPrompt",
           "continuityNotes",
           "continuityMode",
@@ -165,12 +165,12 @@ export const storyboardJsonSchema = {
           durationSec: { type: "integer", minimum: 4, maximum: 15 },
           captionText: { type: "string", minLength: 1, maxLength: 140 },
           voiceoverText: { type: "string", minLength: 1, maxLength: 600 },
-          startFramePrompt: {
+          anchorFramePrompt: {
             type: "string",
             minLength: 20,
             maxLength: 1200,
           },
-          endFramePrompt: {
+          transitionOutPrompt: {
             type: "string",
             minLength: 20,
             maxLength: 1200,
@@ -210,8 +210,8 @@ export const storyboardPatchSchema = z.object({
         durationSec: z.number().int().min(4).max(15),
         captionText: z.string().min(1).max(140),
         voiceoverText: z.string().min(1).max(600),
-        startFramePrompt: z.string().min(20).max(1200),
-        endFramePrompt: z.string().min(20).max(1200),
+        anchorFramePrompt: z.string().min(20).max(1200),
+        transitionOutPrompt: z.string().min(20).max(1200),
         videoMotionPrompt: z.string().min(20).max(1200),
         continuityNotes: z.string().min(1).max(700),
         continuityMode: z.enum([
@@ -540,8 +540,10 @@ function normalizeStoryboardScene(value: unknown, index: number) {
         max: 600,
       },
     ),
-    startFramePrompt: text(
-      record.startFramePrompt ??
+    anchorFramePrompt: text(
+      record.anchorFramePrompt ??
+        record.anchor_frame_prompt ??
+        record.startFramePrompt ??
         record.start_frame_prompt ??
         record.startPrompt ??
         record.keyframeStartPrompt,
@@ -551,8 +553,10 @@ function normalizeStoryboardScene(value: unknown, index: number) {
         max: 1200,
       },
     ),
-    endFramePrompt: text(
-      record.endFramePrompt ??
+    transitionOutPrompt: text(
+      record.transitionOutPrompt ??
+        record.transition_out_prompt ??
+        record.endFramePrompt ??
         record.end_frame_prompt ??
         record.endPrompt ??
         record.keyframeEndPrompt,

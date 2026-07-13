@@ -176,10 +176,10 @@ async function main() {
             captionText: "Better mornings start before the meeting.",
             voiceoverText:
               "Before the first standup, Northstar cold brew is already ready.",
-            startFramePrompt:
+            anchorFramePrompt:
               "Vertical office desk in warm morning light, laptop opening, no product yet.",
-            endFramePrompt:
-              "Cold brew bottle lands beside the laptop with visible condensation.",
+            transitionOutPrompt:
+              "The bottle lands beside the laptop as the hand continues rightward, leaving clean motion and matching amber highlights for the next cut.",
             videoMotionPrompt:
               "Slow push-in from desk clutter to the clean bottle reveal.",
             continuityNotes:
@@ -196,10 +196,10 @@ async function main() {
             captionText: "Small-batch cold brew, no coffee run.",
             voiceoverText:
               "Small-batch flavor shows up on your schedule, without another coffee run.",
-            startFramePrompt:
+            anchorFramePrompt:
               "Team member opens an office fridge stocked with cold brew bottles.",
-            endFramePrompt:
-              "Bottle poured over ice, foam and amber coffee catching the light.",
+            transitionOutPrompt:
+              "The pour continues through frame with the bottle and glass moving left-to-right, ending on lively liquid motion rather than a held pose.",
             videoMotionPrompt:
               "Match cut from fridge door opening to coffee pouring over ice.",
             continuityNotes:
@@ -216,10 +216,10 @@ async function main() {
             captionText: "Subscribe once. Keep the team stocked.",
             voiceoverText:
               "Subscribe once, keep the fridge stocked, and get back to the work.",
-            startFramePrompt:
+            anchorFramePrompt:
               "Three teammates raise cold brew bottles around a planning table.",
-            endFramePrompt:
-              "Clean product closeup with simple subscription call to action.",
+            transitionOutPrompt:
+              "Resolve naturally on the team setting the same bottle near camera, with a steady product-forward composition and a brief edit-safe tail.",
             videoMotionPrompt:
               "Gentle handheld team moment ending on a stable product hero shot.",
             continuityNotes:

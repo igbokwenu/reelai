@@ -18,10 +18,11 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Storyboard grounding auto-recovery: missing logo, product, or interface references do not block creation. Reel AI preserves the selected strategy, adapts unsupported execution to source-safe unbranded storytelling, validates the replacement, and explains the adaptation in the editor.
 - Pre-spend concept validation and post-generation visual grounding review; previews that fail review are replaced with an honest local concept card.
 - Exactly three creative concepts before full generation spend, with optional note-guided regeneration of one direction without replacing the other two.
-- Visual 2 to 4 scene storyboard filmstrip with side-by-side first/last frames, explicit stitch transitions, a product/character/visual-world continuity bible, and a human approval loop.
-- Continuity-aware keyframes reuse uploaded visual references when available and chain generated scene endpoints across continuous or match-cut transitions; plot-required intentional changes remain explicit.
-- A recommended Production story flow shows every scene's opening and closing frame in sequence, auto-selects the newest coherent frame pair and clip, keeps prior generations as optional history, and supports inline scene tuning.
-- Wan 2.7 first-and-last-frame video generation makes each clip travel between the approved visual endpoints instead of relying on a first frame alone.
+- Visual 2 to 4 scene storyboard filmstrip with one anchor image per scene, explicit natural-exit and stitch direction, a product/character/visual-world continuity bible, and a human approval loop.
+- Continuity-aware anchors reuse uploaded visual references when available. Every later anchor is designed from the prior scene's action and exit brief, with screen direction, spatial logic, identity, lighting, and match-cut geometry carried across the cut unless the plot explicitly changes them.
+- A recommended Production story flow auto-selects the newest coherent anchor and clip, keeps older anchors, legacy closing frames, and clips as optional history, and supports inline scene tuning with downstream dependency invalidation.
+- Wan 2.7 scene video generation uses only the approved anchor as an image constraint. Motion exits naturally toward the next edit point without forcing the final seconds to morph, decelerate, or freeze onto a closing still.
+- Remotion uses clean direct scene cuts rather than fading every clip in from black, preserving continuous and match-cut handoffs in the stitched output.
 - Remotion final render path for 9:16 MP4 export.
 - Alibaba OSS-compatible artifact storage with a local dev fallback.
 - Dockerfile, Docker Compose, deploy runbook, seed fixture, and Playwright smoke tests.
@@ -58,7 +59,9 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
-Application-only updates that do not add a Prisma migration require only a restart of `pnpm dev`. Web development, typecheck, and build commands regenerate Prisma Client automatically so editor types stay aligned with `prisma/schema.prisma`. After switching to a branch with schema changes, run `pnpm db:generate` immediately if an already-open editor still shows missing Prisma fields, then restart its TypeScript server. The storyboard continuity and recommended opening/closing-frame updates include migrations, so existing local checkouts must run `pnpm db:migrate` once and then restart `pnpm dev`.
+Application-only updates that do not add a Prisma migration require only a restart of `pnpm dev`. Web development, typecheck, and build commands regenerate Prisma Client automatically so editor types stay aligned with `prisma/schema.prisma`. After switching to a branch with schema changes, run `pnpm db:generate` immediately if an already-open editor still shows missing Prisma fields, then restart its TypeScript server. The continuity-first single-anchor update includes a migration that preserves existing prompt text, keeps prior takes/artifacts, and retires only the obsolete selected-closing-frame pointer. Existing local checkouts must stop `pnpm dev`, run `pnpm db:migrate` once, and then restart `pnpm dev`.
+
+Existing storyboards remain usable after migration: the former opening brief becomes the scene anchor and the former closing brief becomes the natural-exit brief. For the best continuity on an older project, regenerate its storyboard and scene anchors once so the new prompts are authored natively for anchor-to-anchor flow. Reseeding is not required.
 
 The seed creates:
 
@@ -99,7 +102,7 @@ Model defaults used by the MVP:
 
 - Structured Brand Kit, concepts, storyboard, and policy review: `qwen3.6-plus`.
 - Image/keyframe generation: `wan2.7-image-pro`.
-- First-and-last-frame scene generation: `wan2.7-i2v` by default; override with `QWEN_I2V_MODEL` when a region requires a dated Wan 2.7 model ID or a legacy first-frame-only model.
+- Single-anchor scene generation: `wan2.7-i2v` by default; override with `QWEN_I2V_MODEL` when a region requires a dated Wan 2.7 model ID or a compatible legacy model.
 - Narration: `qwen3-tts-flash`.
 
 Secrets, raw private uploads, and full prompts must not be logged in production.

@@ -16,7 +16,6 @@ import {
   hasExactSceneCoverage,
   isStalePollClaim,
   parseVideoJobOutput,
-  resolveSelectedFrameTakes,
   selectRequestedScenes,
   selectVideoGenerationTargets,
   stableSceneStatus,
@@ -107,20 +106,21 @@ export async function selectTake(takeId: string) {
     throw new Error("Only completed takes with artifacts can be selected.");
   }
 
+  if (take.kind === "KEYFRAME_END") {
+    throw new PublicError(
+      "Legacy closing frames are history only. Select or generate a scene anchor instead.",
+      409,
+    );
+  }
+
   const sceneUpdate: Prisma.SceneUpdateInput =
     take.kind === "VIDEO"
       ? { selectedVideoTakeId: take.id, status: "COMPLETE" }
-      : take.kind === "KEYFRAME_END"
-        ? {
-            selectedEndFrameTakeId: take.id,
-            selectedVideoTakeId: null,
-            status: "APPROVED",
-          }
-        : {
-            selectedKeyframeTakeId: take.id,
-            selectedVideoTakeId: null,
-            status: "APPROVED",
-          };
+      : {
+          selectedKeyframeTakeId: take.id,
+          selectedVideoTakeId: null,
+          status: "APPROVED",
+        };
 
   const siblingTakeFilter: Prisma.TakeWhereInput = {
     sceneId: take.sceneId,
@@ -446,51 +446,34 @@ async function runKeyframeJob(jobId: string) {
     const groundingReferenceUrls = await getGroundingReferenceUrls(
       job.projectId,
     );
-    const created: Array<{
-      scene: ProductionScene;
-      startTake: Take;
-      endTake: Take;
-    }> = [];
-    let previousEndReferenceUrl: string | null = null;
+    const created: Array<{ scene: ProductionScene; anchorTake: Take }> = [];
+    let previousAnchorReferenceUrl: string | null = null;
 
-    for (const scene of scenes) {
-      const startTake = await createKeyframeTake({
+    for (const [index, scene] of scenes.entries()) {
+      const previousScene = index > 0 ? scenes[index - 1]! : null;
+      const anchorTake = await createKeyframeTake({
         projectId: job.projectId,
         scene,
         kind: "KEYFRAME_START",
-        prompt: buildKeyframePrompt(scene, "start"),
+        prompt: buildKeyframePrompt(scene, previousScene),
         referenceImageUrls:
-          previousEndReferenceUrl &&
+          previousAnchorReferenceUrl &&
           scene.continuityMode !== "INTENTIONAL_CHANGE"
-            ? [previousEndReferenceUrl, ...groundingReferenceUrls].slice(0, 3)
+            ? [previousAnchorReferenceUrl, ...groundingReferenceUrls].slice(
+                0,
+                3,
+              )
             : groundingReferenceUrls,
       });
-      const endTake = await createKeyframeTake({
-        projectId: job.projectId,
-        scene,
-        kind: "KEYFRAME_END",
-        prompt: buildKeyframePrompt(scene, "end"),
-        referenceImageUrls: [
-          startTake.providerImageUrl,
-          ...groundingReferenceUrls,
-        ].slice(0, 3),
-      });
-      previousEndReferenceUrl = endTake.providerImageUrl;
-      created.push({
-        scene,
-        startTake: startTake.take,
-        endTake: endTake.take,
-      });
+      previousAnchorReferenceUrl = anchorTake.providerImageUrl;
+      created.push({ scene, anchorTake: anchorTake.take });
       const progress = await prisma.generationJob.updateMany({
         where: { id: job.id, status: "RUNNING" },
         data: {
           output: {
             sceneCount: scenes.length,
             generatedSceneCount: created.length,
-            takeIds: created.flatMap((item) => [
-              item.startTake.id,
-              item.endTake.id,
-            ]),
+            takeIds: created.map((item) => item.anchorTake.id),
           },
         },
       });
@@ -505,10 +488,7 @@ async function runKeyframeJob(jobId: string) {
         data: {
           status: "COMPLETE",
           output: {
-            takeIds: created.flatMap((item) => [
-              item.startTake.id,
-              item.endTake.id,
-            ]),
+            takeIds: created.map((item) => item.anchorTake.id),
             sceneCount: scenes.length,
           },
           completedAt: new Date(),
@@ -526,8 +506,8 @@ async function runKeyframeJob(jobId: string) {
           },
           data: { selected: false },
         });
-        await tx.take.updateMany({
-          where: { id: { in: [item.startTake.id, item.endTake.id] } },
+        await tx.take.update({
+          where: { id: item.anchorTake.id },
           data: { selected: true },
         });
         await tx.take.updateMany({
@@ -538,8 +518,7 @@ async function runKeyframeJob(jobId: string) {
           where: { id: item.scene.id },
           data: {
             status: "APPROVED",
-            selectedKeyframeTakeId: item.startTake.id,
-            selectedEndFrameTakeId: item.endTake.id,
+            selectedKeyframeTakeId: item.anchorTake.id,
             selectedVideoTakeId: null,
           },
         });
@@ -583,18 +562,23 @@ async function runVideoSubmissionJob(jobId: string) {
     }
     const preflight = [];
     for (const scene of scenes) {
-      const selectedFrames = await getSelectedKeyframeArtifacts(scene);
+      const selectedAnchor = await getSelectedKeyframeArtifact(scene);
 
-      if (!selectedFrames) {
+      if (!selectedAnchor) {
         throw new Error(
-          "Generate the recommended first and last frames before creating video clips.",
+          "Generate the recommended scene anchors before creating video clips.",
         );
       }
 
       preflight.push({
         scene,
-        imageUrl: artifactUrl(selectedFrames.start),
-        lastFrameUrl: artifactUrl(selectedFrames.end),
+        imageUrl: artifactUrl(selectedAnchor),
+        nextScene:
+          productionScenes[
+            productionScenes.findIndex(
+              (candidate) => candidate.id === scene.id,
+            ) + 1
+          ] ?? null,
       });
     }
 
@@ -607,7 +591,7 @@ async function runVideoSubmissionJob(jobId: string) {
       const take = await createQueuedTake({
         sceneId: item.scene.id,
         kind: "VIDEO",
-        prompt: buildVideoPrompt(item.scene),
+        prompt: buildVideoPrompt(item.scene, item.nextScene),
       });
       prepared.push({ ...item, take });
     }
@@ -639,7 +623,6 @@ async function runVideoSubmissionJob(jobId: string) {
           model: job.model ?? QWEN_I2V_MODEL,
           prompt: take.prompt,
           imageUrl: item.imageUrl,
-          lastFrameUrl: item.lastFrameUrl,
           durationSec: scene.durationSec,
         });
       } catch (error) {
@@ -894,38 +877,23 @@ async function getGroundingReferenceUrls(projectId: string) {
     .slice(0, 3);
 }
 
-async function getSelectedKeyframeArtifacts(scene: ProductionScene) {
-  const selected = resolveSelectedFrameTakes({
-    takes: scene.takes,
-    selectedStartTakeId: scene.selectedKeyframeTakeId,
-    selectedEndTakeId: scene.selectedEndFrameTakeId,
+async function getSelectedKeyframeArtifact(scene: ProductionScene) {
+  const selected = scene.takes.find(
+    (take) =>
+      take.id === scene.selectedKeyframeTakeId &&
+      take.kind === "KEYFRAME_START" &&
+      take.status === "COMPLETE" &&
+      take.artifactId,
+  );
+  if (!selected?.artifactId) return null;
+
+  return prisma.artifact.findFirst({
+    where: {
+      id: selected.artifactId,
+      projectId: scene.storyboard.projectId,
+      mimeType: { startsWith: "image/" },
+    },
   });
-  if (!selected) return null;
-
-  const [start, end] = await Promise.all([
-    prisma.artifact.findFirst({
-      where: {
-        id: selected.start.artifactId!,
-        projectId: scene.storyboard.projectId,
-        mimeType: { startsWith: "image/" },
-      },
-    }),
-    prisma.artifact.findFirst({
-      where: {
-        id: selected.end.artifactId!,
-        projectId: scene.storyboard.projectId,
-        mimeType: { startsWith: "image/" },
-      },
-    }),
-  ]);
-
-  return start &&
-    end &&
-    start.projectId === end.projectId &&
-    start.mimeType.startsWith("image/") &&
-    end.mimeType.startsWith("image/")
-    ? { start, end }
-    : null;
 }
 
 function artifactUrl(artifact: Artifact) {
@@ -946,12 +914,9 @@ function artifactUrl(artifact: Artifact) {
 
 function buildKeyframePrompt(
   scene: ProductionScene,
-  position: "start" | "end",
+  previousScene: ProductionScene | null,
 ) {
-  const basePrompt =
-    position === "start" ? scene.startFramePrompt : scene.endFramePrompt;
-
-  return `${basePrompt}
+  return `${scene.anchorFramePrompt}
 
 Locked brand style: ${scene.lockedStyleLanguage}
 Product continuity: ${scene.storyboard.productContinuity}
@@ -959,23 +924,28 @@ Character continuity: ${scene.storyboard.characterContinuity}
 Visual-world continuity: ${scene.storyboard.visualContinuity}
 Transition mode: ${scene.continuityMode}
 Scene continuity: ${scene.continuityNotes}
-Caption context: ${scene.captionText}
-${scene.continuityMode === "INTENTIONAL_CHANGE" ? "Honor only the explicitly described plot change; preserve every other locked identity and style attribute." : "Treat supplied reference imagery as identity and composition guidance; do not redesign recurring products or characters."}
-Use a vertical 9:16 composition, brand palette fidelity, consistent product/character styling, ad-safe commercial polish, no extra text unless requested.`;
+${previousScene ? `Previous scene motion: ${previousScene.videoMotionPrompt}\nPrevious scene natural exit: ${previousScene.transitionOutPrompt}` : "This is the establishing anchor for the story."}
+${scene.continuityMode === "INTENTIONAL_CHANGE" ? "Honor only the explicitly described plot change; preserve every other locked identity and style attribute." : "Treat supplied prior-scene imagery as identity, screen-direction, lighting, and spatial guidance. Depict the plausible next edit point after the previous motion; do not merely duplicate the prior composition."}
+Use a vertical 9:16 composition, brand palette fidelity, consistent product/character styling, coherent eyelines and screen direction, ad-safe commercial polish, no extra text or logos. This is the scene's only still-image constraint.`;
 }
 
-function buildVideoPrompt(scene: ProductionScene) {
+function buildVideoPrompt(
+  scene: ProductionScene,
+  nextScene: ProductionScene | null,
+) {
   return `${scene.videoMotionPrompt}
 
-Animate from the approved opening frame to the approved closing frame over ${scene.durationSec} seconds. Arrive cleanly at the closing composition; do not introduce a different ending.
+Begin faithfully from the approved scene anchor and execute the motion naturally over ${scene.durationSec} seconds.
+Natural exit / next edit point: ${scene.transitionOutPrompt}
+${nextScene ? `Upcoming scene anchor context: ${nextScene.anchorFramePrompt}\nShape the outgoing motion, screen direction, subject position, and energy so a ${nextScene.continuityMode.toLowerCase().replace("_", " ")} cut into that scene feels intentional.` : "This is the final scene. Resolve the story naturally on a stable, product-forward or character-forward beat with a short edit-safe tail, without forcing an exact pose."}
+Do not converge on a predetermined closing still. Do not morph, abruptly decelerate, freeze, reverse motion, or add an artificial hold near the end. Maintain purposeful motion through an edit-safe final moment.
 Locked brand style: ${scene.lockedStyleLanguage}
 Product continuity: ${scene.storyboard.productContinuity}
 Character continuity: ${scene.storyboard.characterContinuity}
 Visual-world continuity: ${scene.storyboard.visualContinuity}
 Transition mode: ${scene.continuityMode}
 Continuity notes: ${scene.continuityNotes}
-Caption context: ${scene.captionText}
-Keep motion smooth, vertical 9:16, commercial social ad pacing, no unsupported claims, no new logos or text overlays beyond the approved storyboard copy.`;
+Keep motion smooth, vertical 9:16, and commercially polished. Generate no text overlays or logos; captions and branding are composited later. Do not introduce unsupported claims.`;
 }
 
 async function createProductionJob({
@@ -1156,7 +1126,7 @@ function sanitizeProductionError(
       "storyboard",
       "scene",
       "keyframe",
-      "first and last frames",
+      "scene anchors",
       "PUBLIC_APP_URL",
       "API key",
       "QwenCloud",

@@ -18,8 +18,8 @@ export type EditableScene = {
   durationSec: number;
   captionText: string;
   voiceoverText: string;
-  startFramePrompt: string;
-  endFramePrompt: string;
+  anchorFramePrompt: string;
+  transitionOutPrompt: string;
   videoMotionPrompt: string;
   continuityNotes: string;
   continuityMode: ContinuityMode;
@@ -108,13 +108,13 @@ export function SceneInspector({
         </section>
 
         <section className="grid gap-3 border-t border-border pt-5">
-          <SectionLabel icon={Film} label="Frame direction" />
-          <Field label="First frame">
+          <SectionLabel icon={Film} label="Scene anchor & motion" />
+          <Field label="Scene anchor (the only generated still)">
             <textarea
               className="min-h-28 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
-              value={scene.startFramePrompt}
+              value={scene.anchorFramePrompt}
               onChange={(event) =>
-                onChange({ ...scene, startFramePrompt: event.target.value })
+                onChange({ ...scene, anchorFramePrompt: event.target.value })
               }
             />
           </Field>
@@ -122,12 +122,12 @@ export function SceneInspector({
             <MoveRight className="size-3.5" aria-hidden="true" />
             Motion through the shot
           </div>
-          <Field label="Last frame">
+          <Field label="Natural exit / next edit point">
             <textarea
               className="min-h-28 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
-              value={scene.endFramePrompt}
+              value={scene.transitionOutPrompt}
               onChange={(event) =>
-                onChange({ ...scene, endFramePrompt: event.target.value })
+                onChange({ ...scene, transitionOutPrompt: event.target.value })
               }
             />
           </Field>
