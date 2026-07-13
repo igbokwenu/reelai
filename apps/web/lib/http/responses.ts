@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
+import { PublicError } from "@/lib/errors";
+
 export function ok<T>(data: T, init?: ResponseInit) {
   return NextResponse.json(data, init);
 }
@@ -37,6 +39,10 @@ export async function handleRoute<T>(handler: () => Promise<T>) {
   } catch (error) {
     if (error instanceof ZodError) {
       return zodError(error);
+    }
+
+    if (error instanceof PublicError) {
+      return ok({ error: error.message }, { status: error.status });
     }
 
     console.error("Route failed", {

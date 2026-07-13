@@ -156,26 +156,36 @@ export function GenerationConsole({
     setStarting(kind);
     setError(null);
 
-    const endpoint =
-      kind === "keyframes"
-        ? `/api/projects/${projectId}/keyframes`
-        : `/api/projects/${projectId}/videos`;
-    const response = await fetch(endpoint, { method: "POST" });
-    const data = (await response.json()) as { job?: Job; error?: string };
-    setStarting(null);
+    try {
+      const endpoint =
+        kind === "keyframes"
+          ? `/api/projects/${projectId}/keyframes`
+          : `/api/projects/${projectId}/videos`;
+      const response = await fetch(endpoint, { method: "POST" });
+      const data = (await response.json().catch(() => ({}))) as {
+        job?: Job;
+        error?: string;
+      };
 
-    if (!response.ok || !data.job) {
-      setError(data.error ?? "Generation could not start.");
-      return;
+      if (!response.ok || !data.job) {
+        setError(data.error ?? "Generation could not start. Please try again.");
+        return;
+      }
+
+      if (kind === "keyframes") setKeyframeJob(data.job);
+      else setVideoJob(data.job);
+
+      if (data.job.status === "FAILED") {
+        setError(data.job.error ?? "Generation failed.");
+      }
+      router.refresh();
+    } catch {
+      setError(
+        "Could not reach the generation service. Check the dev server and try again.",
+      );
+    } finally {
+      setStarting(null);
     }
-
-    if (kind === "keyframes") setKeyframeJob(data.job);
-    else setVideoJob(data.job);
-
-    if (data.job.status === "FAILED") {
-      setError(data.job.error ?? "Generation failed.");
-    }
-    router.refresh();
   }
 
   async function saveScene(scene: ProductionScene) {

@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Artifact, Prisma, Scene, Storyboard, Take } from "@prisma/client";
 
+import { PublicError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { generateImageWithQwen } from "@/lib/qwen/image";
 import {
@@ -797,18 +798,20 @@ async function getProductionScenes(projectId: string) {
   });
 
   if (!storyboard) {
-    throw new Error("Generate and save a storyboard before production.");
+    throw new PublicError("Generate and save a storyboard before production.");
   }
 
   if (storyboard.status !== "APPROVED" && storyboard.status !== "COMPLETE") {
-    throw new Error("Save and approve the storyboard before generation.");
+    throw new PublicError("Save and approve the storyboard before generation.");
   }
 
   if (storyboard.scenes.length < 2 || storyboard.scenes.length > 4) {
-    throw new Error("Production requires a storyboard with 2 to 4 scenes.");
+    throw new PublicError(
+      "Production requires a storyboard with 2 to 4 scenes.",
+    );
   }
   if (storyboard.scenes.some((scene) => scene.status === "DRAFT")) {
-    throw new Error("Approve every storyboard scene before generation.");
+    throw new PublicError("Approve every storyboard scene before generation.");
   }
 
   return storyboard.scenes.map((scene) => ({
@@ -958,9 +961,17 @@ async function createProductionJob({
   sceneIds: string[];
 }) {
   return prisma.$transaction(async (tx) => {
-    // Serialize production starts per project without requiring a schema-level
-    // singleton row or migration. This closes the double-click/request race.
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`production:${projectId}`}))`;
+    // Lock the existing project row for this transaction. Unlike PostgreSQL's
+    // void-returning advisory lock, this is supported by Prisma's PG adapter.
+    const lockedProject = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id"
+      FROM "Project"
+      WHERE "id" = ${projectId}
+      FOR UPDATE
+    `;
+    if (lockedProject.length === 0) {
+      throw new PublicError("Project not found.", 404);
+    }
 
     const staleBefore = new Date(Date.now() - STALE_PRODUCTION_JOB_MS);
     await tx.generationJob.updateMany({
@@ -987,7 +998,10 @@ async function createProductionJob({
       select: { id: true },
     });
     if (active) {
-      throw new Error("A production job is already running for this project.");
+      throw new PublicError(
+        "A production job is already running for this project.",
+        409,
+      );
     }
 
     return tx.generationJob.create({
