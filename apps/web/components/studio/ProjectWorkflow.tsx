@@ -1,0 +1,279 @@
+"use client";
+
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Clapperboard,
+  FolderOpen,
+  ImagePlus,
+  LayoutTemplate,
+  Palette,
+  PlayCircle,
+  type LucideIcon,
+} from "lucide-react";
+import { type ReactNode, useMemo, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+
+type StageId =
+  "brand" | "concepts" | "storyboard" | "production" | "final" | "assets";
+
+type Stage = {
+  id: StageId;
+  eyebrow: string;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+  content: ReactNode;
+  state: "complete" | "current" | "upcoming" | "available";
+};
+
+export function ProjectWorkflow({
+  brand,
+  concepts,
+  storyboard,
+  production,
+  final,
+  assets,
+  hasBrandKit,
+  hasSelectedConcept,
+  storyboardStatus,
+  productionComplete,
+  finalComplete,
+}: {
+  brand: ReactNode;
+  concepts: ReactNode;
+  storyboard: ReactNode;
+  production: ReactNode;
+  final: ReactNode;
+  assets: ReactNode;
+  hasBrandKit: boolean;
+  hasSelectedConcept: boolean;
+  storyboardStatus: string | null;
+  productionComplete: boolean;
+  finalComplete: boolean;
+}) {
+  const stages = useMemo<Stage[]>(() => {
+    const storyboardComplete = storyboardStatus === "APPROVED";
+
+    return [
+      {
+        id: "brand",
+        eyebrow: "01 · Foundation",
+        label: "Brand",
+        description: "Define the voice, visual language, and safe claims.",
+        icon: Palette,
+        content: brand,
+        state: hasBrandKit ? "complete" : "current",
+      },
+      {
+        id: "concepts",
+        eyebrow: "02 · Direction",
+        label: "Concepts",
+        description: "Compare three creative routes and choose one.",
+        icon: LayoutTemplate,
+        content: concepts,
+        state: hasSelectedConcept
+          ? "complete"
+          : hasBrandKit
+            ? "current"
+            : "upcoming",
+      },
+      {
+        id: "storyboard",
+        eyebrow: "03 · Plan",
+        label: "Storyboard",
+        description: "Shape the script, scenes, pacing, and approvals.",
+        icon: Clapperboard,
+        content: storyboard,
+        state: storyboardComplete
+          ? "complete"
+          : hasSelectedConcept
+            ? "current"
+            : "upcoming",
+      },
+      {
+        id: "production",
+        eyebrow: "04 · Create",
+        label: "Production",
+        description: "Generate, compare, and select keyframes and clips.",
+        icon: ImagePlus,
+        content: production,
+        state: productionComplete
+          ? "complete"
+          : storyboardComplete
+            ? "current"
+            : "upcoming",
+      },
+      {
+        id: "final",
+        eyebrow: "05 · Deliver",
+        label: "Final",
+        description: "Add narration and export the finished vertical reel.",
+        icon: PlayCircle,
+        content: final,
+        state: finalComplete
+          ? "complete"
+          : productionComplete
+            ? "current"
+            : "upcoming",
+      },
+      {
+        id: "assets",
+        eyebrow: "Project library",
+        label: "Assets",
+        description: "Manage source material and generated artifacts.",
+        icon: FolderOpen,
+        content: assets,
+        state: "available",
+      },
+    ];
+  }, [
+    assets,
+    brand,
+    concepts,
+    final,
+    finalComplete,
+    hasBrandKit,
+    hasSelectedConcept,
+    production,
+    productionComplete,
+    storyboard,
+    storyboardStatus,
+  ]);
+
+  const suggestedStage =
+    stages.find((stage) => stage.state === "current")?.id ??
+    (finalComplete ? "final" : "brand");
+  const [activeId, setActiveId] = useState<StageId>(suggestedStage);
+  const activeIndex = stages.findIndex((stage) => stage.id === activeId);
+  const activeStage = stages[activeIndex] ?? stages[0];
+
+  function selectStage(id: StageId) {
+    setActiveId(id);
+    window.requestAnimationFrame(() => {
+      document.getElementById("project-workspace")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
+
+  return (
+    <div className="mt-6" id="project-workspace">
+      <nav
+        aria-label="Project workflow"
+        className="workflow-rail overflow-x-auto rounded-2xl border border-border/80 bg-card/70 p-2 shadow-2xl shadow-black/20 backdrop-blur-xl"
+      >
+        <div className="grid min-w-[760px] grid-cols-6 gap-1">
+          {stages.map((stage) => {
+            const Icon = stage.icon;
+            const isActive = stage.id === activeStage.id;
+            return (
+              <button
+                aria-current={isActive ? "step" : undefined}
+                className={`group relative min-w-0 rounded-xl px-3 py-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/10"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+                key={stage.id}
+                onClick={() => selectStage(stage.id)}
+                type="button"
+              >
+                <span className="flex items-center gap-2">
+                  <span
+                    className={`flex size-7 shrink-0 items-center justify-center rounded-lg border ${
+                      isActive
+                        ? "border-primary-foreground/15 bg-primary-foreground/10"
+                        : stage.state === "complete"
+                          ? "border-primary/30 bg-primary/10 text-primary"
+                          : "border-border bg-background/60"
+                    }`}
+                  >
+                    {stage.state === "complete" && !isActive ? (
+                      <Check className="size-3.5" aria-hidden="true" />
+                    ) : (
+                      <Icon className="size-3.5" aria-hidden="true" />
+                    )}
+                  </span>
+                  <span className="truncate text-sm font-semibold">
+                    {stage.label}
+                  </span>
+                </span>
+                <span
+                  className={`mt-2 block truncate text-[10px] font-medium uppercase tracking-[0.12em] ${
+                    isActive
+                      ? "text-primary-foreground/65"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  {stage.state === "complete"
+                    ? "Complete"
+                    : stage.state === "current"
+                      ? "Ready now"
+                      : stage.state === "available"
+                        ? "Anytime"
+                        : "Up next"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      <section className="mt-4 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-2xl shadow-black/20">
+        <header className="border-b border-border bg-gradient-to-br from-white/[0.045] to-transparent px-5 py-5 sm:px-7">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+                {activeStage.eyebrow}
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+                {activeStage.label}
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                {activeStage.description}
+              </p>
+            </div>
+            <span className="w-fit rounded-full border border-border bg-background/60 px-3 py-1.5 text-xs text-muted-foreground">
+              {activeIndex + 1} of {stages.length}
+            </span>
+          </div>
+        </header>
+
+        <div className="p-4 sm:p-7">
+          {stages.map((stage) => (
+            <div hidden={stage.id !== activeStage.id} key={stage.id}>
+              {stage.content}
+            </div>
+          ))}
+        </div>
+
+        <footer className="flex items-center justify-between gap-3 border-t border-border bg-background/30 px-4 py-3 sm:px-7">
+          <Button
+            disabled={activeIndex === 0}
+            onClick={() => selectStage(stages[activeIndex - 1].id)}
+            size="sm"
+            variant="outline"
+          >
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            Previous
+          </Button>
+          <p className="hidden text-xs text-muted-foreground sm:block">
+            Your work is preserved as you move between stages.
+          </p>
+          <Button
+            disabled={activeIndex === stages.length - 1}
+            onClick={() => selectStage(stages[activeIndex + 1].id)}
+            size="sm"
+          >
+            Next
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </Button>
+        </footer>
+      </section>
+    </div>
+  );
+}

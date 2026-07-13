@@ -11,6 +11,7 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Server-side QwenCloud clients for structured text, vision, image generation, video generation, and TTS.
 - URL-first project creation that automatically queues Brand Kit research; project and business names can be inferred from the website.
 - Focused two-column landing workspace with optional pipeline guidance and confirmed project deletion, including local/OSS artifact cleanup.
+- Focused horizontal project workflow with six navigable stages: Brand, Concepts, Storyboard, Production, Final, and Assets. Stage readiness and completion are visible at a glance, and switching stages preserves in-progress client state.
 - Reusable Brand Kit with value props, palette, claims, policy risks, locked style language, and citations.
 - Multi-page website evidence collection covering metadata, visible copy, CSS color candidates, logos/social images, and QwenCloud visual analysis.
 - Evidence-capability guardrails: website-only projects cannot manufacture product UI, logos, branded uniforms, badges, packaging, or unsupported trust claims.
@@ -53,6 +54,8 @@ pnpm dev
 ```
 
 Open `http://localhost:3000`.
+
+The project workflow UI is application-only and introduces no database schema changes. After pulling UI changes, restart `pnpm dev` if the Next.js development server does not hot-reload them. You do **not** need to run `pnpm db:migrate` for this workflow update.
 
 The seed creates:
 
@@ -106,6 +109,8 @@ pnpm test
 pnpm e2e
 pnpm format
 ```
+
+Inside a selected project, use the horizontal stage rail or the Previous/Next controls to move through the workflow. Brand Kit essentials (summary, audience, tone, value props, and palette) remain visible by default; visual motifs, approved claims, policy risks, and citations are grouped into expandable guardrail panels. Project uploads and generated artifacts live in the Assets stage.
 
 Run a deployed smoke test against an existing URL:
 

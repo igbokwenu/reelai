@@ -1,12 +1,4 @@
-import {
-  ArrowLeft,
-  Boxes,
-  Clapperboard,
-  Database,
-  FileVideo,
-  Globe2,
-  HardDrive,
-} from "lucide-react";
+import { ArrowLeft, Boxes, ChevronDown, Globe2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -17,9 +9,9 @@ import { ConceptTable } from "@/components/studio/ConceptTable";
 import { FinalVideoPlayer } from "@/components/studio/FinalVideoPlayer";
 import { GenerationConsole } from "@/components/studio/GenerationConsole";
 import { ProjectList } from "@/components/studio/ProjectList";
-import { StoryboardTimeline } from "@/components/studio/StoryboardTimeline";
+import { ProjectWorkflow } from "@/components/studio/ProjectWorkflow";
 import { SourceUploader } from "@/components/studio/SourceUploader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StoryboardTimeline } from "@/components/studio/StoryboardTimeline";
 import { prisma } from "@/lib/prisma";
 import { getProjectGraph } from "@/lib/projects/graph";
 
@@ -65,22 +57,31 @@ export default async function ProjectPage({ params }: PageProps) {
     project.jobs.find((job) => job.type === "RENDER") ?? null;
   const selectedConcept =
     project.concepts.find((concept) => concept.selected) ?? null;
+  const productionComplete = Boolean(
+    project.storyboard?.scenes.length &&
+    project.storyboard.scenes.every(
+      (scene) => scene.status === "COMPLETE" && scene.selectedVideoTakeId,
+    ),
+  );
+  const finalComplete = project.renders.some(
+    (render) => render.status === "COMPLETE" && render.artifactId,
+  );
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_340px]">
-        <aside className="border-border bg-sidebar/70 border-b px-4 py-5 lg:border-r lg:border-b-0">
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[268px_minmax(0,1fr)]">
+        <aside className="border-border bg-sidebar/80 border-b px-4 py-5 backdrop-blur-xl lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-r lg:border-b-0">
           <Link
-            className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+            className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
             href="/"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
-            Intake
+            New project
           </Link>
           <div className="flex items-center gap-3">
             <Image
               alt="Reel AI logo"
-              className="size-10 rounded-md object-cover"
+              className="size-10 rounded-xl object-cover ring-1 ring-white/10"
               height={40}
               priority
               src="/reelai_logo.jpeg"
@@ -88,58 +89,157 @@ export default async function ProjectPage({ params }: PageProps) {
             />
             <div>
               <p className="text-sm font-semibold">Reel AI</p>
-              <p className="text-muted-foreground text-xs">Project graph</p>
+              <p className="text-muted-foreground text-xs">Creative studio</p>
             </div>
           </div>
-          <div className="mt-7">
-            <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-              <Boxes className="size-4" aria-hidden="true" />
-              Projects
+          <div className="mt-6">
+            <details className="group lg:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl border border-border bg-card/60 px-3 py-2.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center gap-2">
+                  <Boxes
+                    className="size-4 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  Switch project
+                </span>
+                <ChevronDown
+                  className="size-4 text-muted-foreground transition-transform group-open:rotate-180"
+                  aria-hidden="true"
+                />
+              </summary>
+              <div className="mt-2 max-h-64 overflow-y-auto pr-1">
+                <ProjectList projects={projects} />
+              </div>
+            </details>
+            <div className="hidden lg:block">
+              <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                <Boxes className="size-4" aria-hidden="true" />
+                Projects
+              </div>
+              <ProjectList projects={projects} />
             </div>
-            <ProjectList projects={projects} />
           </div>
         </aside>
 
-        <section className="min-w-0 px-5 py-5 lg:px-7">
-          <header className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-muted-foreground text-sm">
-                {project.businessName}
-              </p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-normal">
-                {project.name}
-              </h1>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-              <Metric label="Style" value={formatEnum(project.style)} />
-              <Metric label="Length" value={`${project.videoLengthSec}s`} />
-              <Metric label="Sources" value={String(project.sources.length)} />
-              <Metric
-                label="Artifacts"
-                value={String(project.artifacts.length)}
-              />
-            </div>
-          </header>
+        <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8 xl:px-10">
+          <div className="mx-auto max-w-[1480px]">
+            <header className="flex flex-col gap-5 border-b border-border/80 pb-6 xl:flex-row xl:items-end xl:justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Globe2 className="size-4" aria-hidden="true" />
+                  <span className="truncate">{project.businessName}</span>
+                </div>
+                <h1 className="mt-2 truncate text-3xl font-semibold tracking-tight sm:text-4xl">
+                  {project.name}
+                </h1>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  One guided workspace from brand research to final reel.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Metric label="Style" value={formatEnum(project.style)} />
+                <Metric label="Length" value={`${project.videoLengthSec}s`} />
+                <Metric
+                  label="Sources"
+                  value={String(project.sources.length)}
+                />
+                <Metric
+                  label="Artifacts"
+                  value={String(project.artifacts.length)}
+                />
+              </div>
+            </header>
 
-          <div className="mt-6 grid gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Brand Kit</CardTitle>
-              </CardHeader>
-              <CardContent>
+            <details className="group mt-4 rounded-xl border border-border/70 bg-card/50 px-4 py-3 text-sm">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-medium [&::-webkit-details-marker]:hidden">
+                <span>Project details</span>
+                <ChevronDown
+                  className="size-4 text-muted-foreground transition-transform group-open:rotate-180"
+                  aria-hidden="true"
+                />
+              </summary>
+              <div className="mt-3 grid gap-3 border-t border-border/70 pt-3 text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
+                <ProjectDetail
+                  label="Website"
+                  value={project.websiteUrl ?? "Not set"}
+                />
+                <ProjectDetail
+                  label="Status"
+                  value={formatEnum(project.status)}
+                />
+                <ProjectDetail
+                  label="Selected concept"
+                  value={selectedConcept?.title ?? "Not selected"}
+                />
+                <ProjectDetail
+                  label="Final render"
+                  value={
+                    project.renders[0]?.status
+                      ? formatEnum(project.renders[0].status)
+                      : "Not started"
+                  }
+                />
+              </div>
+            </details>
+
+            <ProjectWorkflow
+              assets={
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                  <section>
+                    <SectionHeading
+                      description="Add logos, product shots, screenshots, or supporting URLs. New material becomes available to future generations."
+                      title="Source material"
+                    />
+                    <SourceUploader projectId={project.id} />
+                    <div className="mt-5 grid gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Registered sources · {project.sources.length}
+                      </p>
+                      {project.sources.length > 0 ? (
+                        project.sources.map((source) => (
+                          <div
+                            className="rounded-xl border border-border bg-background/50 p-3 text-sm"
+                            key={source.id}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="font-medium">
+                                {formatEnum(source.type)}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {source.artifactId
+                                  ? "File linked"
+                                  : "Web source"}
+                              </span>
+                            </div>
+                            <p className="mt-1 truncate text-xs text-muted-foreground">
+                              {source.url ??
+                                source.artifactId ??
+                                "Uploaded file"}
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <EmptyState text="No sources yet." />
+                      )}
+                    </div>
+                  </section>
+                  <section>
+                    <SectionHeading
+                      description="Every generated preview, take, audio track, and render remains available here."
+                      title="Artifact library"
+                    />
+                    <ArtifactStore artifacts={project.artifacts} />
+                  </section>
+                </div>
+              }
+              brand={
                 <BrandKitPanel
                   brandKit={project.brandKit}
                   latestBrandKitJob={latestBrandKitJob}
                   projectId={project.id}
                 />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Concepts</CardTitle>
-              </CardHeader>
-              <CardContent>
+              }
+              concepts={
                 <ConceptTable
                   artifacts={project.artifacts}
                   concepts={project.concepts}
@@ -148,49 +248,8 @@ export default async function ProjectPage({ params }: PageProps) {
                   projectId={project.id}
                   sources={project.sources}
                 />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Storyboard</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <StoryboardTimeline
-                  key={
-                    project.storyboard
-                      ? `${project.storyboard.id}-${project.storyboard.updatedAt.toISOString()}`
-                      : selectedConcept?.id ?? "no-storyboard"
-                  }
-                  latestPolicyJob={latestPolicyJob}
-                  latestStoryboardJob={latestStoryboardJob}
-                  projectId={project.id}
-                  selectedConcept={selectedConcept}
-                  storyboard={project.storyboard}
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Generation</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <GenerationConsole
-                  artifacts={project.artifacts}
-                  latestKeyframeJob={latestKeyframeJob}
-                  latestVideoJob={latestVideoJob}
-                  projectId={project.id}
-                  storyboard={project.storyboard}
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Final Render</CardTitle>
-              </CardHeader>
-              <CardContent>
+              }
+              final={
                 <FinalVideoPlayer
                   artifacts={project.artifacts}
                   latestNarrationJob={latestNarrationJob}
@@ -199,127 +258,38 @@ export default async function ProjectPage({ params }: PageProps) {
                   renders={project.renders}
                   storyboard={project.storyboard}
                 />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Project Sources</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <SourceUploader projectId={project.id} />
-              </CardContent>
-            </Card>
-
-            <div className="grid gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Registered Sources</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {project.sources.length > 0 ? (
-                    <div className="grid gap-2">
-                      {project.sources.map((source) => (
-                        <div
-                          className="rounded-md border border-border bg-background/50 p-3 text-sm"
-                          key={source.id}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="font-medium">
-                              {formatEnum(source.type)}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {source.artifactId
-                                ? "artifact linked"
-                                : "metadata"}
-                            </span>
-                          </div>
-                          <p className="mt-1 break-all text-xs text-muted-foreground">
-                            {source.url ?? source.artifactId ?? "Uploaded file"}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyState text="No sources yet." />
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Artifact Store</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ArtifactStore artifacts={project.artifacts} />
-                </CardContent>
-              </Card>
-            </div>
+              }
+              finalComplete={finalComplete}
+              hasBrandKit={Boolean(project.brandKit)}
+              hasSelectedConcept={Boolean(selectedConcept)}
+              production={
+                <GenerationConsole
+                  artifacts={project.artifacts}
+                  latestKeyframeJob={latestKeyframeJob}
+                  latestVideoJob={latestVideoJob}
+                  projectId={project.id}
+                  storyboard={project.storyboard}
+                />
+              }
+              productionComplete={productionComplete}
+              storyboard={
+                <StoryboardTimeline
+                  key={
+                    project.storyboard
+                      ? `${project.storyboard.id}-${project.storyboard.updatedAt.toISOString()}`
+                      : (selectedConcept?.id ?? "no-storyboard")
+                  }
+                  latestPolicyJob={latestPolicyJob}
+                  latestStoryboardJob={latestStoryboardJob}
+                  projectId={project.id}
+                  selectedConcept={selectedConcept}
+                  storyboard={project.storyboard}
+                />
+              }
+              storyboardStatus={project.storyboard?.status ?? null}
+            />
           </div>
         </section>
-
-        <aside className="border-border bg-card/40 border-t px-5 py-5 lg:border-t-0 lg:border-l">
-          <p className="text-sm font-semibold">Inspector</p>
-          <div className="mt-4 space-y-3">
-            <InspectorRow
-              icon={Globe2}
-              label="Website"
-              value={project.websiteUrl ?? "Not set"}
-            />
-            <InspectorRow
-              icon={Database}
-              label="Status"
-              value={formatEnum(project.status)}
-            />
-            <InspectorRow
-              icon={HardDrive}
-              label="Storage rows"
-              value={`${project.artifacts.length}`}
-            />
-            <InspectorRow
-              icon={FileVideo}
-              label="Next phase"
-              value={
-                project.storyboard
-                  ? "Keyframes"
-                  : selectedConcept
-                    ? "Storyboard"
-                    : project.concepts.length === 3
-                      ? "Concept Selection"
-                      : project.brandKit
-                        ? "Creative Concepts"
-                        : "Brand Kit"
-              }
-            />
-            <InspectorRow
-              icon={Clapperboard}
-              label="Brand Kit job"
-              value={latestBrandKitJob?.status ?? "Not started"}
-            />
-            <InspectorRow
-              icon={Clapperboard}
-              label="Concept"
-              value={selectedConcept?.title ?? "Not selected"}
-            />
-            <InspectorRow
-              icon={Clapperboard}
-              label="Storyboard"
-              value={project.storyboard?.status ?? "Not started"}
-            />
-            <InspectorRow
-              icon={FileVideo}
-              label="Final render"
-              value={project.renders[0]?.status ?? "Not started"}
-            />
-          </div>
-          <div className="mt-5 rounded-md border border-dashed border-border p-3 text-sm">
-            <p className="font-medium">Persistence check</p>
-            <p className="mt-2 text-muted-foreground">
-              This page is rendered from the project graph API shape: project,
-              sources, artifacts, jobs, storyboard, renders, and related rows.
-            </p>
-          </div>
-        </aside>
       </div>
     </main>
   );
@@ -327,8 +297,8 @@ export default async function ProjectPage({ params }: PageProps) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-border bg-card px-3 py-2">
-      <p className="text-muted-foreground text-[11px] uppercase tracking-[0.16em]">
+    <div className="min-w-24 rounded-xl border border-border/80 bg-card px-3 py-2.5">
+      <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-[0.14em]">
         {label}
       </p>
       <p className="mt-1 whitespace-nowrap text-sm font-semibold">{value}</p>
@@ -336,29 +306,37 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function InspectorRow({
-  icon: Icon,
-  label,
-  value,
+function ProjectDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] font-medium uppercase tracking-[0.14em]">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-sm text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function SectionHeading({
+  title,
+  description,
 }: {
-  icon: typeof Globe2;
-  label: string;
-  value: string;
+  title: string;
+  description: string;
 }) {
   return (
-    <div className="rounded-md border border-border px-3 py-2 text-sm">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <Icon className="size-4" aria-hidden="true" />
-        <span>{label}</span>
-      </div>
-      <p className="mt-1 break-words font-medium">{value}</p>
+    <div className="mb-4">
+      <h3 className="text-base font-semibold">{title}</h3>
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+        {description}
+      </p>
     </div>
   );
 }
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+    <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
       {text}
     </div>
   );
