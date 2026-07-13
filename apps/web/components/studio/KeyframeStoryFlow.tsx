@@ -169,7 +169,7 @@ export function KeyframeStoryFlow({
                 {selectedVideo?.artifactId ? (
                   <video
                     aria-label={`Selected clip for scene ${scene.index}`}
-                    className="mt-3 aspect-video w-full rounded-lg border border-border bg-black object-cover"
+                    className="mt-3 aspect-[9/16] w-full rounded-lg border border-border bg-black object-contain"
                     controls
                     muted
                     playsInline

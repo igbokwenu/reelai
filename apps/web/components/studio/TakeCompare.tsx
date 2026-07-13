@@ -143,8 +143,9 @@ function TakeGroup({
 
               {href && isVideo ? (
                 <video
-                  className="mt-3 aspect-[9/16] w-full rounded-md border border-border object-cover"
+                  className="mt-3 aspect-[9/16] w-full rounded-md border border-border bg-black object-contain"
                   controls
+                  playsInline
                   preload="metadata"
                   src={href}
                 />
