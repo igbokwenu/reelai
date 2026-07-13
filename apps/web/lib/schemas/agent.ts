@@ -16,6 +16,14 @@ export const creativeConceptsSchema = z.object({
   concepts: z.array(creativeConceptSchema).length(3),
 });
 
+export const creativeConceptRegenerationSchema = z.object({
+  concept: creativeConceptSchema,
+});
+
+export const creativeConceptRegenerationInputSchema = z.object({
+  adjustmentNote: z.string().trim().max(500).optional().default(""),
+});
+
 export const creativeConceptsJsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -52,6 +60,15 @@ export const creativeConceptsJsonSchema = {
         },
       },
     },
+  },
+} satisfies Record<string, unknown>;
+
+export const creativeConceptRegenerationJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["concept"],
+  properties: {
+    concept: creativeConceptsJsonSchema.properties.concepts.items,
   },
 } satisfies Record<string, unknown>;
 
@@ -243,6 +260,16 @@ export function parseCreativeConceptsOutput(
   return creativeConceptsSchema.parse({ concepts });
 }
 
+export function parseCreativeConceptRegenerationOutput(value: unknown) {
+  const record = asRecord(value);
+  const directConcept = record ? asRecord(record.concept) : null;
+  const extracted = directConcept ?? extractConceptArray(value)[0];
+
+  return creativeConceptRegenerationSchema.parse({
+    concept: normalizeConcept(extracted),
+  });
+}
+
 export function parseStoryboardOutput(value: unknown): StoryboardOutput {
   const canonical = canonicalizeStoryboardValue(value);
   const strict = storyboardSchema.safeParse(canonical);
@@ -257,9 +284,9 @@ export function parseStoryboardOutput(value: unknown): StoryboardOutput {
     : Array.isArray(record.storyboard)
       ? record.storyboard
       : [];
-  const scenes = rawScenes.slice(0, 4).map((scene, index) =>
-    normalizeStoryboardScene(scene, index),
-  );
+  const scenes = rawScenes
+    .slice(0, 4)
+    .map((scene, index) => normalizeStoryboardScene(scene, index));
 
   return storyboardSchema.parse({
     title: text(record.title ?? record.name ?? "Generated storyboard", {
@@ -314,30 +341,42 @@ function normalizeConcept(value: unknown) {
   const parsed = flexibleConceptSchema.parse(asRecord(value) ?? {});
   const scenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
   const firstScene = scenes[0] ? asRecord(scenes[0]) : null;
-  
+
   const title = text(parsed.title, {
     fallback: "",
     min: 3,
     max: 90,
   });
   const hook = text(
-    parsed.hook ?? 
-    (firstScene ? firstScene.text_overlay : undefined) ??
-    (firstScene ? firstScene.visual_direction : undefined) ??
-    (firstScene ? firstScene.visual_description : undefined),
+    parsed.hook ??
+      (firstScene ? firstScene.text_overlay : undefined) ??
+      (firstScene ? firstScene.visual_direction : undefined) ??
+      (firstScene ? firstScene.visual_description : undefined),
     {
       fallback: "",
       min: 8,
       max: 220,
     },
   );
-  const strategy = text(parsed.strategy ?? parsed.approach ?? parsed.concept ?? parsed.concept_summary ?? parsed.core_strategy, {
-    fallback: "",
-    min: 20,
-    max: 420,
-  });
+  const strategy = text(
+    parsed.strategy ??
+      parsed.approach ??
+      parsed.concept ??
+      parsed.concept_summary ??
+      parsed.core_strategy,
+    {
+      fallback: "",
+      min: 20,
+      max: 420,
+    },
+  );
   const narrativeArc = text(
-    parsed.narrativeArc ?? parsed.narrative_arc ?? parsed.arc ?? parsed.storyArc ?? parsed.concept_summary ?? parsed.core_strategy,
+    parsed.narrativeArc ??
+      parsed.narrative_arc ??
+      parsed.arc ??
+      parsed.storyArc ??
+      parsed.concept_summary ??
+      parsed.core_strategy,
     {
       fallback: "",
       min: 20,
@@ -345,11 +384,11 @@ function normalizeConcept(value: unknown) {
     },
   );
   const visualStyle = text(
-    parsed.visualStyle ?? 
-    parsed.visual_style ?? 
-    parsed.style ??
-    (firstScene ? firstScene.visual_direction : undefined) ??
-    (firstScene ? firstScene.visual_description : undefined),
+    parsed.visualStyle ??
+      parsed.visual_style ??
+      parsed.style ??
+      (firstScene ? firstScene.visual_direction : undefined) ??
+      (firstScene ? firstScene.visual_description : undefined),
     {
       fallback: "",
       min: 12,
@@ -447,16 +486,19 @@ function normalizeStoryboardScene(value: unknown, index: number) {
       record.durationSec ?? record.duration_sec ?? record.duration,
       { fallback: 8, min: 4, max: 15 },
     ),
-    captionText: text(record.captionText ?? record.caption ?? record.onScreenText, {
-      fallback: "",
-      min: 1,
-      max: 140,
-    }),
+    captionText: text(
+      record.captionText ?? record.caption ?? record.onScreenText,
+      {
+        fallback: "",
+        min: 1,
+        max: 140,
+      },
+    ),
     voiceoverText: text(
       record.voiceoverText ??
         record.voiceover ??
         record.narration ??
-      record.voiceOver,
+        record.voiceOver,
       {
         fallback: "",
         min: 1,

@@ -25,6 +25,21 @@ export async function POST(_request: Request, context: RouteContext) {
       );
     }
 
+    const activeJob = await prisma.generationJob.findFirst({
+      where: {
+        projectId,
+        type: "CONCEPTS",
+        status: { in: ["QUEUED", "RUNNING", "WAITING_PROVIDER"] },
+      },
+      select: { id: true },
+    });
+    if (activeJob) {
+      return ok(
+        { error: "Another concept generation is already in progress." },
+        { status: 409 },
+      );
+    }
+
     const job = await createAndRunConceptJob(projectId);
     const concepts = await prisma.creativeConcept.findMany({
       where: { projectId },

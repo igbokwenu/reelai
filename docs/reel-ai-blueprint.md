@@ -445,6 +445,7 @@ Public app endpoints:
 - `POST /api/brand-kits`
 - `PATCH /api/brand-kits/:id`
 - `POST /api/projects/:id/concepts`
+- `POST /api/projects/:id/concepts/:conceptId/regenerate`
 - `POST /api/projects/:id/select-concept`
 - `POST /api/projects/:id/storyboard`
 - `PATCH /api/storyboards/:id`

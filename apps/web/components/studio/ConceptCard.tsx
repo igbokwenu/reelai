@@ -1,6 +1,13 @@
 "use client";
 
-import { CheckCircle2, ImageIcon, MousePointer2 } from "lucide-react";
+import {
+  CheckCircle2,
+  ImageIcon,
+  Loader2,
+  MousePointer2,
+  RefreshCw,
+} from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -28,18 +35,22 @@ export function ConceptCard({
   concept,
   artifact,
   onSelect,
-  isSelecting,
+  isRegenerating,
+  isBusy,
   requiresRegeneration,
+  onRegenerate,
 }: {
   concept: Concept;
   artifact: Artifact | null;
   onSelect: (conceptId: string) => void;
-  isSelecting: boolean;
+  onRegenerate: (conceptId: string, adjustmentNote: string) => Promise<boolean>;
+  isRegenerating: boolean;
+  isBusy: boolean;
   requiresRegeneration: boolean;
 }) {
-  const previewHref = artifact
-    ? `/api/artifacts/${artifact.id}/file`
-    : null;
+  const [isAdjusting, setIsAdjusting] = useState(false);
+  const [adjustmentNote, setAdjustmentNote] = useState("");
+  const previewHref = artifact ? `/api/artifacts/${artifact.id}/file` : null;
 
   return (
     <article className="grid min-h-full gap-3 rounded-md border border-border bg-background/50 p-3">
@@ -60,9 +71,14 @@ export function ConceptCard({
 
       <div>
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-base font-semibold leading-tight">{concept.title}</h3>
+          <h3 className="text-base font-semibold leading-tight">
+            {concept.title}
+          </h3>
           {concept.selected ? (
-            <CheckCircle2 className="size-5 shrink-0 text-primary" aria-label="Selected" />
+            <CheckCircle2
+              className="size-5 shrink-0 text-primary"
+              aria-label="Selected"
+            />
           ) : null}
         </div>
         <p className="mt-2 text-sm font-medium text-primary">{concept.hook}</p>
@@ -79,24 +95,105 @@ export function ConceptCard({
         <Info label="Rationale" value={concept.rationale} />
       </dl>
 
-      <div className="mt-auto">
-        <Button
-          disabled={concept.selected || isSelecting || requiresRegeneration}
-          onClick={() => onSelect(concept.id)}
-          size="sm"
-          variant={concept.selected ? "outline" : "default"}
-        >
-          {concept.selected ? (
-            <CheckCircle2 className="size-4" aria-hidden="true" />
-          ) : (
-            <MousePointer2 className="size-4" aria-hidden="true" />
-          )}
-          {concept.selected
-            ? "Selected Direction"
-            : requiresRegeneration
-              ? "Regenerate required"
-              : "Select Direction"}
-        </Button>
+      <div className="mt-auto grid gap-3">
+        {isAdjusting ? (
+          <div className="grid gap-2 rounded-md border border-border bg-card p-3">
+            <label className="grid gap-2">
+              <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                Optional adjustment
+              </span>
+              <textarea
+                autoFocus
+                className="min-h-20 rounded-md border border-border bg-background px-3 py-2 text-sm"
+                disabled={isRegenerating}
+                maxLength={500}
+                onChange={(event) => setAdjustmentNote(event.target.value)}
+                placeholder="E.g. make it more playful, lead with the founder story, or expand the product-demo angle."
+                value={adjustmentNote}
+              />
+            </label>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">
+                {adjustmentNote.length}/500
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  disabled={isRegenerating}
+                  onClick={() => setIsAdjusting(false)}
+                  size="sm"
+                  variant="ghost"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={isBusy}
+                  onClick={async () => {
+                    const succeeded = await onRegenerate(
+                      concept.id,
+                      adjustmentNote.trim(),
+                    );
+                    if (succeeded) {
+                      setAdjustmentNote("");
+                      setIsAdjusting(false);
+                    }
+                  }}
+                  size="sm"
+                  variant="outline"
+                >
+                  {isRegenerating ? (
+                    <Loader2
+                      className="size-4 animate-spin"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <RefreshCw className="size-4" aria-hidden="true" />
+                  )}
+                  Regenerate
+                </Button>
+              </div>
+            </div>
+            {concept.selected ? (
+              <p className="text-xs leading-5 text-amber-200">
+                This selected direction drives the current storyboard.
+                Regenerating it returns the storyboard and its scenes to draft
+                for review.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={concept.selected || isBusy || requiresRegeneration}
+            onClick={() => onSelect(concept.id)}
+            size="sm"
+            variant={concept.selected ? "outline" : "default"}
+          >
+            {concept.selected ? (
+              <CheckCircle2 className="size-4" aria-hidden="true" />
+            ) : (
+              <MousePointer2 className="size-4" aria-hidden="true" />
+            )}
+            {concept.selected
+              ? "Selected Direction"
+              : requiresRegeneration
+                ? "Regenerate required"
+                : "Select Direction"}
+          </Button>
+          <Button
+            disabled={isBusy || isAdjusting}
+            onClick={() => setIsAdjusting(true)}
+            size="sm"
+            variant="outline"
+          >
+            {isRegenerating ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <RefreshCw className="size-4" aria-hidden="true" />
+            )}
+            Refine / Regenerate
+          </Button>
+        </div>
       </div>
     </article>
   );

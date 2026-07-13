@@ -16,7 +16,7 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Multi-page website evidence collection covering metadata, visible copy, CSS color candidates, logos/social images, and QwenCloud visual analysis.
 - Evidence-capability guardrails: website-only projects cannot manufacture product UI, logos, branded uniforms, badges, packaging, or unsupported trust claims.
 - Pre-spend concept validation and post-generation visual grounding review; previews that fail review are replaced with an honest local concept card.
-- Exactly three creative concepts before full generation spend.
+- Exactly three creative concepts before full generation spend, with optional note-guided regeneration of one direction without replacing the other two.
 - Editable 2 to 4 scene storyboard and human approval loop.
 - Additive keyframe/video takes with selection instead of destructive regeneration.
 - Remotion final render path for 9:16 MP4 export.
@@ -55,7 +55,7 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
-The project workflow UI is application-only and introduces no database schema changes. After pulling UI changes, restart `pnpm dev` if the Next.js development server does not hot-reload them. You do **not** need to run `pnpm db:migrate` for this workflow update.
+The project workflow and per-concept regeneration update introduce no database schema changes. After pulling the changes, restart `pnpm dev` so the new route is loaded reliably. You do **not** need to run `pnpm db:migrate` or `pnpm db:generate` for this update.
 
 The seed creates:
 

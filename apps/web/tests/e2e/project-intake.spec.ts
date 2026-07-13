@@ -15,7 +15,7 @@ test("creates a URL-first project and starts Brand Kit research", async ({
 
   await expect(page).toHaveURL(/\/projects\/.+/);
   await expect(
-    page.locator("header").getByText("Example", { exact: true }),
+    page.getByRole("heading", { level: 1, name: /reel$/ }),
   ).toBeVisible();
   await page.getByRole("button", { name: /^Brand/ }).click();
   await expect(page.getByText("Brand Kit Agent")).toBeVisible();

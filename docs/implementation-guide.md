@@ -382,22 +382,23 @@ All route handlers must:
 
 Required endpoints:
 
-| Endpoint                                                | Method  | Purpose                                    | Sync/async                                    |
-| ------------------------------------------------------- | ------- | ------------------------------------------ | --------------------------------------------- |
-| `/api/projects`                                         | `POST`  | Create project                             | sync                                          |
-| `/api/projects/[projectId]`                             | `GET`   | Fetch full project graph                   | sync                                          |
-| `/api/projects/[projectId]/sources`                     | `POST`  | Upload/register sources                    | sync for metadata, async extraction if needed |
-| `/api/projects/[projectId]/brand-kit`                   | `POST`  | Generate Brand Kit                         | async                                         |
-| `/api/projects/[projectId]/concepts`                    | `POST`  | Generate three concepts and preview frames | async                                         |
-| `/api/projects/[projectId]/concepts/[conceptId]/select` | `POST`  | Select concept                             | sync                                          |
-| `/api/projects/[projectId]/storyboard`                  | `POST`  | Generate storyboard from selected concept  | async                                         |
-| `/api/storyboards/[storyboardId]`                       | `PATCH` | Edit storyboard/scenes                     | sync                                          |
-| `/api/projects/[projectId]/keyframes`                   | `POST`  | Generate scene keyframes                   | async                                         |
-| `/api/projects/[projectId]/videos`                      | `POST`  | Generate scene videos                      | async                                         |
-| `/api/projects/[projectId]/tts`                         | `POST`  | Generate narration                         | async                                         |
-| `/api/projects/[projectId]/render`                      | `POST`  | Render final MP4                           | async                                         |
-| `/api/jobs/[jobId]`                                     | `GET`   | Poll job status                            | sync                                          |
-| `/api/artifacts/[artifactId]`                           | `GET`   | Resolve artifact metadata/download URL     | sync                                          |
+| Endpoint                                                    | Method  | Purpose                                                 | Sync/async                                    |
+| ----------------------------------------------------------- | ------- | ------------------------------------------------------- | --------------------------------------------- |
+| `/api/projects`                                             | `POST`  | Create project                                          | sync                                          |
+| `/api/projects/[projectId]`                                 | `GET`   | Fetch full project graph                                | sync                                          |
+| `/api/projects/[projectId]/sources`                         | `POST`  | Upload/register sources                                 | sync for metadata, async extraction if needed |
+| `/api/projects/[projectId]/brand-kit`                       | `POST`  | Generate Brand Kit                                      | async                                         |
+| `/api/projects/[projectId]/concepts`                        | `POST`  | Generate three concepts and preview frames              | async                                         |
+| `/api/projects/[projectId]/concepts/[conceptId]/regenerate` | `POST`  | Regenerate one concept with an optional adjustment note | async                                         |
+| `/api/projects/[projectId]/concepts/[conceptId]/select`     | `POST`  | Select concept                                          | sync                                          |
+| `/api/projects/[projectId]/storyboard`                      | `POST`  | Generate storyboard from selected concept               | async                                         |
+| `/api/storyboards/[storyboardId]`                           | `PATCH` | Edit storyboard/scenes                                  | sync                                          |
+| `/api/projects/[projectId]/keyframes`                       | `POST`  | Generate scene keyframes                                | async                                         |
+| `/api/projects/[projectId]/videos`                          | `POST`  | Generate scene videos                                   | async                                         |
+| `/api/projects/[projectId]/tts`                             | `POST`  | Generate narration                                      | async                                         |
+| `/api/projects/[projectId]/render`                          | `POST`  | Render final MP4                                        | async                                         |
+| `/api/jobs/[jobId]`                                         | `GET`   | Poll job status                                         | sync                                          |
+| `/api/artifacts/[artifactId]`                               | `GET`   | Resolve artifact metadata/download URL                  | sync                                          |
 
 Use typed response helpers in `apps/web/lib/http/responses.ts`.
 
@@ -831,6 +832,7 @@ Build:
 - Creative Director agent that returns exactly three concepts.
 - Preview frame generation for each concept.
 - `ConceptTable` and `ConceptCard`.
+- Note-guided regeneration of one concept that retains the other two and includes them in the prompt as anti-duplication context.
 - Concept selection endpoint.
 - Storyboard agent using selected concept and Brand Kit.
 - Editable `StoryboardTimeline`.
@@ -842,6 +844,8 @@ Exit checklist:
 
 - [ ] User can generate exactly three concepts from a Brand Kit.
 - [ ] Each concept has title, hook, strategy, narrative arc, preview prompt, rationale, and preview frame.
+- [ ] User can regenerate one concept, optionally describe the adjustment in 500 characters or less, and retain the other two concepts.
+- [ ] Regenerating a selected concept preserves its identity and selection but returns its storyboard and scenes to draft review.
 - [ ] User can select exactly one concept.
 - [ ] Storyboard generation requires a selected concept.
 - [ ] Storyboard contains 2 to 4 scenes for MVP.

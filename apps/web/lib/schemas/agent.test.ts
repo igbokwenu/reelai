@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  creativeConceptRegenerationInputSchema,
+  creativeConceptRegenerationJsonSchema,
   creativeConceptsSchema,
   creativeConceptsJsonSchema,
+  parseCreativeConceptRegenerationOutput,
   parseCreativeConceptsOutput,
   parseStoryboardOutput,
   storyboardJsonSchema,
@@ -28,11 +31,13 @@ describe("Phase 4 agent schemas", () => {
     };
 
     expect(
-      creativeConceptsSchema.safeParse({ concepts: [concept, concept, concept] })
-        .success,
+      creativeConceptsSchema.safeParse({
+        concepts: [concept, concept, concept],
+      }).success,
     ).toBe(true);
     expect(
-      creativeConceptsSchema.safeParse({ concepts: [concept, concept] }).success,
+      creativeConceptsSchema.safeParse({ concepts: [concept, concept] })
+        .success,
     ).toBe(false);
   });
 
@@ -84,10 +89,12 @@ describe("Phase 4 agent schemas", () => {
     const makeConcept = (index: number) => ({
       title: `Direction ${index}`,
       hook: `Hook ${index}: make the business feel immediately useful.`,
-      approach: "Lead with a proof-led story instead of a generic feature list.",
+      approach:
+        "Lead with a proof-led story instead of a generic feature list.",
       narrative_arc:
         "Open on the customer problem, move into the branded solution, and end with a direct call to action.",
-      visual_style: "Clean vertical product-led visuals with warm human context.",
+      visual_style:
+        "Clean vertical product-led visuals with warm human context.",
       estimated_scenes: "3 scenes",
       estimatedDuration: "24 seconds",
       preview_prompt:
@@ -140,6 +147,44 @@ describe("Phase 4 agent schemas", () => {
     expect(concepts.items.properties.rationale.minLength).toBe(20);
   });
 
+  it("validates and normalizes one concept regeneration", () => {
+    const parsed = parseCreativeConceptRegenerationOutput({
+      concept: {
+        title: "A Fresh Ritual",
+        hook: "Turn an ordinary daily moment into a branded ritual.",
+        approach:
+          "Use a relatable ritual transformation instead of repeating the other product or founder-led directions.",
+        narrative_arc:
+          "Open on a flat routine, introduce the brand as the turning point, and close on a satisfying repeatable ritual.",
+        visual_style:
+          "Warm tactile close-ups with a restrained palette and rhythmic match cuts.",
+        estimated_scenes: "3 scenes",
+        estimatedDuration: "22 seconds",
+        preview_prompt:
+          "Vertical 9:16 tactile lifestyle frame with warm light, restrained brand colors, and clean safe-zone composition.",
+        why_it_works:
+          "The ritual framing makes the offer memorable without relying on unsupported performance claims.",
+      },
+    });
+
+    expect(parsed.concept.title).toBe("A Fresh Ritual");
+    expect(parsed.concept.estimatedDurationSec).toBe(22);
+    expect(creativeConceptRegenerationJsonSchema.required).toEqual(["concept"]);
+  });
+
+  it("keeps concept adjustment notes concise", () => {
+    expect(
+      creativeConceptRegenerationInputSchema.parse({
+        adjustmentNote: "  More playful  ",
+      }),
+    ).toEqual({ adjustmentNote: "More playful" });
+    expect(
+      creativeConceptRegenerationInputSchema.safeParse({
+        adjustmentNote: "x".repeat(501),
+      }).success,
+    ).toBe(false);
+  });
+
   it("normalizes storyboard variants before strict validation", () => {
     const scene = (index: number) => ({
       index,
@@ -158,9 +203,11 @@ describe("Phase 4 agent schemas", () => {
 
     const parsed = parseStoryboardOutput({
       title: "Launch reel",
-      copy:
-        "A compact launch script that frames the problem, shows the brand answer, and closes clearly.",
-      music: { mood: "warm pulse", description: "Light upbeat background bed." },
+      copy: "A compact launch script that frames the problem, shows the brand answer, and closes clearly.",
+      music: {
+        mood: "warm pulse",
+        description: "Light upbeat background bed.",
+      },
       storyboard_scenes: [scene(1), scene(2), scene(3)],
     });
 
