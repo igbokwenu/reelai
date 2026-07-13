@@ -2,7 +2,10 @@ import "server-only";
 
 import type { Artifact, Prisma, Scene, Storyboard, Take } from "@prisma/client";
 
-import { createStoredArtifact, createArtifactFromUrl } from "@/lib/media/artifacts";
+import {
+  createStoredArtifact,
+  createArtifactFromUrl,
+} from "@/lib/media/artifacts";
 import { prisma } from "@/lib/prisma";
 import {
   QWEN_TTS_MAX_CHARS,
@@ -141,7 +144,9 @@ async function runNarrationJob(jobId: string, chunks: string[]) {
       generated.map((item) => fetchArtifactBuffer(item.artifact)),
     );
     const combinedAudio =
-      audioBuffers.length === 1 ? audioBuffers[0] : concatenateWav(audioBuffers);
+      audioBuffers.length === 1
+        ? audioBuffers[0]
+        : concatenateWav(audioBuffers);
     const durationSec = estimateNarrationDurationSec(chunks.join(" "));
     const narration = await createStoredArtifact({
       projectId: job.projectId,
@@ -325,21 +330,39 @@ async function getRenderableStoryboard(
     throw new Error("Storyboard must be approved before final export.");
   }
 
-  const scenes = storyboard.scenes.filter((scene) =>
-    requireVideos
-      ? scene.status === "COMPLETE"
-      : scene.status === "APPROVED" || scene.status === "COMPLETE",
-  );
-
-  if (requireVideos && scenes.some((scene) => !scene.selectedVideoTakeId)) {
-    throw new Error("Select completed video takes for every scene before render.");
+  if (storyboard.scenes.length < 2 || storyboard.scenes.length > 4) {
+    throw new Error("Final export needs a storyboard with 2 to 4 scenes.");
+  }
+  if (
+    requireVideos &&
+    storyboard.scenes.some(
+      (scene) =>
+        scene.status !== "COMPLETE" ||
+        !scene.takes.some(
+          (take) =>
+            take.id === scene.selectedVideoTakeId &&
+            take.kind === "VIDEO" &&
+            take.status === "COMPLETE" &&
+            take.artifactId,
+        ),
+    )
+  ) {
+    throw new Error(
+      "Complete and select a video take for every storyboard scene before render.",
+    );
+  }
+  if (
+    !requireVideos &&
+    storyboard.scenes.some(
+      (scene) => scene.status !== "APPROVED" && scene.status !== "COMPLETE",
+    )
+  ) {
+    throw new Error(
+      "Approve every storyboard scene before generating narration.",
+    );
   }
 
-  if (scenes.length < 2 || scenes.length > 4) {
-    throw new Error("Final export needs 2 to 4 completed scenes.");
-  }
-
-  return { ...storyboard, scenes };
+  return storyboard;
 }
 
 async function buildReelCompositionInput({
@@ -359,7 +382,9 @@ async function buildReelCompositionInput({
   const scenes = [];
 
   for (const scene of storyboard.scenes) {
-    const take = scene.takes.find((item) => item.id === scene.selectedVideoTakeId);
+    const take = scene.takes.find(
+      (item) => item.id === scene.selectedVideoTakeId,
+    );
 
     if (!take?.artifactId) {
       throw new Error("Every render scene needs a selected video artifact.");
@@ -483,7 +508,10 @@ function generateSampleBgmWav() {
       Math.sin(2 * Math.PI * 110 * t) * 0.18 +
       Math.sin(2 * Math.PI * 165 * t) * 0.08 +
       Math.sin(2 * Math.PI * 220 * t) * 0.035;
-    data.writeInt16LE(Math.trunc(Math.max(-1, Math.min(1, tone * fade)) * 0x7fff), i * 2);
+    data.writeInt16LE(
+      Math.trunc(Math.max(-1, Math.min(1, tone * fade)) * 0x7fff),
+      i * 2,
+    );
   }
 
   const wav = Buffer.alloc(44 + data.length);

@@ -419,22 +419,35 @@ function getCurrentFrame(
       ? scene.selectedKeyframeTakeId
       : scene.selectedEndFrameTakeId;
   const explicitlySelected = scene.takes.find(
-    (take) => take.id === selectedId && take.kind === kind,
+    (take) =>
+      take.id === selectedId &&
+      take.kind === kind &&
+      take.status === "COMPLETE" &&
+      take.artifactId,
   );
 
   if (explicitlySelected) return explicitlySelected;
 
   // Compatibility for projects created before opening/closing selections were split.
-  if (scene.selectedKeyframeTakeId) {
-    return (
-      scene.takes.find(
-        (take) =>
-          take.kind === kind && take.status === "COMPLETE" && take.artifactId,
-      ) ?? null
-    );
-  }
+  const legacyPointer = scene.takes.find(
+    (take) =>
+      take.id === scene.selectedKeyframeTakeId &&
+      take.status === "COMPLETE" &&
+      take.artifactId,
+  );
+  if (!legacyPointer) return null;
 
-  return null;
+  if (legacyPointer.kind === kind) return legacyPointer;
+
+  return (
+    scene.takes.find(
+      (take) =>
+        take.kind === kind &&
+        take.attempt === legacyPointer.attempt &&
+        take.status === "COMPLETE" &&
+        take.artifactId,
+    ) ?? null
+  );
 }
 
 function transitionLabel(mode: ProductionScene["continuityMode"]) {

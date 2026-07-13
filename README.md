@@ -58,7 +58,7 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
-Application-only updates that do not add a Prisma migration require only a restart of `pnpm dev`; do not run `pnpm db:migrate` or `pnpm db:generate` unless the change includes an update under `prisma/migrations` or `prisma/schema.prisma`. The storyboard continuity and recommended opening/closing-frame updates include migrations, so existing local checkouts must run `pnpm db:migrate` once and then restart `pnpm dev`.
+Application-only updates that do not add a Prisma migration require only a restart of `pnpm dev`. Web development, typecheck, and build commands regenerate Prisma Client automatically so editor types stay aligned with `prisma/schema.prisma`. After switching to a branch with schema changes, run `pnpm db:generate` immediately if an already-open editor still shows missing Prisma fields, then restart its TypeScript server. The storyboard continuity and recommended opening/closing-frame updates include migrations, so existing local checkouts must run `pnpm db:migrate` once and then restart `pnpm dev`.
 
 The seed creates:
 

@@ -38,6 +38,12 @@ type Scene = {
   captionText: string;
   voiceoverText: string;
   selectedVideoTakeId: string | null;
+  takes: Array<{
+    id: string;
+    kind: string;
+    status: string;
+    artifactId: string | null;
+  }>;
 };
 
 type Storyboard = {
@@ -73,7 +79,9 @@ export function FinalVideoPlayer({
   latestRenderJob: Job | null;
 }) {
   const router = useRouter();
-  const [narrationJob, setNarrationJob] = useState<Job | null>(latestNarrationJob);
+  const [narrationJob, setNarrationJob] = useState<Job | null>(
+    latestNarrationJob,
+  );
   const [renderJob, setRenderJob] = useState<Job | null>(latestRenderJob);
   const [starting, setStarting] = useState<"narration" | "render" | null>(null);
   const [aiDisclosureEnabled, setAiDisclosureEnabled] = useState(true);
@@ -89,18 +97,33 @@ export function FinalVideoPlayer({
     [artifacts, narrationJob],
   );
   const completeRender =
-    renders.find((render) => render.status === "COMPLETE" && render.artifactId) ??
-    null;
+    renders.find(
+      (render) => render.status === "COMPLETE" && render.artifactId,
+    ) ?? null;
   const finalArtifact = completeRender?.artifactId
-    ? artifacts.find((artifact) => artifact.id === completeRender.artifactId) ?? null
+    ? (artifacts.find(
+        (artifact) => artifact.id === completeRender.artifactId,
+      ) ?? null)
     : null;
   const thumbnailArtifact = findThumbnailArtifact(artifacts, completeRender);
   const completedScenes =
     storyboard?.scenes.filter((scene) => scene.status === "COMPLETE") ?? [];
-  const canRender =
-    completedScenes.length >= 2 &&
-    completedScenes.length <= 4 &&
-    completedScenes.every((scene) => scene.selectedVideoTakeId);
+  const canRender = Boolean(
+    storyboard &&
+    storyboard.scenes.length >= 2 &&
+    storyboard.scenes.length <= 4 &&
+    storyboard.scenes.every(
+      (scene) =>
+        scene.status === "COMPLETE" &&
+        scene.takes.some(
+          (take) =>
+            take.id === scene.selectedVideoTakeId &&
+            take.kind === "VIDEO" &&
+            take.status === "COMPLETE" &&
+            take.artifactId,
+        ),
+    ),
+  );
 
   useEffect(() => {
     if (!activeJob) {
@@ -224,15 +247,24 @@ export function FinalVideoPlayer({
       </div>
 
       <div className="grid gap-2 rounded-md border border-border bg-background/60 p-3 text-sm md:grid-cols-4">
-        <StatusTile label="Narration" value={formatStatus(narrationJob?.status)} />
-        <StatusTile label="Scenes" value={`${completedScenes.length}/4 complete`} />
+        <StatusTile
+          label="Narration"
+          value={formatStatus(narrationJob?.status)}
+        />
+        <StatusTile
+          label="Scenes"
+          value={`${completedScenes.length}/4 complete`}
+        />
         <StatusTile label="Safe zones" value="TikTok/Reels" />
         <StatusTile label="Render" value={formatStatus(renderJob?.status)} />
       </div>
 
       {error ? (
         <div className="flex gap-2 rounded-md border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <AlertTriangle
+            className="mt-0.5 size-4 shrink-0"
+            aria-hidden="true"
+          />
           <span>{error}</span>
         </div>
       ) : null}
@@ -292,9 +324,13 @@ export function FinalVideoPlayer({
             </span>
           </label>
           <div className="flex items-start gap-2 rounded-md border border-border p-3 text-muted-foreground">
-            <Captions className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+            <Captions
+              className="mt-0.5 size-4 shrink-0 text-primary"
+              aria-hidden="true"
+            />
             <span>
-              The BGM option uses a stored neutral sample bed; it does not require generated music.
+              The BGM option uses a stored neutral sample bed; it does not
+              require generated music.
             </span>
           </div>
         </div>
@@ -398,7 +434,10 @@ function readWaveform(artifact: Artifact) {
       .slice(0, 48);
   }
 
-  return Array.from({ length: 48 }, (_, index) => 0.25 + ((index * 17) % 55) / 100);
+  return Array.from(
+    { length: 48 },
+    (_, index) => 0.25 + ((index * 17) % 55) / 100,
+  );
 }
 
 function asRecord(value: unknown) {

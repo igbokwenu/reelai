@@ -72,49 +72,55 @@ export function GenerationConsole({
     ["QUEUED", "RUNNING", "WAITING_PROVIDER"].includes(job?.status ?? ""),
   );
   const scenes = storyboard?.scenes ?? [];
-  const productionScenes = scenes.filter((scene) =>
-    ["APPROVED", "COMPLETE"].includes(scene.status),
-  );
+  const productionScenes = scenes;
+  const hasApprovedStory =
+    productionScenes.length >= 2 &&
+    productionScenes.length <= 4 &&
+    productionScenes.every((scene) => scene.status !== "DRAFT");
   const hasRecommendedFrames =
-    productionScenes.length > 0 &&
+    hasApprovedStory &&
     productionScenes.every((scene) => {
-      const selectedLegacyTake = scene.takes.find(
+      const selectedStartPointer = scene.takes.find(
         (take) => take.id === scene.selectedKeyframeTakeId,
       );
-      const start = scene.takes.find(
-        (take) =>
-          take.id === scene.selectedKeyframeTakeId &&
-          take.kind === "KEYFRAME_START" &&
-          take.status === "COMPLETE" &&
-          take.artifactId,
-      );
-      const legacyStart =
-        selectedLegacyTake?.kind === "KEYFRAME_END" &&
-        scene.takes.find(
-          (take) =>
-            take.kind === "KEYFRAME_START" &&
-            take.status === "COMPLETE" &&
-            take.artifactId,
-        );
-      const end = scene.takes.find(
-        (take) =>
-          take.id === scene.selectedEndFrameTakeId &&
-          take.kind === "KEYFRAME_END" &&
-          take.status === "COMPLETE" &&
-          take.artifactId,
-      );
-      const legacyEnd =
-        scene.selectedKeyframeTakeId &&
-        scene.takes.find(
-          (take) =>
-            take.kind === "KEYFRAME_END" &&
-            take.status === "COMPLETE" &&
-            take.artifactId,
-        );
-      return Boolean((start || legacyStart) && (end || legacyEnd));
+      if (!isUsableFrame(selectedStartPointer)) return false;
+
+      const start =
+        selectedStartPointer.kind === "KEYFRAME_START"
+          ? selectedStartPointer
+          : scene.takes.find(
+              (take) =>
+                take.kind === "KEYFRAME_START" &&
+                take.attempt === selectedStartPointer.attempt &&
+                isUsableFrame(take),
+            );
+      const end = scene.selectedEndFrameTakeId
+        ? scene.takes.find(
+            (take) =>
+              take.id === scene.selectedEndFrameTakeId &&
+              take.kind === "KEYFRAME_END" &&
+              isUsableFrame(take),
+          )
+        : selectedStartPointer.kind === "KEYFRAME_END"
+          ? selectedStartPointer
+          : scene.takes.find(
+              (take) =>
+                take.kind === "KEYFRAME_END" &&
+                take.attempt === selectedStartPointer.attempt &&
+                isUsableFrame(take),
+            );
+      return Boolean(start && end);
     });
   const completedClips = productionScenes.filter(
-    (scene) => scene.selectedVideoTakeId,
+    (scene) =>
+      scene.status === "COMPLETE" &&
+      scene.takes.some(
+        (take) =>
+          take.id === scene.selectedVideoTakeId &&
+          take.kind === "VIDEO" &&
+          take.status === "COMPLETE" &&
+          take.artifactId,
+      ),
   ).length;
   const runDetails = useMemo(
     () => [keyframeJob, videoJob].filter(Boolean) as Job[],
@@ -239,9 +245,8 @@ export function GenerationConsole({
           <div className="flex flex-wrap gap-2 lg:justify-end">
             <Button
               disabled={
-                storyboard.status !== "APPROVED" ||
-                productionScenes.length < 2 ||
-                productionScenes.length > 4 ||
+                !["APPROVED", "COMPLETE"].includes(storyboard.status) ||
+                !hasApprovedStory ||
                 starting !== null ||
                 Boolean(activeJob)
               }
@@ -283,7 +288,7 @@ export function GenerationConsole({
 
         <div className="grid border-t border-border bg-background/35 sm:grid-cols-3">
           <ProgressStep
-            complete={storyboard.status === "APPROVED"}
+            complete={["APPROVED", "COMPLETE"].includes(storyboard.status)}
             label="Story approved"
             step="1"
           />
@@ -382,6 +387,17 @@ export function GenerationConsole({
         </details>
       ) : null}
     </div>
+  );
+}
+
+function isUsableFrame(
+  take: ProductionScene["takes"][number] | undefined,
+): take is ProductionScene["takes"][number] {
+  return Boolean(
+    take &&
+    (take.kind === "KEYFRAME_START" || take.kind === "KEYFRAME_END") &&
+    take.status === "COMPLETE" &&
+    take.artifactId,
   );
 }
 

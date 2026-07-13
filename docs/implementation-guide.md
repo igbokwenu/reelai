@@ -543,6 +543,8 @@ Implementation:
 - `runJob(jobId)` claims the job by setting `RUNNING`.
 - For Qwen async tasks, set `WAITING_PROVIDER` with `providerTaskId`.
 - Poll provider tasks from an API-triggered worker loop for MVP.
+- Claim each polling pass before contacting the provider. A failed scene must not stop healthy sibling tasks from polling, and transient provider/download errors must remain `WAITING_PROVIDER` until the bounded processing window expires.
+- Preflight every selected start/end frame before submitting any video task. Preserve the currently selected keyframe pair or clip until a full replacement succeeds.
 - Store all generated files as `Artifact` rows after upload/download to OSS.
 - UI polls `/api/jobs/[jobId]` every 2 seconds until terminal.
 

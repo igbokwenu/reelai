@@ -11,6 +11,16 @@ import {
   submitImageToVideoTask,
 } from "@/lib/qwen/video";
 import { createArtifactFromUrl } from "@/lib/media/artifacts";
+import {
+  hasExactSceneCoverage,
+  isStalePollClaim,
+  parseVideoJobOutput,
+  resolveSelectedFrameTakes,
+  stableSceneStatus,
+  summarizeVideoTasks,
+  type VideoJobOutput,
+  type VideoSceneTask,
+} from "@/lib/jobs/production-state";
 
 export const QWEN_KEYFRAME_IMAGE_MODEL = "wan2.7-image-pro";
 
@@ -18,51 +28,41 @@ type ProductionScene = Scene & {
   takes: Take[];
   storyboard: Pick<
     Storyboard,
-    "productContinuity" | "characterContinuity" | "visualContinuity"
+    | "projectId"
+    | "productContinuity"
+    | "characterContinuity"
+    | "visualContinuity"
   >;
 };
-type VideoJobOutput = {
-  scenes: Array<{
-    sceneId: string;
-    takeId: string;
-    taskId: string;
-    status: "WAITING_PROVIDER" | "COMPLETE" | "FAILED";
-    artifactId?: string;
-    error?: string;
-  }>;
-};
+const ACTIVE_PRODUCTION_JOB_STATUSES = [
+  "QUEUED",
+  "RUNNING",
+  "WAITING_PROVIDER",
+] as const;
+const VIDEO_PROVIDER_TIMEOUT_MS = 60 * 60 * 1000;
+const STALE_PRODUCTION_JOB_MS = 30 * 60 * 1000;
 
 export async function createAndRunKeyframeJob(projectId: string) {
-  const scenes = await getApprovedScenes(projectId);
-  const job = await prisma.generationJob.create({
-    data: {
-      projectId,
-      type: "KEYFRAME",
-      status: "QUEUED",
-      model: QWEN_KEYFRAME_IMAGE_MODEL,
-      input: {
-        operation: "scene_keyframes",
-        sceneIds: scenes.map((scene) => scene.id),
-      },
-    },
+  const scenes = await getProductionScenes(projectId);
+  const job = await createProductionJob({
+    projectId,
+    type: "KEYFRAME",
+    model: QWEN_KEYFRAME_IMAGE_MODEL,
+    operation: "scene_keyframes",
+    sceneIds: scenes.map((scene) => scene.id),
   });
 
   return runKeyframeJob(job.id);
 }
 
 export async function createAndRunVideoJob(projectId: string) {
-  const scenes = await getApprovedScenes(projectId);
-  const job = await prisma.generationJob.create({
-    data: {
-      projectId,
-      type: "VIDEO",
-      status: "QUEUED",
-      model: QWEN_I2V_MODEL,
-      input: {
-        operation: "scene_i2v",
-        sceneIds: scenes.map((scene) => scene.id),
-      },
-    },
+  const scenes = await getProductionScenes(projectId);
+  const job = await createProductionJob({
+    projectId,
+    type: "VIDEO",
+    model: QWEN_I2V_MODEL,
+    operation: "scene_i2v",
+    sceneIds: scenes.map((scene) => scene.id),
   });
 
   return runVideoSubmissionJob(job.id);
@@ -82,12 +82,20 @@ export async function selectTake(takeId: string) {
     throw new Error("Only completed takes with artifacts can be selected.");
   }
 
-  const sceneUpdate =
+  const sceneUpdate: Prisma.SceneUpdateInput =
     take.kind === "VIDEO"
-      ? { selectedVideoTakeId: take.id }
+      ? { selectedVideoTakeId: take.id, status: "COMPLETE" }
       : take.kind === "KEYFRAME_END"
-        ? { selectedEndFrameTakeId: take.id, selectedVideoTakeId: null }
-        : { selectedKeyframeTakeId: take.id, selectedVideoTakeId: null };
+        ? {
+            selectedEndFrameTakeId: take.id,
+            selectedVideoTakeId: null,
+            status: "APPROVED",
+          }
+        : {
+            selectedKeyframeTakeId: take.id,
+            selectedVideoTakeId: null,
+            status: "APPROVED",
+          };
 
   const siblingTakeFilter: Prisma.TakeWhereInput = {
     sceneId: take.sceneId,
@@ -121,130 +129,271 @@ export async function selectTake(takeId: string) {
 }
 
 export async function advanceVideoJob(jobId: string) {
-  const job = await prisma.generationJob.findUnique({ where: { id: jobId } });
+  let job = await prisma.generationJob.findUnique({ where: { id: jobId } });
 
-  if (!job || job.type !== "VIDEO" || job.status !== "WAITING_PROVIDER") {
+  if (!job || job.type !== "VIDEO") return job;
+
+  if (job.status === "WAITING_PROVIDER") {
+    const claim = await prisma.generationJob.updateMany({
+      where: { id: job.id, status: "WAITING_PROVIDER" },
+      data: { status: "RUNNING" },
+    });
+    if (claim.count === 0) {
+      return prisma.generationJob.findUnique({ where: { id: jobId } });
+    }
+    job = await prisma.generationJob.findUniqueOrThrow({
+      where: { id: jobId },
+    });
+  } else if (job.status === "RUNNING") {
+    if (!isStalePollClaim(job.updatedAt)) return job;
+
+    const claim = await prisma.generationJob.updateMany({
+      where: { id: job.id, status: "RUNNING", updatedAt: job.updatedAt },
+      data: { status: "RUNNING" },
+    });
+    if (claim.count === 0) {
+      return prisma.generationJob.findUnique({ where: { id: jobId } });
+    }
+    job = await prisma.generationJob.findUniqueOrThrow({
+      where: { id: jobId },
+    });
+  } else {
     return job;
   }
 
-  const output = parseVideoOutput(job.output);
-  const nextScenes = await Promise.all(
-    output.scenes.map(async (sceneTask) => {
-      if (sceneTask.status !== "WAITING_PROVIDER") {
-        return sceneTask;
-      }
+  const output = parseVideoJobOutput(job.output);
+  const expectedSceneIds = getExpectedSceneIds(job.input);
+  if (!output || !hasExactSceneCoverage(output.scenes, expectedSceneIds)) {
+    return failProductionJob({
+      jobId: job.id,
+      projectId: job.projectId,
+      error: new Error("Video job provider state is missing or invalid."),
+      operation: "video",
+      projectStatus: "FAILED",
+    });
+  }
 
-      try {
-        const providerStatus = await pollVideoTask(sceneTask.taskId);
-
-        if (
-          providerStatus.status === "PENDING" ||
-          providerStatus.status === "RUNNING" ||
-          providerStatus.status === "UNKNOWN"
-        ) {
-          return sceneTask;
-        }
-
-        if (providerStatus.status === "FAILED" || !providerStatus.videoUrl) {
-          const error =
-            providerStatus.message ??
-            "QwenCloud video task failed before producing a durable URL.";
-          await prisma.take.update({
-            where: { id: sceneTask.takeId },
-            data: { status: "FAILED", notes: error },
-          });
-          await prisma.scene.update({
-            where: { id: sceneTask.sceneId },
-            data: { status: "FAILED" },
-          });
-
-          return { ...sceneTask, status: "FAILED" as const, error };
-        }
-
-        const artifact = await createArtifactFromUrl({
-          projectId: job.projectId,
-          fileName: `scene-${sceneTask.sceneId}-take-${sceneTask.takeId}.mp4`,
-          mimeType: "video/mp4",
-          type: "VIDEO",
-          url: providerStatus.videoUrl,
-          metadata: {
-            operation: "scene_i2v",
-            model: job.model ?? QWEN_I2V_MODEL,
-            providerTaskId: sceneTask.taskId,
-            providerRequestId: providerStatus.providerRequestId,
-          },
-        });
-
-        await prisma.$transaction([
-          prisma.take.update({
-            where: { id: sceneTask.takeId },
-            data: {
-              artifactId: artifact.id,
-              status: "COMPLETE",
-              selected: true,
-              notes: "Completed QwenCloud image-to-video take.",
-            },
-          }),
-          prisma.take.updateMany({
-            where: {
-              sceneId: sceneTask.sceneId,
-              kind: "VIDEO",
-              id: { not: sceneTask.takeId },
-            },
-            data: { selected: false },
-          }),
-          prisma.scene.update({
-            where: { id: sceneTask.sceneId },
-            data: {
-              status: "COMPLETE",
-              selectedVideoTakeId: sceneTask.takeId,
-            },
-          }),
-        ]);
-
-        return {
-          ...sceneTask,
-          status: "COMPLETE" as const,
-          artifactId: artifact.id,
-        };
-      } catch (error) {
-        const safeError = sanitizeVideoError(error);
-        await prisma.take.update({
-          where: { id: sceneTask.takeId },
-          data: { status: "FAILED", notes: safeError },
-        });
-        await prisma.scene.update({
-          where: { id: sceneTask.sceneId },
-          data: { status: "FAILED" },
-        });
-
-        return { ...sceneTask, status: "FAILED" as const, error: safeError };
-      }
-    }),
-  );
-  const hasWaiting = nextScenes.some(
-    (sceneTask) => sceneTask.status === "WAITING_PROVIDER",
-  );
-  const hasFailed = nextScenes.some(
-    (sceneTask) => sceneTask.status === "FAILED",
-  );
-  const completed = !hasWaiting && !hasFailed;
-
-  return prisma.generationJob.update({
-    where: { id: jobId },
-    data: {
-      status: completed
-        ? "COMPLETE"
-        : hasFailed
-          ? "FAILED"
-          : "WAITING_PROVIDER",
-      output: { scenes: nextScenes },
-      error: hasFailed
-        ? "One or more scene video tasks failed. Retry failed scenes from the Generation console."
-        : null,
-      completedAt: completed || hasFailed ? new Date() : null,
+  const persistedTakes = await prisma.take.findMany({
+    where: { id: { in: output.scenes.map((task) => task.takeId) } },
+    select: {
+      id: true,
+      sceneId: true,
+      kind: true,
+      status: true,
+      artifactId: true,
     },
   });
+  const takeById = new Map(persistedTakes.map((take) => [take.id, take]));
+  const hasInvalidTake = output.scenes.some((task) => {
+    const take = takeById.get(task.takeId);
+    return !take || take.sceneId !== task.sceneId || take.kind !== "VIDEO";
+  });
+  if (hasInvalidTake) {
+    return failProductionJob({
+      jobId: job.id,
+      projectId: job.projectId,
+      error: new Error(
+        "Video job provider state references an invalid scene take.",
+      ),
+      operation: "video",
+      projectStatus: "FAILED",
+    });
+  }
+  const hasInvalidCompletion = output.scenes.some((task) => {
+    const take = takeById.get(task.takeId)!;
+    return (
+      task.status === "COMPLETE" &&
+      (take.status !== "COMPLETE" || !take.artifactId)
+    );
+  });
+  if (hasInvalidCompletion) {
+    return failProductionJob({
+      jobId: job.id,
+      projectId: job.projectId,
+      error: new Error(
+        "Video job provider state has an invalid completed take.",
+      ),
+      operation: "video",
+      projectStatus: "FAILED",
+    });
+  }
+
+  const nextScenes: VideoSceneTask[] = [];
+  for (const sceneTask of output.scenes) {
+    const persistedTake = takeById.get(sceneTask.takeId)!;
+    if (persistedTake.status === "COMPLETE" && persistedTake.artifactId) {
+      nextScenes.push({
+        ...withoutTaskError(sceneTask),
+        status: "COMPLETE",
+        artifactId: persistedTake.artifactId,
+      });
+      continue;
+    }
+    if (sceneTask.status === "FAILED") {
+      if (persistedTake.status !== "FAILED") {
+        await markVideoTakeFailed(
+          sceneTask,
+          sceneTask.error ?? "Video submission did not complete.",
+        );
+      }
+      nextScenes.push(sceneTask);
+      continue;
+    }
+
+    try {
+      const providerStatus = await pollVideoTask(sceneTask.taskId!);
+
+      if (
+        providerStatus.status === "PENDING" ||
+        providerStatus.status === "RUNNING" ||
+        providerStatus.status === "UNKNOWN"
+      ) {
+        if (
+          job.startedAt &&
+          Date.now() - job.startedAt.getTime() >= VIDEO_PROVIDER_TIMEOUT_MS
+        ) {
+          const error =
+            "QwenCloud video task exceeded the one-hour processing window.";
+          await markVideoTakeFailed(sceneTask, error);
+          nextScenes.push({ ...sceneTask, status: "FAILED", error });
+          continue;
+        }
+        nextScenes.push(withoutTaskError(sceneTask));
+        continue;
+      }
+
+      if (providerStatus.status === "FAILED" || !providerStatus.videoUrl) {
+        const error =
+          "QwenCloud video task failed before producing a durable URL.";
+        await markVideoTakeFailed(sceneTask, error);
+        nextScenes.push({ ...sceneTask, status: "FAILED", error });
+        continue;
+      }
+
+      const artifact = await createArtifactFromUrl({
+        projectId: job.projectId,
+        fileName: `scene-${sceneTask.sceneId}-take-${sceneTask.takeId}.mp4`,
+        mimeType: "video/mp4",
+        type: "VIDEO",
+        url: providerStatus.videoUrl,
+        metadata: {
+          operation: "scene_i2v",
+          model: job.model ?? QWEN_I2V_MODEL,
+          providerTaskId: sceneTask.taskId,
+          providerRequestId: providerStatus.providerRequestId,
+        },
+      });
+
+      await prisma.$transaction([
+        prisma.take.update({
+          where: { id: sceneTask.takeId },
+          data: {
+            artifactId: artifact.id,
+            status: "COMPLETE",
+            selected: true,
+            notes: "Completed QwenCloud image-to-video take.",
+          },
+        }),
+        prisma.take.updateMany({
+          where: {
+            sceneId: sceneTask.sceneId,
+            kind: "VIDEO",
+            id: { not: sceneTask.takeId },
+          },
+          data: { selected: false },
+        }),
+        prisma.scene.update({
+          where: { id: sceneTask.sceneId },
+          data: {
+            status: "COMPLETE",
+            selectedVideoTakeId: sceneTask.takeId,
+          },
+        }),
+      ]);
+
+      nextScenes.push({
+        ...withoutTaskError(sceneTask),
+        status: "COMPLETE",
+        artifactId: artifact.id,
+      });
+    } catch (error) {
+      // Polling and artifact-copy failures are recoverable. The provider task
+      // remains durable, so keep it live for the next poll instead of losing it.
+      nextScenes.push({
+        ...sceneTask,
+        error: sanitizeVideoError(error),
+      });
+    }
+  }
+
+  const summary = summarizeVideoTasks(nextScenes);
+  const error = summary.hasFailed
+    ? "One or more scene video tasks failed. Existing completed clips were preserved where available."
+    : null;
+  let projectStatus: "DRAFT" | "GENERATING" | "FAILED" = "GENERATING";
+  if (summary.terminal) {
+    projectStatus =
+      summary.status === "COMPLETE" ||
+      (await hasCompleteStoryVideos(job.projectId))
+        ? "DRAFT"
+        : "FAILED";
+  }
+
+  const [, updatedJob] = await prisma.$transaction([
+    prisma.project.update({
+      where: { id: job.projectId },
+      data: { status: projectStatus },
+    }),
+    prisma.generationJob.update({
+      where: { id: job.id },
+      data: {
+        status: summary.status,
+        providerTaskId:
+          nextScenes
+            .filter((task) => task.status === "WAITING_PROVIDER")
+            .map((task) => task.taskId)
+            .filter((taskId): taskId is string => Boolean(taskId))
+            .join(",") || null,
+        output: { scenes: nextScenes } as unknown as Prisma.InputJsonValue,
+        error: summary.terminal ? error : null,
+        completedAt: summary.terminal ? new Date() : null,
+      },
+    }),
+  ]);
+
+  return updatedJob;
+}
+
+export async function recoverStaleKeyframeJob(jobId: string) {
+  const job = await prisma.generationJob.findUnique({ where: { id: jobId } });
+  if (
+    !job ||
+    job.type !== "KEYFRAME" ||
+    (job.status !== "QUEUED" && job.status !== "RUNNING") ||
+    !isStalePollClaim(job.updatedAt, new Date(), STALE_PRODUCTION_JOB_MS)
+  ) {
+    return job;
+  }
+
+  const claim = await prisma.generationJob.updateMany({
+    where: { id: job.id, status: job.status, updatedAt: job.updatedAt },
+    data: {
+      status: "FAILED",
+      error:
+        "Keyframe generation stopped reporting progress. Start it again to retry safely.",
+      completedAt: new Date(),
+    },
+  });
+  if (claim.count === 0) {
+    return prisma.generationJob.findUnique({ where: { id: jobId } });
+  }
+
+  await restoreProductionScenes(job.projectId);
+  await prisma.project.update({
+    where: { id: job.projectId },
+    data: { status: "DRAFT" },
+  });
+  return prisma.generationJob.findUnique({ where: { id: jobId } });
 }
 
 async function runKeyframeJob(jobId: string) {
@@ -257,24 +406,29 @@ async function runKeyframeJob(jobId: string) {
   });
 
   try {
-    await prisma.project.update({
-      where: { id: job.projectId },
-      data: { status: "GENERATING" },
-    });
+    const scenes = await getProductionScenes(job.projectId);
+    await prisma.$transaction([
+      prisma.project.update({
+        where: { id: job.projectId },
+        data: { status: "GENERATING" },
+      }),
+      prisma.scene.updateMany({
+        where: { id: { in: scenes.map((scene) => scene.id) } },
+        data: { status: "GENERATING" },
+      }),
+    ]);
 
-    const scenes = await getApprovedScenes(job.projectId);
     const groundingReferenceUrls = await getGroundingReferenceUrls(
       job.projectId,
     );
-    const created = [];
+    const created: Array<{
+      scene: ProductionScene;
+      startTake: Take;
+      endTake: Take;
+    }> = [];
     let previousEndReferenceUrl: string | null = null;
 
     for (const scene of scenes) {
-      await prisma.scene.update({
-        where: { id: scene.id },
-        data: { status: "GENERATING" },
-      });
-
       const startTake = await createKeyframeTake({
         projectId: job.projectId,
         scene,
@@ -297,53 +451,90 @@ async function runKeyframeJob(jobId: string) {
         ].slice(0, 3),
       });
       previousEndReferenceUrl = endTake.providerImageUrl;
-      created.push(startTake.take, endTake.take);
-      await prisma.$transaction([
-        prisma.take.updateMany({
+      created.push({
+        scene,
+        startTake: startTake.take,
+        endTake: endTake.take,
+      });
+      const progress = await prisma.generationJob.updateMany({
+        where: { id: job.id, status: "RUNNING" },
+        data: {
+          output: {
+            sceneCount: scenes.length,
+            generatedSceneCount: created.length,
+            takeIds: created.flatMap((item) => [
+              item.startTake.id,
+              item.endTake.id,
+            ]),
+          },
+        },
+      });
+      if (progress.count === 0) {
+        throw new Error("Keyframe generation job is no longer active.");
+      }
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const completion = await tx.generationJob.updateMany({
+        where: { id: job.id, status: "RUNNING" },
+        data: {
+          status: "COMPLETE",
+          output: {
+            takeIds: created.flatMap((item) => [
+              item.startTake.id,
+              item.endTake.id,
+            ]),
+            sceneCount: scenes.length,
+          },
+          completedAt: new Date(),
+        },
+      });
+      if (completion.count === 0) {
+        throw new Error("Keyframe generation job is no longer active.");
+      }
+
+      for (const item of created) {
+        await tx.take.updateMany({
           where: {
-            sceneId: scene.id,
+            sceneId: item.scene.id,
             kind: { in: ["KEYFRAME_START", "KEYFRAME_END"] },
           },
           data: { selected: false },
-        }),
-        prisma.take.updateMany({
-          where: { id: { in: [startTake.take.id, endTake.take.id] } },
+        });
+        await tx.take.updateMany({
+          where: { id: { in: [item.startTake.id, item.endTake.id] } },
           data: { selected: true },
-        }),
-        prisma.take.updateMany({
-          where: { sceneId: scene.id, kind: "VIDEO" },
+        });
+        await tx.take.updateMany({
+          where: { sceneId: item.scene.id, kind: "VIDEO" },
           data: { selected: false },
-        }),
-        prisma.scene.update({
-          where: { id: scene.id },
+        });
+        await tx.scene.update({
+          where: { id: item.scene.id },
           data: {
             status: "APPROVED",
-            selectedKeyframeTakeId: startTake.take.id,
-            selectedEndFrameTakeId: endTake.take.id,
+            selectedKeyframeTakeId: item.startTake.id,
+            selectedEndFrameTakeId: item.endTake.id,
             selectedVideoTakeId: null,
           },
-        }),
-      ]);
-    }
+        });
+      }
+      await tx.project.update({
+        where: { id: job.projectId },
+        data: { status: "DRAFT" },
+      });
 
-    await prisma.project.update({
-      where: { id: job.projectId },
-      data: { status: "DRAFT" },
-    });
-
-    return prisma.generationJob.update({
-      where: { id: jobId },
-      data: {
-        status: "COMPLETE",
-        output: {
-          takeIds: created.map((take) => take.id),
-          sceneCount: scenes.length,
-        },
-        completedAt: new Date(),
-      },
+      return tx.generationJob.findUniqueOrThrow({ where: { id: job.id } });
     });
   } catch (error) {
-    return failProductionJob(job.id, job.projectId, error);
+    return failProductionJob({
+      jobId: job.id,
+      projectId: job.projectId,
+      error,
+      operation: "keyframe",
+      projectStatus: "DRAFT",
+      restoreScenes: true,
+    });
   }
 }
 
@@ -357,14 +548,8 @@ async function runVideoSubmissionJob(jobId: string) {
   });
 
   try {
-    await prisma.project.update({
-      where: { id: job.projectId },
-      data: { status: "GENERATING" },
-    });
-
-    const scenes = await getApprovedScenes(job.projectId);
-    const submitted = [];
-
+    const scenes = await getProductionScenes(job.projectId);
+    const preflight = [];
     for (const scene of scenes) {
       const selectedFrames = await getSelectedKeyframeArtifacts(scene);
 
@@ -374,54 +559,145 @@ async function runVideoSubmissionJob(jobId: string) {
         );
       }
 
-      const take = await createQueuedTake({
-        sceneId: scene.id,
-        kind: "VIDEO",
-        prompt: buildVideoPrompt(scene),
+      preflight.push({
+        scene,
+        imageUrl: artifactUrl(selectedFrames.start),
+        lastFrameUrl: artifactUrl(selectedFrames.end),
       });
+    }
+
+    await prisma.project.update({
+      where: { id: job.projectId },
+      data: { status: "GENERATING" },
+    });
+    const prepared = [];
+    for (const item of preflight) {
+      const take = await createQueuedTake({
+        sceneId: item.scene.id,
+        kind: "VIDEO",
+        prompt: buildVideoPrompt(item.scene),
+      });
+      prepared.push({ ...item, take });
+    }
+    const submitted: VideoSceneTask[] = prepared.map(({ scene, take }) => ({
+      sceneId: scene.id,
+      takeId: take.id,
+      status: "FAILED",
+      error: "Video submission did not start.",
+    }));
+    await prisma.generationJob.update({
+      where: { id: job.id },
+      data: {
+        output: { scenes: submitted } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    for (const [index, item] of prepared.entries()) {
+      const { scene, take } = item;
 
       await prisma.scene.update({
         where: { id: scene.id },
         data: { status: "GENERATING" },
       });
 
-      const submission = await submitImageToVideoTask({
-        operation: "scene_i2v",
-        model: job.model ?? QWEN_I2V_MODEL,
-        prompt: take.prompt,
-        imageUrl: artifactUrl(selectedFrames.start),
-        lastFrameUrl: artifactUrl(selectedFrames.end),
-        durationSec: scene.durationSec,
-      });
+      let submission;
+      try {
+        submission = await submitImageToVideoTask({
+          operation: "scene_i2v",
+          model: job.model ?? QWEN_I2V_MODEL,
+          prompt: take.prompt,
+          imageUrl: item.imageUrl,
+          lastFrameUrl: item.lastFrameUrl,
+          durationSec: scene.durationSec,
+        });
+      } catch (error) {
+        const safeError = sanitizeVideoError(error);
+        const failedTask: VideoSceneTask = {
+          sceneId: scene.id,
+          takeId: take.id,
+          status: "FAILED",
+          error: safeError,
+        };
+        submitted[index] = failedTask;
+        await markVideoTakeFailed(failedTask, safeError);
+        await prisma.generationJob.update({
+          where: { id: job.id },
+          data: {
+            output: { scenes: submitted } as unknown as Prisma.InputJsonValue,
+          },
+        });
+        continue;
+      }
 
-      await prisma.take.update({
-        where: { id: take.id },
-        data: {
-          status: "RUNNING",
-          notes: `Provider task ${submission.taskId}`,
-        },
-      });
-
-      submitted.push({
+      const task: VideoSceneTask = {
         sceneId: scene.id,
         takeId: take.id,
         taskId: submission.taskId,
-        status: "WAITING_PROVIDER" as const,
-      });
+        status: "WAITING_PROVIDER",
+      };
+      submitted[index] = task;
+      await prisma.$transaction([
+        prisma.take.update({
+          where: { id: take.id },
+          data: {
+            status: "RUNNING",
+            notes: `Provider task ${submission.taskId}`,
+          },
+        }),
+        prisma.generationJob.update({
+          where: { id: job.id },
+          data: {
+            providerTaskId: submitted
+              .map((submittedTask) => submittedTask.taskId)
+              .filter((taskId): taskId is string => Boolean(taskId))
+              .join(","),
+            output: { scenes: submitted } as unknown as Prisma.InputJsonValue,
+          },
+        }),
+      ]);
     }
 
     const output: VideoJobOutput = { scenes: submitted };
+    const summary = summarizeVideoTasks(submitted);
+    const projectStatus = summary.terminal
+      ? (await hasCompleteStoryVideos(job.projectId))
+        ? "DRAFT"
+        : "FAILED"
+      : "GENERATING";
+    const [, updatedJob] = await prisma.$transaction([
+      prisma.project.update({
+        where: { id: job.projectId },
+        data: { status: projectStatus },
+      }),
+      prisma.generationJob.update({
+        where: { id: jobId },
+        data: {
+          status: summary.status,
+          providerTaskId:
+            submitted
+              .filter((item) => item.status === "WAITING_PROVIDER")
+              .map((item) => item.taskId)
+              .filter((taskId): taskId is string => Boolean(taskId))
+              .join(",") || null,
+          output: output as unknown as Prisma.InputJsonValue,
+          error: summary.terminal
+            ? "Video submission failed for every scene. Existing completed clips were preserved where available."
+            : null,
+          completedAt: summary.terminal ? new Date() : null,
+        },
+      }),
+    ]);
 
-    return prisma.generationJob.update({
-      where: { id: jobId },
-      data: {
-        status: "WAITING_PROVIDER",
-        providerTaskId: submitted.map((item) => item.taskId).join(","),
-        output: output as unknown as Prisma.InputJsonValue,
-      },
-    });
+    return updatedJob;
   } catch (error) {
-    return failProductionJob(job.id, job.projectId, error);
+    return failProductionJob({
+      jobId: job.id,
+      projectId: job.projectId,
+      error,
+      operation: "video",
+      projectStatus: "DRAFT",
+      restoreScenes: true,
+    });
   }
 }
 
@@ -476,10 +752,7 @@ async function createKeyframeTake({
 
     return { take, providerImageUrl: generated.imageUrl };
   } catch (error) {
-    const safeError =
-      error instanceof Error
-        ? error.message
-        : "Keyframe generation failed. Check sanitized server logs.";
+    const safeError = sanitizeProductionError(error, "keyframe");
 
     await prisma.take.update({
       where: { id: queued.id },
@@ -512,7 +785,7 @@ async function createQueuedTake({
   });
 }
 
-async function getApprovedScenes(projectId: string) {
+async function getProductionScenes(projectId: string) {
   const storyboard = await prisma.storyboard.findUnique({
     where: { projectId },
     include: {
@@ -531,17 +804,17 @@ async function getApprovedScenes(projectId: string) {
     throw new Error("Save and approve the storyboard before generation.");
   }
 
-  const scenes = storyboard.scenes.filter((scene) =>
-    ["APPROVED", "COMPLETE"].includes(scene.status),
-  );
-
-  if (scenes.length < 2 || scenes.length > 4) {
-    throw new Error("Phase 5 supports 2 to 4 approved scenes.");
+  if (storyboard.scenes.length < 2 || storyboard.scenes.length > 4) {
+    throw new Error("Production requires a storyboard with 2 to 4 scenes.");
+  }
+  if (storyboard.scenes.some((scene) => scene.status === "DRAFT")) {
+    throw new Error("Approve every storyboard scene before generation.");
   }
 
-  return scenes.map((scene) => ({
+  return storyboard.scenes.map((scene) => ({
     ...scene,
     storyboard: {
+      projectId: storyboard.projectId,
       productContinuity: storyboard.productContinuity,
       characterContinuity: storyboard.characterContinuity,
       visualContinuity: storyboard.visualContinuity,
@@ -567,6 +840,7 @@ async function getGroundingReferenceUrls(projectId: string) {
   const artifacts = await prisma.artifact.findMany({
     where: {
       id: { in: artifactIds },
+      projectId,
       mimeType: { startsWith: "image/" },
     },
   });
@@ -587,43 +861,37 @@ async function getGroundingReferenceUrls(projectId: string) {
 }
 
 async function getSelectedKeyframeArtifacts(scene: ProductionScene) {
-  const startTake =
-    scene.takes.find(
-      (take) =>
-        take.id === scene.selectedKeyframeTakeId &&
-        take.kind === "KEYFRAME_START" &&
-        take.status === "COMPLETE",
-    ) ??
-    scene.takes.find(
-      (take) =>
-        take.kind === "KEYFRAME_START" &&
-        take.status === "COMPLETE" &&
-        take.artifactId,
-    );
-  const endTake =
-    scene.takes.find(
-      (take) =>
-        take.id === scene.selectedEndFrameTakeId &&
-        take.kind === "KEYFRAME_END" &&
-        take.status === "COMPLETE",
-    ) ??
-    scene.takes.find(
-      (take) =>
-        take.kind === "KEYFRAME_END" &&
-        take.status === "COMPLETE" &&
-        take.artifactId,
-    );
-
-  if (!startTake?.artifactId || !endTake?.artifactId) {
-    return null;
-  }
+  const selected = resolveSelectedFrameTakes({
+    takes: scene.takes,
+    selectedStartTakeId: scene.selectedKeyframeTakeId,
+    selectedEndTakeId: scene.selectedEndFrameTakeId,
+  });
+  if (!selected) return null;
 
   const [start, end] = await Promise.all([
-    prisma.artifact.findUnique({ where: { id: startTake.artifactId! } }),
-    prisma.artifact.findUnique({ where: { id: endTake.artifactId! } }),
+    prisma.artifact.findFirst({
+      where: {
+        id: selected.start.artifactId!,
+        projectId: scene.storyboard.projectId,
+        mimeType: { startsWith: "image/" },
+      },
+    }),
+    prisma.artifact.findFirst({
+      where: {
+        id: selected.end.artifactId!,
+        projectId: scene.storyboard.projectId,
+        mimeType: { startsWith: "image/" },
+      },
+    }),
   ]);
 
-  return start && end ? { start, end } : null;
+  return start &&
+    end &&
+    start.projectId === end.projectId &&
+    start.mimeType.startsWith("image/") &&
+    end.mimeType.startsWith("image/")
+    ? { start, end }
+    : null;
 }
 
 function artifactUrl(artifact: Artifact) {
@@ -676,43 +944,205 @@ Caption context: ${scene.captionText}
 Keep motion smooth, vertical 9:16, commercial social ad pacing, no unsupported claims, no new logos or text overlays beyond the approved storyboard copy.`;
 }
 
-async function failProductionJob(
-  jobId: string,
-  projectId: string,
-  error: unknown,
-) {
-  const safeError = sanitizeVideoError(error);
-  const failed = await prisma.generationJob.update({
-    where: { id: jobId },
-    data: {
-      status: "FAILED",
-      error: safeError,
-      completedAt: new Date(),
+async function createProductionJob({
+  projectId,
+  type,
+  model,
+  operation,
+  sceneIds,
+}: {
+  projectId: string;
+  type: "KEYFRAME" | "VIDEO";
+  model: string;
+  operation: string;
+  sceneIds: string[];
+}) {
+  return prisma.$transaction(async (tx) => {
+    // Serialize production starts per project without requiring a schema-level
+    // singleton row or migration. This closes the double-click/request race.
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`production:${projectId}`}))`;
+
+    const staleBefore = new Date(Date.now() - STALE_PRODUCTION_JOB_MS);
+    await tx.generationJob.updateMany({
+      where: {
+        projectId,
+        type: { in: ["KEYFRAME", "VIDEO"] },
+        status: { in: [...ACTIVE_PRODUCTION_JOB_STATUSES] },
+        updatedAt: { lt: staleBefore },
+      },
+      data: {
+        status: "CANCELLED",
+        error:
+          "Superseded after the production job stopped reporting progress.",
+        completedAt: new Date(),
+      },
+    });
+
+    const active = await tx.generationJob.findFirst({
+      where: {
+        projectId,
+        type: { in: ["KEYFRAME", "VIDEO"] },
+        status: { in: [...ACTIVE_PRODUCTION_JOB_STATUSES] },
+      },
+      select: { id: true },
+    });
+    if (active) {
+      throw new Error("A production job is already running for this project.");
+    }
+
+    return tx.generationJob.create({
+      data: {
+        projectId,
+        type,
+        status: "QUEUED",
+        model,
+        input: { operation, sceneIds },
+      },
+    });
+  });
+}
+
+async function markVideoTakeFailed(sceneTask: VideoSceneTask, error: string) {
+  const scene = await prisma.scene.findUnique({
+    where: { id: sceneTask.sceneId },
+    select: { selectedVideoTakeId: true },
+  });
+  if (!scene) return;
+
+  await prisma.$transaction([
+    prisma.take.update({
+      where: { id: sceneTask.takeId },
+      data: { status: "FAILED", selected: false, notes: error },
+    }),
+    prisma.scene.update({
+      where: { id: sceneTask.sceneId },
+      data: { status: stableSceneStatus(scene.selectedVideoTakeId) },
+    }),
+  ]);
+}
+
+async function hasCompleteStoryVideos(projectId: string) {
+  const storyboard = await prisma.storyboard.findUnique({
+    where: { projectId },
+    include: {
+      scenes: {
+        include: { takes: { where: { kind: "VIDEO" } } },
+      },
     },
   });
+  if (
+    !storyboard ||
+    storyboard.scenes.length < 2 ||
+    storyboard.scenes.length > 4
+  ) {
+    return false;
+  }
 
-  await prisma.project.update({
-    where: { id: projectId },
-    data: { status: "FAILED" },
+  return storyboard.scenes.every((scene) => {
+    const selected = scene.takes.find(
+      (take) => take.id === scene.selectedVideoTakeId,
+    );
+    return selected?.status === "COMPLETE" && Boolean(selected.artifactId);
   });
+}
+
+async function failProductionJob({
+  jobId,
+  projectId,
+  error,
+  operation,
+  projectStatus,
+  restoreScenes = false,
+}: {
+  jobId: string;
+  projectId: string;
+  error: unknown;
+  operation: "keyframe" | "video";
+  projectStatus: "DRAFT" | "FAILED";
+  restoreScenes?: boolean;
+}) {
+  const safeError = sanitizeProductionError(error, operation);
+
+  if (restoreScenes) {
+    await restoreProductionScenes(projectId);
+  }
+
+  const [, failed] = await prisma.$transaction([
+    prisma.project.update({
+      where: { id: projectId },
+      data: { status: projectStatus },
+    }),
+    prisma.generationJob.update({
+      where: { id: jobId },
+      data: {
+        status: "FAILED",
+        error: safeError,
+        completedAt: new Date(),
+      },
+    }),
+  ]);
 
   return failed;
 }
 
-function parseVideoOutput(value: Prisma.JsonValue | null): VideoJobOutput {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return { scenes: [] };
+async function restoreProductionScenes(projectId: string) {
+  const scenes = await prisma.scene.findMany({
+    where: { storyboard: { projectId }, status: "GENERATING" },
+    select: { id: true, selectedVideoTakeId: true },
+  });
+  if (scenes.length === 0) return;
+
+  await prisma.$transaction(
+    scenes.map((scene) =>
+      prisma.scene.update({
+        where: { id: scene.id },
+        data: { status: stableSceneStatus(scene.selectedVideoTakeId) },
+      }),
+    ),
+  );
+}
+
+function sanitizeProductionError(
+  error: unknown,
+  operation: "keyframe" | "video",
+) {
+  if (error instanceof Error) {
+    const safeMessages = [
+      "storyboard",
+      "scene",
+      "keyframe",
+      "first and last frames",
+      "PUBLIC_APP_URL",
+      "API key",
+      "QwenCloud",
+      "production job",
+      "provider state",
+    ];
+    if (
+      safeMessages.some((fragment) =>
+        error.message.toLowerCase().includes(fragment.toLowerCase()),
+      )
+    ) {
+      return error.message;
+    }
   }
 
-  const scenes = (value as { scenes?: unknown }).scenes;
+  return operation === "video"
+    ? sanitizeVideoError(error)
+    : "Keyframe generation failed. Check server logs for sanitized provider metadata.";
+}
 
-  if (!Array.isArray(scenes)) {
-    return { scenes: [] };
-  }
+function getExpectedSceneIds(value: Prisma.JsonValue): string[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const sceneIds = (value as { sceneIds?: unknown }).sceneIds;
+  return Array.isArray(sceneIds) &&
+    sceneIds.every((sceneId) => typeof sceneId === "string")
+    ? sceneIds
+    : [];
+}
 
-  return {
-    scenes: scenes
-      .map((scene) => scene as VideoJobOutput["scenes"][number])
-      .filter((scene) => scene.sceneId && scene.takeId && scene.taskId),
-  };
+function withoutTaskError(task: VideoSceneTask): VideoSceneTask {
+  const next = { ...task };
+  delete next.error;
+  return next;
 }

@@ -1,5 +1,8 @@
 import { handleRoute, notFound, ok } from "@/lib/http/responses";
-import { advanceVideoJob } from "@/lib/jobs/production";
+import {
+  advanceVideoJob,
+  recoverStaleKeyframeJob,
+} from "@/lib/jobs/production";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -18,9 +21,13 @@ export async function GET(_request: Request, context: RouteContext) {
     }
 
     const job =
-      found.type === "VIDEO" && found.status === "WAITING_PROVIDER"
+      found.type === "VIDEO" &&
+      (found.status === "WAITING_PROVIDER" || found.status === "RUNNING")
         ? await advanceVideoJob(found.id)
-        : found;
+        : found.type === "KEYFRAME" &&
+            (found.status === "QUEUED" || found.status === "RUNNING")
+          ? await recoverStaleKeyframeJob(found.id)
+          : found;
 
     return ok({ job });
   });
