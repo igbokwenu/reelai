@@ -13,6 +13,8 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Focused two-column landing workspace with optional pipeline guidance and confirmed project deletion, including local/OSS artifact cleanup.
 - Reusable Brand Kit with value props, palette, claims, policy risks, locked style language, and citations.
 - Multi-page website evidence collection covering metadata, visible copy, CSS color candidates, logos/social images, and QwenCloud visual analysis.
+- Evidence-capability guardrails: website-only projects cannot manufacture product UI, logos, branded uniforms, badges, packaging, or unsupported trust claims.
+- Pre-spend concept validation and post-generation visual grounding review; previews that fail review are replaced with an honest local concept card.
 - Exactly three creative concepts before full generation spend.
 - Editable 2 to 4 scene storyboard and human approval loop.
 - Additive keyframe/video takes with selection instead of destructive regeneration.

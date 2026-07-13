@@ -146,6 +146,7 @@ export default async function ProjectPage({ params }: PageProps) {
                   hasBrandKit={Boolean(project.brandKit)}
                   latestConceptJob={latestConceptJob}
                   projectId={project.id}
+                  sources={project.sources}
                 />
               </CardContent>
             </Card>

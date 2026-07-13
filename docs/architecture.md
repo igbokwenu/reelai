@@ -50,15 +50,28 @@ flowchart TB
 1. User supplies a company website and, optionally, a short creative direction. Advanced project fields remain available but are not required for the primary flow. The direction is stored with the website source metadata, avoiding a project-schema migration for transient generation guidance.
 2. The API persists the project and website source, infers placeholder identity from the hostname when needed, creates a queued `BRAND_KIT` job, and returns immediately. Next.js `after()` starts the job after the response so navigation is not held open by model latency.
 3. Brand research follows a small set of same-origin product/about links and collects metadata, visible copy, CSS/HTML color candidates, and likely logo/social-image URLs. Uploaded assets are stored in OSS as `Artifact` rows.
-4. QwenCloud vision analyzes accessible website and uploaded visuals; structured generation combines that evidence with text sources and saves the reusable `BrandKit`.
-5. Concept job calls QwenCloud text for three concepts and image generation for preview frames.
-6. User selects a concept.
-7. Storyboard job creates editable scenes with prompts, captions, narration text, and continuity notes.
-8. Keyframe job generates start/end scene images and stores them in OSS.
-9. Video job submits i2v tasks and polls QwenCloud until clips are complete.
-10. TTS job generates narration audio.
-11. Render job uses Remotion to produce the final 9:16 MP4 and thumbnail.
-12. Final artifacts are stored in OSS and displayed in the studio.
+4. QwenCloud vision analyzes accessible website and uploaded visuals; structured generation combines that evidence with text sources and saves the reusable `BrandKit`. Hostname-inferred project identity is replaced by a researched site name only when the user did not explicitly name the project.
+5. Concept generation derives explicit capabilities from uploaded sources. Without an uploaded logo, product image, UI screenshot/reference ad, or other visual source, prompts prohibit manufacturing those visual elements. Structured concepts are validated before image spend.
+6. Preview prompts receive the same grounding constraints. Each generated preview is reviewed by QwenCloud vision; rejected or unavailable previews fall back to a clearly designed local concept card instead of presenting fabricated imagery as grounded output. After a successful regeneration, replaced concept-preview files and artifact rows are removed so stale or fabricated previews do not remain in the project.
+7. User selects a concept. Legacy previews without grounding metadata cannot advance until regenerated.
+8. Storyboard generation re-applies capability rules and validates the complete scene plan before persistence.
+9. Keyframe job generates start/end scene images and stores them in OSS.
+10. Video job submits i2v tasks and polls QwenCloud until clips are complete.
+11. TTS job generates narration audio.
+12. Render job uses Remotion to produce the final 9:16 MP4 and thumbnail.
+13. Final artifacts are stored in OSS and displayed in the studio.
+
+## Evidence capability model
+
+ReelAI distinguishes knowing that a product or service exists from having permission-quality visual evidence to reproduce it:
+
+- Website copy can support cautious positioning and claims, but does not authorize invention of a product interface or exact product appearance.
+- A `LOGO` upload authorizes logo-aware direction; absent that source, image generation cannot draw logos, wordmarks, branded uniforms, or badges.
+- A `PRODUCT_IMAGE` upload authorizes referenced product depiction; absent it, visuals remain generic and unbranded.
+- A `REFERENCE_AD` or clearly labeled UI/screenshot upload authorizes interface-aware direction; absent it, concepts cannot use phones, dashboards, profiles, buttons, or booking flows.
+- Certifications, vetting, availability, pricing, and outcome claims must also appear in supported Brand Kit claims.
+
+These restrictions are enforced in prompts, deterministic validation, preview metadata, selection APIs, and storyboard validation rather than relying on model instructions alone.
 
 ## Project and Brand Kit boundary
 

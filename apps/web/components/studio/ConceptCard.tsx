@@ -29,11 +29,13 @@ export function ConceptCard({
   artifact,
   onSelect,
   isSelecting,
+  requiresRegeneration,
 }: {
   concept: Concept;
   artifact: Artifact | null;
   onSelect: (conceptId: string) => void;
   isSelecting: boolean;
+  requiresRegeneration: boolean;
 }) {
   const previewHref = artifact
     ? `/api/artifacts/${artifact.id}/file`
@@ -79,7 +81,7 @@ export function ConceptCard({
 
       <div className="mt-auto">
         <Button
-          disabled={concept.selected || isSelecting}
+          disabled={concept.selected || isSelecting || requiresRegeneration}
           onClick={() => onSelect(concept.id)}
           size="sm"
           variant={concept.selected ? "outline" : "default"}
@@ -89,7 +91,11 @@ export function ConceptCard({
           ) : (
             <MousePointer2 className="size-4" aria-hidden="true" />
           )}
-          {concept.selected ? "Selected Direction" : "Select Direction"}
+          {concept.selected
+            ? "Selected Direction"
+            : requiresRegeneration
+              ? "Regenerate required"
+              : "Select Direction"}
         </Button>
       </div>
     </article>

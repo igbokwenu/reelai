@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, Info, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -25,7 +25,10 @@ type Concept = {
 type Artifact = {
   id: string;
   mimeType: string;
+  metadata?: unknown;
 };
+
+type Source = { type: string; artifactId: string | null };
 
 type Job = {
   id: string;
@@ -41,12 +44,14 @@ export function ConceptTable({
   concepts,
   artifacts,
   latestConceptJob,
+  sources,
 }: {
   projectId: string;
   hasBrandKit: boolean;
   concepts: Concept[];
   artifacts: Artifact[];
   latestConceptJob: Job | null;
+  sources: Source[];
 }) {
   const router = useRouter();
   const [job, setJob] = useState<Job | null>(latestConceptJob);
@@ -58,6 +63,14 @@ export function ConceptTable({
     () => new Map(artifacts.map((artifact) => [artifact.id, artifact])),
     [artifacts],
   );
+  const hasUploadedBrandVisuals = sources.some((source) => Boolean(source.artifactId));
+  const hasLegacyPreviews = concepts.some((concept) => {
+    const artifact = concept.previewArtifactId
+      ? artifactById.get(concept.previewArtifactId)
+      : null;
+    const metadata = artifact?.metadata as { groundingMode?: unknown } | null;
+    return artifact && typeof metadata?.groundingMode !== "string";
+  });
 
   useEffect(() => {
     if (!job || !isRunning) {
@@ -171,6 +184,25 @@ export function ConceptTable({
         </div>
       ) : null}
 
+      {!hasUploadedBrandVisuals ? (
+        <div className="flex gap-3 rounded-md border border-primary/20 bg-primary/5 p-3 text-sm">
+          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+          <div>
+            <p className="font-medium">Website-only grounding is active</p>
+            <p className="mt-1 leading-5 text-muted-foreground">
+              Concepts use unbranded lifestyle imagery and must not invent product UI, logos, badges, uniforms, or product details. Upload a logo, product image, or interface reference to authorize those elements.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {hasLegacyPreviews ? (
+        <div className="flex gap-3 rounded-md border border-amber-400/25 bg-amber-400/5 p-3 text-sm text-amber-100">
+          <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>These previews were created before visual grounding metadata was recorded. Regenerate the concepts to apply the current safeguards.</span>
+        </div>
+      ) : null}
+
       {!hasBrandKit ? (
         <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
           Generate a Brand Kit first. Concepts are grounded in brand tone, claims, and policy risks.
@@ -190,6 +222,11 @@ export function ConceptTable({
               isSelecting={selectingId === concept.id}
               key={concept.id}
               onSelect={selectConcept}
+              requiresRegeneration={isLegacyPreview(
+                concept.previewArtifactId
+                  ? artifactById.get(concept.previewArtifactId) ?? null
+                  : null,
+              )}
             />
           ))}
         </div>
@@ -200,6 +237,12 @@ export function ConceptTable({
       )}
     </div>
   );
+}
+
+function isLegacyPreview(artifact: Artifact | null) {
+  if (!artifact) return true;
+  const metadata = artifact.metadata as { groundingMode?: unknown } | null;
+  return typeof metadata?.groundingMode !== "string";
 }
 
 function formatEnum(value: string) {

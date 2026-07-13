@@ -42,6 +42,8 @@ export async function POST(request: Request) {
                     label: input.websiteUrl ? "Project website" : "Creative direction",
                     source: "project-intake",
                     creativeDirection: input.brief,
+                    businessNameInferred: !input.businessName,
+                    projectNameInferred: !input.name,
                   },
                 },
               }

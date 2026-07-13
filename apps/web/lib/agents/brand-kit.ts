@@ -40,6 +40,7 @@ export async function generateBrandKitForProject(projectId: string) {
   }
 
   const contexts = await collectBrandContexts(project);
+  await applyResearchedIdentity(project, contexts);
   const result = await generateStructuredWithQwen({
     operation: "brand_kit_generation",
     schema: brandKitOutputSchema,
@@ -60,6 +61,49 @@ export async function generateBrandKitForProject(projectId: string) {
     elapsedMs: result.elapsedMs,
     usage: result.usage,
   };
+}
+
+async function applyResearchedIdentity(
+  project: ProjectWithContext,
+  contexts: SourceContext[],
+) {
+  const websiteSource = project.sources.find((source) => source.type === "WEBSITE");
+  const metadata = websiteSource?.metadata as {
+    businessNameInferred?: unknown;
+    projectNameInferred?: unknown;
+  } | null;
+  const domainLabel = project.websiteUrl
+    ? new URL(project.websiteUrl).hostname.replace(/^www\./, "").split(".")[0] ?? ""
+    : "";
+  const normalized = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const legacyInferredBusiness =
+    Boolean(domainLabel) && normalized(project.businessName) === normalized(domainLabel);
+  const businessWasInferred =
+    metadata?.businessNameInferred === true || legacyInferredBusiness;
+  const projectWasInferred =
+    metadata?.projectNameInferred === true ||
+    normalized(project.name) === `${normalized(project.businessName)}reel`;
+  if (!businessWasInferred && !projectWasInferred) return;
+
+  const websiteText = contexts.find((context) => context.kind === "WEBSITE")?.text ?? "";
+  const siteName = websiteText.match(/^Site name:\s*(.+)$/m)?.[1]?.trim();
+  const title = websiteText.match(/^Title:\s*(.+)$/m)?.[1]?.trim();
+  const candidate = (siteName ?? title?.split(/\s+[|–—-]\s+/)[0] ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (candidate.length < 2 || candidate.length > 80) return;
+
+  const businessName = businessWasInferred ? candidate : project.businessName;
+  const name = projectWasInferred ? `${businessName} reel` : project.name;
+  await prisma.project.update({ where: { id: project.id }, data: { businessName, name } });
+  project.businessName = businessName;
+  project.name = name;
+  const intake = contexts.find((context) => context.kind === "INTAKE");
+  if (intake) {
+    intake.text = intake.text
+      .replace(/^Business:.*$/m, `Business: ${businessName}`)
+      .replace(/^Project:.*$/m, `Project: ${name}`);
+  }
 }
 
 export function getBrandKitGenerationError(error: unknown) {
@@ -295,8 +339,8 @@ function buildBrandKitPrompt(project: Project, contexts: SourceContext[]) {
 Project:
 - Name: ${project.name}
 - Business: ${project.businessName}
-- Target audience: ${project.targetAudience ?? "Unknown"}
-- Offer: ${project.offer ?? "Not supplied; infer a cautious brand positioning from sources instead of inventing a product claim."}
+- Target audience: ${project.targetAudience?.trim() || "Unknown"}
+- Offer: ${project.offer?.trim() || "Not supplied; infer a cautious brand positioning from sources instead of inventing a product claim."}
 - User direction: ${getCreativeDirectionFromContexts(contexts) ?? "None; determine the most useful positioning from website evidence."}
 - Style: ${project.style}
 - Target duration: ${project.videoLengthSec}s
@@ -338,37 +382,55 @@ function enrichBrandKitFromProject(
   project: Project,
   contexts: SourceContext[],
 ) {
-  const sourceIds = contexts.map((context) => context.id);
-  const primarySourceId = sourceIds[0] ?? "project-intake";
+  const primarySourceId =
+    contexts.find((context) => context.kind === "WEBSITE")?.id ??
+    contexts[0]?.id ??
+    "project-intake";
   const positioning = getProjectPositioning(project, contexts);
-  const audience = project.targetAudience ?? "the intended audience";
+  const audience =
+    project.targetAudience?.trim() ||
+    brandKit.audience ||
+    "customers described in the supplied sources";
   const business = project.businessName;
   const hasFallbackSummary = brandKit.summary.startsWith(
     "Brand summary was not provided.",
   );
+  const hasUploadedVisualEvidence = contexts.some((context) =>
+    /^(LOGO|PRODUCT_IMAGE|REFERENCE_AD|UPLOAD)_VISION$/.test(context.kind),
+  );
+  const policyRisks = [...brandKit.policyRisks];
+  if (!hasUploadedVisualEvidence) {
+    policyRisks.unshift({
+      risk: "No uploaded brand or product visuals are available for exact reproduction.",
+      severity: "medium" as const,
+      mitigation:
+        "Use unbranded lifestyle scenes. Do not manufacture logos, app screens, packaging, badges, uniforms, or product details.",
+    });
+  }
 
   return brandKitOutputSchema.parse({
     ...brandKit,
     summary: hasFallbackSummary
-      ? `${business} is positioned for ${audience} around ${positioning}. The Brand Kit should keep the reel source-grounded, practical, and focused on clear short-form ad storytelling rather than unsupported performance claims.`
+      ? `${business} serves ${audience}. ${positioning} Creative work should remain source-grounded and avoid presenting unverified product or brand visuals as authentic.`
       : brandKit.summary,
     audience: brandKit.audience ?? audience,
     valueProps: replaceFallbackValueProps(
       brandKit.valueProps,
       positioning,
       business,
-      Boolean(project.offer),
+      Boolean(project.offer?.trim()),
     ),
     claims: replaceFallbackClaims(
       brandKit.claims,
       positioning,
-      Boolean(project.offer),
+      Boolean(project.offer?.trim()),
     ),
     sourceCitations: replaceFallbackCitations(
       brandKit.sourceCitations,
       primarySourceId,
       contexts,
     ),
+    policyRisks: policyRisks.slice(0, 8),
   });
 }
 
@@ -385,7 +447,7 @@ function replaceFallbackValueProps(
   return [
     {
       label: hasOffer ? "Clear offer" : "Clear positioning",
-      detail: `${business} should lead with ${positioning}, using simple ad copy that a viewer can understand in the first few seconds.`,
+      detail: `${business} should lead with this source-backed positioning: ${truncateText(positioning, 190)}`,
     },
     {
       label: "Source-grounded trust",
@@ -444,17 +506,26 @@ function getProjectPositioning(project: Project, contexts: SourceContext[]) {
   }
 
   const websiteContext = contexts.find((context) => context.kind === "WEBSITE");
-  const contextText = truncateText(websiteContext?.text ?? contexts[0]?.text ?? "", 10_000);
+  const contextText = websiteContext?.text ?? "";
+  const description = contextText.match(/^Description:\s*(.+)$/m)?.[1]?.trim();
+  if (description && description.length > 30) {
+    return ensureSentence(truncateText(description, 260));
+  }
 
-  if (contextText.length > 40) {
-    return contextText.slice(0, 160);
+  const visibleContent = contextText.match(/^Visible content:\s*(.+)$/m)?.[1]?.trim();
+  if (visibleContent && visibleContent.length > 40) {
+    return ensureSentence(truncateText(visibleContent, 260));
   }
 
   if (project.websiteUrl) {
-    return `the brand presence at ${project.websiteUrl}`;
+    return `The available website establishes the brand presence at ${project.websiteUrl}, but did not provide enough clean copy for a more specific positioning statement.`;
   }
 
   return `${project.businessName}'s supplied brand context`;
+}
+
+function ensureSentence(value: string) {
+  return /[.!?]$/.test(value) ? value : `${value}.`;
 }
 
 function truncateText(value: string, maxLength: number) {

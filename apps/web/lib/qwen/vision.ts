@@ -40,3 +40,35 @@ export async function analyzeVisualAssetWithQwen({
     usage: result.usage,
   };
 }
+
+export async function reviewGeneratedPreviewGrounding({
+  imageUrl,
+  restrictions,
+}: {
+  imageUrl: string;
+  restrictions: string;
+}) {
+  const result = await qwenChatCompletion({
+    operation: "concept_preview_grounding_review",
+    model: QWEN_VISION_MODEL,
+    maxTokens: 300,
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a strict visual grounding reviewer. Return a first line of exactly VERDICT: PASS or VERDICT: FAIL, then briefly list visible violations. Apply the supplied restrictions literally. Fail when the image visibly contains an element those restrictions prohibit; do not fail an allowed referenced element.",
+      },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: `Review this generated concept preview. Restrictions:\n${restrictions}` },
+          { type: "image_url", image_url: { url: imageUrl } },
+        ],
+      },
+    ],
+  });
+  return {
+    passed: /^VERDICT:\s*PASS\b/i.test(result.content.trim()),
+    summary: result.content,
+  };
+}
