@@ -3,6 +3,7 @@ import "server-only";
 import { performance } from "node:perf_hooks";
 
 import { qwenEndpoint } from "@/lib/qwen/endpoints";
+import { isRetryableVideoSubmissionError } from "@/lib/qwen/video-retry";
 import { buildVideoSubmissionBody } from "@/lib/qwen/video-request";
 
 export const QWEN_VIDEO_BASE_URL = qwenEndpoint(
@@ -28,21 +29,39 @@ export type VideoTaskStatus = {
   providerRequestId: string | null;
 };
 
-export async function submitImageToVideoTask({
-  operation,
-  model = QWEN_I2V_MODEL,
-  prompt,
-  imageUrl,
-  lastFrameUrl,
-  durationSec,
-}: {
+type VideoSubmissionInput = {
   operation: string;
   model?: string;
   prompt: string;
   imageUrl: string;
   lastFrameUrl?: string;
   durationSec: number;
-}): Promise<VideoTaskSubmission> {
+};
+
+export async function submitImageToVideoTask(input: VideoSubmissionInput) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await submitImageToVideoTaskOnce(input);
+    } catch (error) {
+      lastError = error;
+      if (attempt === 2 || !isRetryableVideoSubmissionError(error)) throw error;
+      await wait(500 * 2 ** attempt);
+    }
+  }
+
+  throw lastError;
+}
+
+async function submitImageToVideoTaskOnce({
+  operation,
+  model = QWEN_I2V_MODEL,
+  prompt,
+  imageUrl,
+  lastFrameUrl,
+  durationSec,
+}: VideoSubmissionInput): Promise<VideoTaskSubmission> {
   const apiKey = getQwenApiKey();
   const startedAt = performance.now();
   const response = await fetch(
@@ -142,6 +161,10 @@ export async function pollVideoTask(taskId: string): Promise<VideoTaskStatus> {
 
 export function sanitizeVideoError(error: unknown) {
   if (error instanceof Error) {
+    if (error instanceof TypeError || error.message.includes("fetch failed")) {
+      return "Could not reach QwenCloud video generation after retrying. Try this scene again.";
+    }
+
     if (error.message.includes("API key")) {
       return error.message;
     }
@@ -152,6 +175,10 @@ export function sanitizeVideoError(error: unknown) {
   }
 
   return "Video generation failed. Check server logs for sanitized provider metadata.";
+}
+
+function wait(durationMs: number) {
+  return new Promise((resolve) => setTimeout(resolve, durationMs));
 }
 
 function normalizeTaskStatus(status: string): VideoTaskStatus["status"] {

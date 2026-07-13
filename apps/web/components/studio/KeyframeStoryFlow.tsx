@@ -9,6 +9,7 @@ import {
   ImageIcon,
   Link2,
   Loader2,
+  RefreshCw,
   Save,
   Sparkles,
 } from "lucide-react";
@@ -36,12 +37,18 @@ export function KeyframeStoryFlow({
   scenes,
   artifacts,
   savingSceneId,
+  retryingSceneId,
+  isProductionBusy,
   onSaveScene,
+  onRetrySceneVideo,
 }: {
   scenes: ProductionScene[];
   artifacts: TakeArtifact[];
   savingSceneId: string | null;
+  retryingSceneId: string | null;
+  isProductionBusy: boolean;
   onSaveScene: (scene: ProductionScene) => Promise<boolean>;
+  onRetrySceneVideo: (sceneId: string) => Promise<void>;
 }) {
   const artifactById = new Map(
     artifacts.map((artifact) => [artifact.id, artifact]),
@@ -71,11 +78,19 @@ export function KeyframeStoryFlow({
             const startTake = getCurrentFrame(scene, "KEYFRAME_START");
             const endTake = getCurrentFrame(scene, "KEYFRAME_END");
             const selectedVideo = scene.takes.find(
-              (take) => take.id === scene.selectedVideoTakeId,
+              (take) =>
+                take.id === scene.selectedVideoTakeId &&
+                take.kind === "VIDEO" &&
+                take.status === "COMPLETE" &&
+                take.artifactId,
+            );
+            const failedVideo = scene.takes.find(
+              (take) => take.kind === "VIDEO" && take.status === "FAILED",
             );
             const isReady = Boolean(
               startTake?.artifactId && endTake?.artifactId,
             );
+            const needsVideo = isReady && !selectedVideo;
 
             return (
               <article
@@ -161,6 +176,37 @@ export function KeyframeStoryFlow({
                     preload="metadata"
                     src={`/api/artifacts/${selectedVideo.artifactId}/file`}
                   />
+                ) : null}
+
+                {needsVideo ? (
+                  <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-amber-400/25 bg-amber-400/[0.08] p-2.5">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold text-amber-200">
+                        {failedVideo
+                          ? "Scene clip needs a retry"
+                          : "Scene clip not created"}
+                      </p>
+                      <p className="mt-0.5 line-clamp-2 text-[9px] leading-4 text-muted-foreground">
+                        {failedVideo?.notes ??
+                          "Generate only this scene while preserving completed clips."}
+                      </p>
+                    </div>
+                    <Button
+                      className="shrink-0"
+                      disabled={isProductionBusy}
+                      onClick={() => onRetrySceneVideo(scene.id)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {retryingSceneId === scene.id ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="size-3.5" />
+                      )}
+                      {failedVideo ? "Retry clip" : "Create clip"}
+                    </Button>
+                  </div>
                 ) : null}
 
                 <SceneTuner

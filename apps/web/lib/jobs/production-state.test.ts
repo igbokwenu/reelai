@@ -5,6 +5,8 @@ import {
   hasExactSceneCoverage,
   parseVideoJobOutput,
   resolveSelectedFrameTakes,
+  selectRequestedScenes,
+  selectVideoGenerationTargets,
   stableSceneStatus,
   summarizeVideoTasks,
 } from "./production-state";
@@ -106,6 +108,26 @@ describe("production state", () => {
       hasExactSceneCoverage([tasks[0], tasks[0]], ["scene-1", "scene-2"]),
     ).toBe(false);
   });
+
+  it("selects only the ordered scenes requested by a targeted retry", () => {
+    const scenes = [{ id: "scene-1" }, { id: "scene-2" }];
+
+    expect(selectRequestedScenes(scenes, ["scene-2"])).toEqual([
+      { id: "scene-2" },
+    ]);
+    expect(selectRequestedScenes(scenes, ["missing"])).toBeNull();
+    expect(selectRequestedScenes(scenes, ["scene-1", "scene-1"])).toBeNull();
+  });
+
+  it("generates only missing clips while retaining recreate-all behavior", () => {
+    const missing = videoScene("scene-1", false);
+    const complete = videoScene("scene-2", true);
+
+    expect(selectVideoGenerationTargets([missing, complete])).toEqual([
+      missing,
+    ]);
+    expect(selectVideoGenerationTargets([complete])).toEqual([complete]);
+  });
 });
 
 function frameTake(
@@ -119,5 +141,23 @@ function frameTake(
     attempt,
     status: "COMPLETE",
     artifactId: `${id}-artifact`,
+  };
+}
+
+function videoScene(id: string, complete: boolean) {
+  const takeId = `${id}-video`;
+  return {
+    id,
+    selectedVideoTakeId: complete ? takeId : null,
+    takes: complete
+      ? [
+          {
+            id: takeId,
+            kind: "VIDEO",
+            status: "COMPLETE",
+            artifactId: `${takeId}-artifact`,
+          },
+        ]
+      : [],
   };
 }

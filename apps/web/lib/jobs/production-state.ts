@@ -19,6 +19,16 @@ type FrameTake = {
   attempt: number;
 };
 
+type SceneWithVideoTakes = {
+  selectedVideoTakeId: string | null;
+  takes: Array<{
+    id: string;
+    kind: string;
+    status: string;
+    artifactId: string | null;
+  }>;
+};
+
 export function resolveSelectedFrameTakes<T extends FrameTake>({
   takes,
   selectedStartTakeId,
@@ -124,6 +134,43 @@ export function hasExactSceneCoverage(
     expected.size === expectedSceneIds.length &&
     expectedSceneIds.every((sceneId) => actual.has(sceneId))
   );
+}
+
+export function selectRequestedScenes<T extends { id: string }>(
+  scenes: T[],
+  requestedSceneIds: string[],
+): T[] | null {
+  if (
+    requestedSceneIds.length === 0 ||
+    new Set(requestedSceneIds).size !== requestedSceneIds.length
+  ) {
+    return null;
+  }
+
+  const sceneById = new Map(scenes.map((scene) => [scene.id, scene]));
+  const requested = requestedSceneIds.map((sceneId) => sceneById.get(sceneId));
+  return requested.every((scene): scene is T => Boolean(scene))
+    ? requested
+    : null;
+}
+
+export function selectVideoGenerationTargets<T extends SceneWithVideoTakes>(
+  scenes: T[],
+) {
+  const missing = scenes.filter(
+    (scene) =>
+      !scene.takes.some(
+        (take) =>
+          take.id === scene.selectedVideoTakeId &&
+          take.kind === "VIDEO" &&
+          take.status === "COMPLETE" &&
+          Boolean(take.artifactId),
+      ),
+  );
+
+  // Once every clip is complete, the global action intentionally means
+  // "recreate all". While partial, it spends only on missing scenes.
+  return missing.length > 0 ? missing : scenes;
 }
 
 export function stableSceneStatus(selectedVideoTakeId: string | null) {

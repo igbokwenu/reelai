@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { isRetryableVideoSubmissionError } from "./video-retry";
 import { buildVideoSubmissionBody } from "./video-request";
 
 describe("buildVideoSubmissionBody", () => {
@@ -43,5 +44,36 @@ describe("buildVideoSubmissionBody", () => {
       input: { img_url: "https://example.test/open.png" },
       parameters: { duration: 15, audio: false },
     });
+  });
+});
+
+describe("video submission retry policy", () => {
+  it("retries transient network, rate-limit, and provider availability errors", () => {
+    expect(isRetryableVideoSubmissionError(new TypeError("fetch failed"))).toBe(
+      true,
+    );
+    expect(
+      isRetryableVideoSubmissionError(
+        new Error("QwenCloud video rate limit or quota was reached."),
+      ),
+    ).toBe(true);
+    expect(
+      isRetryableVideoSubmissionError(
+        new Error("QwenCloud video generation is temporarily unavailable."),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not retry authentication or invalid-media errors", () => {
+    expect(
+      isRetryableVideoSubmissionError(
+        new Error("QwenCloud authentication failed."),
+      ),
+    ).toBe(false);
+    expect(
+      isRetryableVideoSubmissionError(
+        new Error("QwenCloud rejected the video request."),
+      ),
+    ).toBe(false);
   });
 });

@@ -64,6 +64,7 @@ export function GenerationConsole({
   const [keyframeJob, setKeyframeJob] = useState<Job | null>(latestKeyframeJob);
   const [videoJob, setVideoJob] = useState<Job | null>(latestVideoJob);
   const [starting, setStarting] = useState<"keyframes" | "videos" | null>(null);
+  const [retryingSceneId, setRetryingSceneId] = useState<string | null>(null);
   const [savingSceneId, setSavingSceneId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(
     latestKeyframeJob?.error ?? latestVideoJob?.error ?? null,
@@ -71,6 +72,8 @@ export function GenerationConsole({
   const activeJob = [keyframeJob, videoJob].find((job) =>
     ["QUEUED", "RUNNING", "WAITING_PROVIDER"].includes(job?.status ?? ""),
   );
+  const productionBusy =
+    starting !== null || retryingSceneId !== null || Boolean(activeJob);
   const scenes = storyboard?.scenes ?? [];
   const productionScenes = scenes;
   const hasApprovedStory =
@@ -140,11 +143,13 @@ export function GenerationConsole({
 
       if (data.job.status === "COMPLETE") {
         setError(null);
+        setRetryingSceneId(null);
         router.refresh();
       }
 
       if (data.job.status === "FAILED") {
         setError(data.job.error ?? "Generation failed.");
+        setRetryingSceneId(null);
         router.refresh();
       }
     }, 2000);
@@ -224,6 +229,42 @@ export function GenerationConsole({
     return true;
   }
 
+  async function retrySceneVideo(sceneId: string) {
+    setRetryingSceneId(sceneId);
+    setError(null);
+    let retryAccepted = false;
+
+    try {
+      const response = await fetch(
+        `/api/projects/${projectId}/scenes/${sceneId}/video`,
+        { method: "POST" },
+      );
+      const data = (await response.json().catch(() => ({}))) as {
+        job?: Job;
+        error?: string;
+      };
+
+      if (!response.ok || !data.job) {
+        setError(data.error ?? "This scene clip could not be retried.");
+        return;
+      }
+
+      setVideoJob(data.job);
+      if (data.job.status === "FAILED") {
+        setError(data.job.error ?? "This scene clip retry failed.");
+      } else {
+        retryAccepted = true;
+      }
+      router.refresh();
+    } catch {
+      setError(
+        "Could not reach the generation service. Check the dev server and try again.",
+      );
+    } finally {
+      if (!retryAccepted) setRetryingSceneId(null);
+    }
+  }
+
   if (!storyboard) {
     return (
       <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
@@ -257,8 +298,7 @@ export function GenerationConsole({
               disabled={
                 !["APPROVED", "COMPLETE"].includes(storyboard.status) ||
                 !hasApprovedStory ||
-                starting !== null ||
-                Boolean(activeJob)
+                productionBusy
               }
               onClick={() => startGeneration("keyframes")}
               size="sm"
@@ -276,9 +316,7 @@ export function GenerationConsole({
                 : "Create story frames"}
             </Button>
             <Button
-              disabled={
-                !hasRecommendedFrames || starting !== null || Boolean(activeJob)
-              }
+              disabled={!hasRecommendedFrames || productionBusy}
               onClick={() => startGeneration("videos")}
               size="sm"
             >
@@ -291,7 +329,9 @@ export function GenerationConsole({
               )}
               {completedClips === productionScenes.length
                 ? "Recreate scene clips"
-                : "Create scene clips"}
+                : completedClips > 0
+                  ? "Create missing clips"
+                  : "Create scene clips"}
             </Button>
           </div>
         </div>
@@ -345,7 +385,10 @@ export function GenerationConsole({
 
       <KeyframeStoryFlow
         artifacts={artifacts}
+        isProductionBusy={productionBusy}
         onSaveScene={saveScene}
+        onRetrySceneVideo={retrySceneVideo}
+        retryingSceneId={retryingSceneId}
         savingSceneId={savingSceneId}
         scenes={scenes}
       />

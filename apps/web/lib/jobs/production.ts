@@ -17,6 +17,8 @@ import {
   isStalePollClaim,
   parseVideoJobOutput,
   resolveSelectedFrameTakes,
+  selectRequestedScenes,
+  selectVideoGenerationTargets,
   stableSceneStatus,
   summarizeVideoTasks,
   type VideoJobOutput,
@@ -58,12 +60,34 @@ export async function createAndRunKeyframeJob(projectId: string) {
 
 export async function createAndRunVideoJob(projectId: string) {
   const scenes = await getProductionScenes(projectId);
+  const targets = selectVideoGenerationTargets(scenes);
   const job = await createProductionJob({
     projectId,
     type: "VIDEO",
     model: QWEN_I2V_MODEL,
     operation: "scene_i2v",
-    sceneIds: scenes.map((scene) => scene.id),
+    sceneIds: targets.map((scene) => scene.id),
+  });
+
+  return runVideoSubmissionJob(job.id);
+}
+
+export async function createAndRunSceneVideoJob(
+  projectId: string,
+  sceneId: string,
+) {
+  const scenes = await getProductionScenes(projectId);
+  const scene = scenes.find((candidate) => candidate.id === sceneId);
+  if (!scene) {
+    throw new PublicError("Scene not found in this project's storyboard.", 404);
+  }
+
+  const job = await createProductionJob({
+    projectId,
+    type: "VIDEO",
+    model: QWEN_I2V_MODEL,
+    operation: "scene_i2v_retry",
+    sceneIds: [scene.id],
   });
 
   return runVideoSubmissionJob(job.id);
@@ -549,7 +573,14 @@ async function runVideoSubmissionJob(jobId: string) {
   });
 
   try {
-    const scenes = await getProductionScenes(job.projectId);
+    const productionScenes = await getProductionScenes(job.projectId);
+    const scenes = selectRequestedScenes(
+      productionScenes,
+      getExpectedSceneIds(job.input),
+    );
+    if (!scenes) {
+      throw new Error("Video job references an invalid storyboard scene set.");
+    }
     const preflight = [];
     for (const scene of scenes) {
       const selectedFrames = await getSelectedKeyframeArtifacts(scene);
