@@ -513,7 +513,7 @@ export const StoryboardSchema = z.object({
         durationSec: z.number().int().min(5).max(10),
         captionText: z.string(),
         voiceoverText: z.string().max(600),
-        shotPrompt: z.string(), // one mood-first sentence, 8–36 words
+        shotPrompt: z.string(), // one mood-first motion hierarchy, 14–60 words
         continuityNotes: z.string(),
       }),
     )
@@ -541,7 +541,7 @@ Implementation:
 - Poll provider tasks from an API-triggered worker loop for MVP.
 - Claim each polling pass before contacting the provider. A failed scene must not stop healthy sibling tasks from polling, and transient provider/download errors must remain `WAITING_PROVIDER` until the bounded processing window expires.
 - Preflight every selected scene anchor before submitting any video task. Submit no closing-frame constraint and send only the stored one-sentence `shotPrompt` as positive prompt text.
-- Validate new shot directions as one mood-first sentence with one primary subject, one action, exactly one reliable camera move, no sequential-action language, and a 5–10 second duration. Keep brand and continuity prose in anchor generation/reference chaining, not in the video prompt.
+- Validate new shot directions as one 14–60 word mood-first sentence with one focal action arc, optional simple supporting motion in a separate depth plane, one visible story change, at most one motivated two-beat progression, exactly one reliable camera move, and a 5–10 second duration. Use at least two camera behaviors across a storyboard. Keep brand and continuity prose in anchor generation/reference chaining, not in the video prompt.
 - Treat anchors as an ordered dependency chain: shot/continuity changes invalidate the edited and downstream anchors/clips; timing-only changes invalidate only the current clip.
 - Expose a scene-level video retry for missing or failed clips. The retry creates a new take for only that scene and must not resubmit completed sibling scenes.
 - Store all generated files as `Artifact` rows after upload/download to OSS.
@@ -654,7 +654,11 @@ type ReelCompositionInput = {
   }>;
   narrationUrl?: string;
   bgmUrl?: string;
-  brandWatermark?: { text?: string; logoUrl?: string };
+  brandWatermark?: {
+    text?: string;
+    logoUrl?: string;
+    showOn?: "FIRST" | "LAST" | "ALL";
+  };
   aiDisclosureEnabled: boolean;
   safeZonePreset: "TIKTOK_REELS" | "YOUTUBE_SHORTS" | "NONE";
 };

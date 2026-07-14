@@ -100,18 +100,18 @@ export function SceneInspector({
 
         <section className="grid gap-3 border-t border-border pt-5">
           <SectionLabel icon={Film} label="AI shot direction" />
-          <Field label="One simple shot sentence">
+          <Field label="One directed shot sentence">
             <textarea
               className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
-              maxLength={280}
+              maxLength={480}
               value={scene.shotPrompt}
               onChange={(event) =>
                 onChange({ ...scene, shotPrompt: event.target.value })
               }
             />
             <p className="text-[11px] leading-5 text-muted-foreground">
-              Mood first, then one subject, one action, and one camera move ·
-              8–36 words.
+              Mood first · one focal action arc · optional simple supporting
+              motion · one camera behavior · 14–60 words.
             </p>
           </Field>
         </section>

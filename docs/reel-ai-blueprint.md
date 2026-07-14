@@ -111,7 +111,7 @@ Differentiators:
 
 - Parallel creative directions, not one script: the Creative Director Agent pitches three genuinely different concepts with cheap preview frames before any full storyboard or video spend.
 - Optional consistent AI spokesperson: using reference-to-video, the same character can hold their face, outfit, and presence across the reel. Treat this as the main visual wow path when generation quality is stable enough.
-- Continuity-first storyboard: each scene has one visual anchor and one concise mood/subject/action/camera sentence; continuity metadata informs the next anchor without bloating the video prompt.
+- Continuity-first storyboard: each scene has one visual anchor and one directed mood/focal-action/supporting-motion/camera sentence; continuity metadata informs the next anchor without bloating the video prompt.
 - Brand-aware creative director: website and documents become a reusable Brand Kit, not a one-time analysis.
 - Take-compare editing: every regeneration is additive; the user chooses between takes like an editor.
 - Token-budget planner: the agent proposes a low-cost draft path and a high-quality render path, with a live generation ticker.

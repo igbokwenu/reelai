@@ -12,9 +12,11 @@ import {
 } from "remotion";
 
 import type { ReelCompositionInput } from "./schema";
+import { getBrandWatermarkWindow } from "./schema";
 
 export function ReelComposition(input: ReelCompositionInput) {
   const { fps } = useVideoConfig();
+  const brandWindow = getBrandWatermarkWindow(input, fps);
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#080b10" }}>
@@ -43,7 +45,14 @@ export function ReelComposition(input: ReelCompositionInput) {
       {input.narrationUrl ? <Audio src={input.narrationUrl} /> : null}
       {input.bgmUrl ? <Audio src={input.bgmUrl} volume={0.18} /> : null}
 
-      <BrandWatermark watermark={input.brandWatermark} />
+      {brandWindow ? (
+        <Sequence
+          durationInFrames={brandWindow.durationInFrames}
+          from={brandWindow.from}
+        >
+          <BrandWatermark watermark={input.brandWatermark} />
+        </Sequence>
+      ) : null}
       {input.aiDisclosureEnabled ? <Disclosure /> : null}
     </AbsoluteFill>
   );
@@ -94,6 +103,14 @@ function BrandWatermark({
 }: {
   watermark?: ReelCompositionInput["brandWatermark"];
 }) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const entrance = spring({
+    frame,
+    fps,
+    config: { damping: 90, stiffness: 110 },
+  });
+
   if (!watermark?.text && !watermark?.logoUrl) {
     return null;
   }
@@ -102,16 +119,24 @@ function BrandWatermark({
     <div
       style={{
         alignItems: "center",
-        color: "rgba(255,255,255,0.82)",
+        backdropFilter: "blur(16px)",
+        background: "rgba(8,11,16,0.56)",
+        border: "1px solid rgba(255,255,255,0.22)",
+        borderRadius: 18,
+        boxShadow: "0 18px 60px rgba(0,0,0,0.28)",
+        color: "rgba(255,255,255,0.94)",
         display: "flex",
         fontFamily: "Inter, Arial, sans-serif",
         fontSize: 32,
         fontWeight: 700,
         gap: 16,
         left: 56,
+        opacity: entrance,
+        padding: "14px 18px",
         position: "absolute",
         textShadow: "0 2px 18px rgba(0,0,0,0.45)",
         top: 76,
+        transform: `translateY(${Math.round((1 - entrance) * -12)}px)`,
       }}
     >
       {watermark.logoUrl ? (
@@ -120,14 +145,17 @@ function BrandWatermark({
           alt=""
           src={watermark.logoUrl}
           style={{
-            borderRadius: 10,
-            height: 52,
+            borderRadius: 8,
+            height: 58,
+            maxWidth: 240,
             objectFit: "contain",
-            width: 52,
+            width: "auto",
           }}
         />
       ) : null}
-      {watermark.text ? <span>{watermark.text}</span> : null}
+      {watermark.text ? (
+        <span style={{ maxWidth: 420 }}>{watermark.text}</span>
+      ) : null}
     </div>
   );
 }

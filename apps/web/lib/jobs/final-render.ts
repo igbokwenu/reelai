@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Artifact, Prisma, Scene, Storyboard, Take } from "@prisma/client";
 
+import { researchWebsite } from "@/lib/brand/website-research";
 import {
   createStoredArtifact,
   createArtifactFromUrl,
@@ -78,6 +79,7 @@ export async function createAndRunFinalRenderJob({
       settings: {
         aiDisclosureEnabled,
         bgmEnabled,
+        logoIncluded: Boolean(input.brandWatermark?.logoUrl),
         safeZonePreset: input.safeZonePreset,
         narrationArtifactId: narration?.id ?? null,
       },
@@ -95,6 +97,7 @@ export async function createAndRunFinalRenderJob({
         sceneIds: storyboard.scenes.map((scene) => scene.id),
         aiDisclosureEnabled,
         bgmEnabled,
+        logoIncluded: Boolean(input.brandWatermark?.logoUrl),
       },
     },
   });
@@ -405,17 +408,55 @@ async function buildReelCompositionInput({
 
   const project = await prisma.project.findUniqueOrThrow({
     where: { id: projectId },
+    include: {
+      sources: {
+        where: { type: "LOGO" },
+        orderBy: { createdAt: "desc" },
+      },
+    },
   });
+  const logoArtifactIds = project.sources.flatMap((source) =>
+    source.artifactId ? [source.artifactId] : [],
+  );
+  const logoArtifact = logoArtifactIds.length
+    ? await prisma.artifact.findFirst({
+        where: {
+          id: { in: logoArtifactIds },
+          projectId,
+          mimeType: { startsWith: "image/" },
+        },
+        orderBy: { createdAt: "desc" },
+      })
+    : null;
+  const uploadedLogoUrl = logoArtifact ? artifactUrl(logoArtifact) : null;
+  const verifiedWebsiteLogoUrl = uploadedLogoUrl
+    ? null
+    : await findVerifiedWebsiteLogoUrl(project.websiteUrl);
   const bgm = bgmEnabled ? await getOrCreateSampleBgmArtifact(projectId) : null;
 
   return {
     scenes,
     narrationUrl: narration ? artifactUrl(narration) : undefined,
     bgmUrl: bgm ? artifactUrl(bgm) : undefined,
-    brandWatermark: { text: project.businessName },
+    brandWatermark: {
+      text: project.businessName,
+      logoUrl: uploadedLogoUrl ?? verifiedWebsiteLogoUrl ?? undefined,
+      showOn: "LAST",
+    },
     aiDisclosureEnabled,
     safeZonePreset: storyboard.scenes[0]?.safeZonePreset ?? "TIKTOK_REELS",
   };
+}
+
+async function findVerifiedWebsiteLogoUrl(websiteUrl: string | null) {
+  if (!websiteUrl) return null;
+
+  const research = await researchWebsite(websiteUrl);
+  const visual = research?.visualUrls.find((candidate) =>
+    /\b(?:logo|wordmark)\b/i.test(candidate.label),
+  );
+
+  return visual?.url ?? null;
 }
 
 async function getLatestNarrationArtifact(projectId: string) {

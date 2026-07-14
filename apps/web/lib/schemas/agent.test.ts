@@ -43,17 +43,24 @@ describe("Phase 4 agent schemas", () => {
   });
 
   it("keeps storyboards inside the MVP scene and duration window", () => {
-    const scene = (index: number) => ({
-      index,
-      durationSec: 8,
-      captionText: `Scene ${index}`,
-      voiceoverText: "A concise narration chunk for the scene.",
-      shotPrompt:
-        "Quiet confidence: the product rotates gently as the camera makes one slow push-in.",
-      continuityNotes:
-        "Keep the same palette, lighting, product shape, and caption placement.",
-      continuityMode: index === 2 ? "MATCH_CUT" : "CONTINUOUS",
-    });
+    const scene = (index: number) => {
+      const shotPrompts = [
+        "Tense reveal: the package lid lifts in the foreground while the fixed camera holds a customer's surprised reaction behind it.",
+        "Quiet confidence: the product rotates across a narrow pool of light as the camera slowly pushes in toward its tactile finish.",
+        "Earned relief: the founder steps away from the finished display while a fixed camera holds the clean final arrangement.",
+      ];
+
+      return {
+        index,
+        durationSec: 8,
+        captionText: `Scene ${index}`,
+        voiceoverText: "A concise narration chunk for the scene.",
+        shotPrompt: shotPrompts[index - 1],
+        continuityNotes:
+          "Keep the same palette, lighting, product shape, and caption placement.",
+        continuityMode: index === 2 ? "MATCH_CUT" : "CONTINUOUS",
+      };
+    };
 
     expect(
       storyboardSchema.safeParse({
@@ -212,7 +219,7 @@ describe("Phase 4 agent schemas", () => {
       motionPrompt:
         index === 1
           ? "Tense anticipation. One founder lifts the bottle."
-          : "Calm focus: the product turns gently as the camera slowly pushes in.",
+          : "Calm focus: the product turns gently into the foreground as the camera slowly pushes in toward its textured label.",
       continuity_notes:
         "Keep palette, lighting, subject identity, and caption placement consistent.",
     });
@@ -273,14 +280,14 @@ describe("Phase 4 agent schemas", () => {
     expect(scenes.minItems).toBe(2);
     expect(scenes.maxItems).toBe(4);
     expect(scenes.items.required).toContain("shotPrompt");
-    expect(scenes.items.properties.shotPrompt.maxLength).toBe(280);
+    expect(scenes.items.properties.shotPrompt.maxLength).toBe(480);
     expect(scenes.items.properties.shotPrompt.pattern).toBeDefined();
     expect(scenes.items.required).toContain("continuityMode");
     expect(scenes.items.properties.continuityNotes.minLength).toBe(6);
     expect(storyboardJsonSchema.required).toContain("continuityBible");
   });
 
-  it("accepts one concise shot sentence and rejects compound directions", () => {
+  it("allows controlled supporting motion while rejecting banal or overloaded directions", () => {
     const base = {
       index: 1,
       durationSec: 6,
@@ -294,14 +301,22 @@ describe("Phase 4 agent schemas", () => {
       storyboardSceneSchema.safeParse({
         ...base,
         shotPrompt:
-          "Tense curiosity: one founder lifts the bottle as the camera slowly pushes in.",
+          "Tense curiosity: one founder lifts the bottle into the foreground as the camera slowly pushes in toward a startled customer behind it.",
       }).success,
     ).toBe(true);
     expect(
       storyboardSceneSchema.safeParse({
         ...base,
         shotPrompt:
-          "Quiet confidence: a founder raises the finished package toward a fixed camera.",
+          "Quiet confidence: a founder raises the finished package into clear view while a fixed camera holds the customer's approving reaction behind it.",
+      }).success,
+    ).toBe(true);
+    expect(
+      storyboardSceneSchema.safeParse({
+        ...base,
+        durationSec: 8,
+        shotPrompt:
+          "Reassuring trust: a parent watches the caregiver guide a child's puzzle in the foreground, then rises and exits frame as the fixed camera holds.",
       }).success,
     ).toBe(true);
     expect(
@@ -309,6 +324,29 @@ describe("Phase 4 agent schemas", () => {
         ...base,
         shotPrompt:
           "The founder walks forward. The camera pans, zooms, and then orbits.",
+      }).success,
+    ).toBe(false);
+    expect(
+      storyboardSceneSchema.safeParse({
+        ...base,
+        shotPrompt:
+          "Serene mood: warm natural light illuminates a mother looking out the window while the camera slowly pulls back through the tidy room.",
+      }).success,
+    ).toBe(false);
+    expect(
+      storyboardSceneSchema.safeParse({
+        ...base,
+        durationSec: 8,
+        shotPrompt:
+          "Chaotic rush: a founder opens the package, then lifts the product, then walks away while the fixed camera holds the cluttered table.",
+      }).success,
+    ).toBe(false);
+    expect(
+      storyboardSceneSchema.safeParse({
+        ...base,
+        durationSec: 8,
+        shotPrompt:
+          "Frantic overload: a founder walks forward and talks to camera and opens the package while the fixed camera holds the cluttered foreground.",
       }).success,
     ).toBe(false);
   });

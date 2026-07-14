@@ -955,13 +955,20 @@ Requirements:
 - Each scene needs a caption, voiceover, one shotPrompt, and engine-only continuity metadata.
 - Build a continuityBible before the scenes. Separately lock recurring product attributes, recurring character identity/wardrobe, and the shared visual world. If a category is absent, explicitly say that no recurring product or character is required.
 - Set continuityMode on every scene: CONTINUOUS for a seamless handoff, MATCH_CUT when the composition/action intentionally bridges from the prior scene, or INTENTIONAL_CHANGE only when the plot requires a different character, location, time, or visual world.
-- shotPrompt is the only creative direction sent to video generation. It must be exactly one sentence of 8 to 36 words: begin with a short mood or emotional anchor, name one primary subject, give that subject one distinct action, and specify exactly one camera behavior.
+- shotPrompt is the only creative direction sent to video generation. It must be exactly one substantive sentence of 14 to 60 words: begin with a specific mood/emotional anchor, identify the focal subject, describe a visible story beat, and specify exactly one camera behavior.
 - Use only one reliable camera behavior per shot: fixed camera, slow push-in, slow pull-back, gentle product orbit, or handheld follow. Never combine pan, tilt, zoom, dolly, orbit, rack focus, or handheld movement in one scene.
-- Keep every scene single-shot. Do not describe cuts, montages, transformations, before/after states, multiple locations, sequential actions, dialogue, lip-sync, or simultaneous tasks inside shotPrompt.
-- Use at most one active character. Additional people may appear only as a still, non-distracting background group; never assign them actions.
+- Keep every scene single-shot. Do not describe cuts, montages, transformations, multiple locations, dialogue, lip-sync, or a checklist of actions inside shotPrompt.
+- Build a clear MOTION HIERARCHY instead of freezing everyone except one person:
+  1. Give one focal subject one readable action arc.
+  2. Optionally add one supporting subject in a clearly separated foreground or background plane performing one simple, continuous low-amplitude behavior that motivates or contrasts with the focal action.
+  3. Never give both subjects complex choreography, physical contact, an object handoff, crossed paths, or competing focal actions.
+- A 5–6 second scene gets one focal action only. A 7–10 second scene may contain one short two-beat progression by the same focal subject, using at most one "then"; good progressions are reaction-to-release, rise-to-exit, reach-to-reveal, or turn-to-look. The two beats must read as one motivated action arc, not separate tasks.
+- Every shot needs one VISUAL INTEREST DEVICE chosen for the story: foreground/background cause-and-effect, a subject entering or leaving frame, a reveal through blocking, a clear emotional reaction, tactile product motion, or a small environmental disruption. Rotate devices across scenes.
+- Do not write passive tableau directions using "shows", "captures", "depicts", "features", or "light illuminates". Describe what visibly changes during the shot. Avoid generic beats such as standing worried, smiling softly, or looking out a window unless another visible cause, reaction, or spatial change gives the moment story value.
+- Use at least two different camera behaviors across the complete storyboard. A fixed camera is valuable when subject blocking supplies the energy; camera movement must not be used as a substitute for story motion.
 - Prefer actions with clean silhouettes and stable physics. Avoid hand-to-hand object transfers, intricate finger work, eating, crowds, mirrors, transparent-object transformations, rapid turns, collisions, and heavy occlusion unless the concept absolutely requires one and it remains the only action.
 - Scene 1 must create a brand-relevant visual pattern interrupt immediately: the emotionally surprising action or reaction begins in the first frame and pays off inside the first 3 seconds, with no establishing preamble.
-- Later scenes must advance one new story beat each. continuityNotes and continuityMode are internal planning metadata and must never be repeated inside shotPrompt.
+- Later scenes must advance one new cause-and-effect story beat each rather than merely changing the room, lighting, or facial expression. continuityNotes and continuityMode are internal planning metadata and must never be repeated inside shotPrompt.
 - Do not leave any required field blank or generic.
 - A CONTINUOUS or MATCH_CUT scene must name the invariant product, character, wardrobe, palette, lighting, and spatial details it inherits from the previous scene. INTENTIONAL_CHANGE must name exactly what changes and what still remains visually consistent.
 - Do not design or request a closing image. The engine derives one high-resolution opening anchor from shotPrompt and animates from that image.
@@ -969,6 +976,7 @@ Requirements:
 - Preserve screen direction and the 180-degree line unless continuityMode explicitly calls for an intentional change. Avoid jump cuts caused by near-identical framing; vary shot size deliberately while retaining identity and spatial logic.
 - Prompts must keep product and character identity stable and respect the locked brand style unless INTENTIONAL_CHANGE explicitly justifies the difference.
 - Use the brand palette colors and visual motifs in scene descriptions.
+- The final scene must resolve with a clear brand-value payoff and preserve calm negative space in the upper-left safe area for Reel AI's composited brand lockup. When an uploaded logo is available, the renderer places that exact asset over the final scene; never ask the image or video model to redraw it.
 - Match the ${project.style === "THREE_D_ANIMATION" ? "3D animation" : "realistic"} visual style.
 - Do not create unsupported performance, medical, financial, or legal claims.
 - ${buildGroundingInstructions(grounding)}

@@ -59,8 +59,8 @@ export function KeyframeStoryFlow({
             Recommended story flow
           </div>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Every clip follows one concise direction: one subject, one action,
-            and one camera move from a continuity-locked anchor.
+            Every clip follows one controlled motion hierarchy: one focal
+            action arc, optional simple supporting motion, and one camera move.
           </p>
         </div>
         <span className="w-fit rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">
@@ -288,10 +288,10 @@ function SceneTuner({
         <ChevronDown className="size-3.5 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
       <div className="grid gap-3 border-t border-border p-3">
-        <TuningField label="One simple shot sentence">
+        <TuningField label="One directed shot sentence">
           <textarea
             className="min-h-24 w-full rounded-md border border-border bg-background px-2.5 py-2 text-xs leading-5 outline-none focus:border-primary/60"
-            maxLength={280}
+            maxLength={480}
             value={draft.shotPrompt}
             onChange={(event) =>
               setDraft({ ...draft, shotPrompt: event.target.value })
@@ -299,8 +299,8 @@ function SceneTuner({
           />
         </TuningField>
         <p className="text-[10px] leading-4 text-muted-foreground">
-          Mood first, then one primary subject, one action, and one camera move
-          · 8–36 words.
+          Mood first · one focal action arc · optional low-complexity
+          foreground/background motion · one camera behavior · 14–60 words.
         </p>
         <TuningField label="Seconds">
           <input

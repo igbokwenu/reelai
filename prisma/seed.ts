@@ -177,7 +177,7 @@ async function main() {
             voiceoverText:
               "Before the first standup, Northstar cold brew is already ready.",
             shotPrompt:
-              "Eager anticipation: one hand places the chilled bottle beside the laptop as the camera slowly pushes in.",
+              "Eager anticipation: a teammate slides the chilled bottle into the foreground while another opens the laptop behind it as the camera slowly pushes in.",
             continuityNotes:
               "Keep amber highlights and black label styling consistent.",
             continuityMode: "CONTINUOUS",
@@ -193,7 +193,7 @@ async function main() {
             voiceoverText:
               "Small-batch flavor shows up on your schedule, without another coffee run.",
             shotPrompt:
-              "Refreshing relief: one teammate pours the cold brew over ice as the camera gently orbits the glass.",
+              "Refreshing relief: a teammate pours cold brew over ice in the foreground while condensation rolls down the glass as the camera gently orbits it.",
             continuityNotes:
               "Use the same bottle shape and amber/oat palette from scene one.",
             continuityMode: "MATCH_CUT",
@@ -209,7 +209,7 @@ async function main() {
             voiceoverText:
               "Subscribe once, keep the fridge stocked, and get back to the work.",
             shotPrompt:
-              "Warm confidence: one teammate raises the bottle toward camera while a handheld follow keeps the product centered.",
+              "Warm confidence: a teammate rises with the bottle and crosses toward the bright workspace while the handheld camera follows at an easy pace.",
             continuityNotes:
               "End with readable label space and safe caption zone.",
             continuityMode: "CONTINUOUS",

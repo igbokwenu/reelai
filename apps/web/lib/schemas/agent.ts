@@ -72,33 +72,44 @@ export const creativeConceptRegenerationJsonSchema = {
   },
 } satisfies Record<string, unknown>;
 
-const singleShotSentencePattern = /^[^.!?\n:]{2,40}: [^.!?\n]+[.!?]?$/;
+const singleShotSentencePattern = /^[^.!?\n:]{2,50}: [^.!?\n]+[.!?]?$/;
 const reliableCameraPatterns = [
-  /\b(?:(?:fixed|static) camera|camera[^,.]{0,24}(?:fixed|static))\b/i,
-  /\b(?:slow push-in|camera[^,.]{0,24}push(?:es)? in)\b/i,
-  /\b(?:slow pull-back|camera[^,.]{0,24}pull(?:s)? (?:back|out))\b/i,
-  /\b(?:gentle product orbit|camera[^,.]{0,24}orbit(?:s|ing)?)\b/i,
-  /\b(?:handheld follow|handheld camera[^,.]{0,24}follow(?:s|ing)?)\b/i,
+  ["fixed", /\b(?:(?:fixed|static) camera|camera[^,.]{0,24}(?:fixed|static))\b/i],
+  ["push-in", /\b(?:slow push-in|camera[^,.]{0,24}push(?:es)? in)\b/i],
+  ["pull-back", /\b(?:slow pull-back|camera[^,.]{0,24}pull(?:s)? (?:back|out))\b/i],
+  ["orbit", /\b(?:gentle product orbit|camera[^,.]{0,24}orbit(?:s|ing)?)\b/i],
+  ["handheld-follow", /\b(?:handheld follow|handheld camera[^,.]{0,24}follow(?:s|ing)?)\b/i],
 ] as const;
+const passiveFramingPattern =
+  /\b(?:shows?|captures?|depicts?|features?|illuminates?|can be seen|is seen)\b/i;
+const visibleStoryBeatPattern =
+  /\b(?:foreground|background|behind (?:her|him|them|the)|enters? (?:the )?frame|exits? (?:the )?frame|walks? (?:away|out)|steps? (?:away|out)|rises?|stands? up|sits? down|reacts?|relaxes?|releases?|brightens?|recoils?|reveals?|unfolds?|opens?|closes?|topples?|spills?|drops?|lifts?|raises?|turns?|rotates?|slides?|crosses? (?:the )?frame|moves? into|moves? out of)\b/i;
+const sequencePattern =
+  /\b(?:then|afterward|afterwards|next|finally|followed by)\b/gi;
 
 function countReliableCameraBehaviors(value: string) {
-  return reliableCameraPatterns.filter((pattern) => pattern.test(value)).length;
+  return reliableCameraPatterns.filter(([, pattern]) => pattern.test(value))
+    .length;
+}
+
+function reliableCameraBehavior(value: string) {
+  return reliableCameraPatterns.find(([, pattern]) => pattern.test(value))?.[0];
 }
 
 export const shotPromptSchema = z
   .string()
   .trim()
   .min(20)
-  .max(280)
+  .max(480)
   .refine((value) => singleShotSentencePattern.test(value), {
     message: "Shot direction must be exactly one sentence.",
   })
   .refine(
     (value) => {
       const words = value.split(/\s+/).filter(Boolean).length;
-      return words >= 8 && words <= 36;
+      return words >= 14 && words <= 60;
     },
-    { message: "Shot direction must contain 8 to 36 words." },
+    { message: "Shot direction must contain 14 to 60 words." },
   )
   .refine(
     (value) => countReliableCameraBehaviors(value) === 1,
@@ -106,19 +117,49 @@ export const shotPromptSchema = z
       message: "Shot direction must contain exactly one reliable camera move.",
     },
   )
-  .refine((value) => !/\b(?:and|then|before|after)\b/i.test(value), {
-    message: "Shot direction must describe one action without sequencing.",
+  .refine((value) => (value.match(sequencePattern) ?? []).length <= 1, {
+    message: "Shot direction may contain at most one simple two-beat progression.",
+  })
+  .refine((value) => (value.match(/\band\b/gi) ?? []).length <= 1, {
+    message:
+      "Shot direction may use at most one 'and' to link a single motivated action arc.",
+  })
+  .refine((value) => !passiveFramingPattern.test(value), {
+    message:
+      "Shot direction must describe visible action, not passive shows/captures/illuminates framing.",
+  })
+  .refine((value) => visibleStoryBeatPattern.test(value), {
+    message:
+      "Shot direction must include a visible story change, layered composition, reveal, reaction, entrance, exit, or tactile motion.",
   });
 
-export const storyboardSceneSchema = z.object({
-  index: z.number().int().min(1).max(4),
-  durationSec: z.number().int().min(5).max(10),
-  captionText: z.string().min(1).max(140),
-  voiceoverText: z.string().min(1).max(600),
-  shotPrompt: shotPromptSchema,
-  continuityNotes: z.string().min(6).max(700),
-  continuityMode: z.enum(["CONTINUOUS", "MATCH_CUT", "INTENTIONAL_CHANGE"]),
-});
+export const storyboardSceneSchema = z
+  .object({
+    index: z.number().int().min(1).max(4),
+    durationSec: z.number().int().min(5).max(10),
+    captionText: z.string().min(1).max(140),
+    voiceoverText: z.string().min(1).max(600),
+    shotPrompt: shotPromptSchema,
+    continuityNotes: z.string().min(6).max(700),
+    continuityMode: z.enum([
+      "CONTINUOUS",
+      "MATCH_CUT",
+      "INTENTIONAL_CHANGE",
+    ]),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      value.durationSec <= 6 &&
+      (value.shotPrompt.match(sequencePattern) ?? []).length > 0
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "A 5-6 second shot must use one continuous focal action; reserve a two-beat progression for 7-10 seconds.",
+        path: ["shotPrompt"],
+      });
+    }
+  });
 
 export const storyboardSchema = z
   .object({
@@ -146,6 +187,21 @@ export const storyboardSchema = z
       ctx.addIssue({
         code: "custom",
         message: "Storyboard duration must land between 15 and 30 seconds.",
+        path: ["scenes"],
+      });
+    }
+
+    const cameraBehaviors = new Set(
+      value.scenes
+        .map((scene) => reliableCameraBehavior(scene.shotPrompt))
+        .filter(Boolean),
+    );
+
+    if (value.scenes.length > 1 && cameraBehaviors.size < 2) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Use at least two camera behaviors across the storyboard so the visual rhythm does not become repetitive.",
         path: ["scenes"],
       });
     }
@@ -202,10 +258,10 @@ export const storyboardJsonSchema = {
           shotPrompt: {
             type: "string",
             minLength: 20,
-            maxLength: 280,
-            pattern: "^[^.!?\\n:]{2,40}: [^.!?\\n]+[.!?]?$",
+            maxLength: 480,
+            pattern: "^[^.!?\\n:]{2,50}: [^.!?\\n]+[.!?]?$",
             description:
-              "Exactly one 8-36 word sentence in the form 'Mood anchor: one primary subject performs one action while one camera behavior is specified.' Use exactly one of: fixed camera, slow push-in, slow pull-back, gentle product orbit, or handheld follow.",
+              "Exactly one 14-60 word sentence. Start with a specific mood anchor, then describe one focal subject's action arc, optionally one simple background/supporting behavior, one visible change or spatial reveal, and exactly one of: fixed camera, slow push-in, slow pull-back, gentle product orbit, or handheld follow. At most one 'then' progression; no passive 'shows/captures/illuminates' framing.",
           },
           continuityNotes: {
             type: "string",
@@ -657,7 +713,7 @@ function normalizeContinuityMode(value: unknown) {
  * fail validation instead of becoming generic filler.
  */
 function normalizeGeneratedShotPrompt(value: unknown) {
-  const raw = text(value, { fallback: "", min: 20, max: 280 });
+  const raw = text(value, { fallback: "", min: 20, max: 480 });
 
   if (shotPromptSchema.safeParse(raw).success || raw.length < 20) {
     return raw;
@@ -668,13 +724,19 @@ function normalizeGeneratedShotPrompt(value: unknown) {
     .split(/[.!?]+/)
     .map((part) => part.trim())
     .filter(Boolean);
-  const colonMatch = clean.match(/^([^:]{2,40}):\s*(.+)$/);
-  let mood = "Focused momentum";
+  const colonMatch = clean.match(/^([^:]{2,50}):\s*(.+)$/);
+  const moodLeadMatch = clean.match(
+    /^([^.!?:]{2,40}\b(?:atmosphere|mood|energy|tension|pressure|warmth|relief|confidence|curiosity|delight|unease))\s+(.+)$/i,
+  );
+  let mood = inferShotMood(clean);
   let action = sentenceParts[0] ?? clean;
 
   if (colonMatch) {
     mood = colonMatch[1]?.trim() || mood;
     action = (colonMatch[2] ?? action).split(/[.!?]+/)[0]?.trim() || action;
+  } else if (moodLeadMatch) {
+    mood = moodLeadMatch[1]?.trim() || mood;
+    action = moodLeadMatch[2]?.trim() || action;
   } else if (
     sentenceParts.length > 1 &&
     (sentenceParts[0]?.split(/\s+/).length ?? 0) <= 6
@@ -684,7 +746,6 @@ function normalizeGeneratedShotPrompt(value: unknown) {
   }
 
   mood = mood
-    .replace(/\band\b/gi, ",")
     .replace(/[:.!?]+/g, "")
     .replace(/\s*,\s*/g, ", ")
     .trim()
@@ -692,9 +753,8 @@ function normalizeGeneratedShotPrompt(value: unknown) {
     .slice(0, 6)
     .join(" ");
   action = action
-    .split(/\b(?:and then|then|before|after)\b/i)[0]
-    ?.split(/\s+and\s+(?=(?:the|a|an|he|she|they|it|camera|handheld)\b)/i)[0]
-    ?.replace(/[:.!?]+/g, "")
+    .replace(/^(?:shows?|captures?|depicts?|features?)\s+/i, "")
+    .replace(/[:.!?]+/g, "")
     .trim() || action;
 
   const candidate = `${mood}: ${action}.`;
@@ -702,20 +762,35 @@ function normalizeGeneratedShotPrompt(value: unknown) {
     return candidate;
   }
 
-  // An absent, unsupported, or compound camera brief defaults to the most
-  // stable generation setup. Remove only an explicit trailing camera clause.
-  const primaryAction = action
-    .split(/\b(?:as|while|with)\s+(?:the\s+)?(?:camera|handheld)\b/i)[0]
-    ?.split(/[,;]+/)[0]
-    ?.trim();
-  const actionWords = (primaryAction || action).split(/\s+/).slice(0, 20);
-  const paddedAction =
-    actionWords.length >= 3
-      ? actionWords.join(" ")
-      : `${actionWords.join(" ")} remains clearly visible`.trim();
-  const repaired = `${mood}: ${paddedAction}, while a fixed camera holds the composition.`;
+  // A missing camera brief defaults to the most stable generation setup. Do
+  // not invent a story beat here: if the supplied action is still banal or
+  // overloaded, final validation intentionally sends it to model repair.
+  const repaired =
+    countReliableCameraBehaviors(action) === 0
+      ? `${mood}: ${action.replace(/[,;\s]+$/, "")}, while a fixed camera holds the composition.`
+      : candidate;
 
   return shotPromptSchema.safeParse(repaired).success ? repaired : raw;
+}
+
+function inferShotMood(value: string) {
+  if (/\b(?:overwhelm|frustrat|tense|cry|panic|pressure|stress)\w*\b/i.test(value)) {
+    return "Tense pressure";
+  }
+  if (/\b(?:relief|release|calm|safe|trust|reassur|gentle|warm)\w*\b/i.test(value)) {
+    return "Reassuring warmth";
+  }
+  if (/\b(?:quiet|serene|rest|coffee|breathe|peace)\w*\b/i.test(value)) {
+    return "Earned relief";
+  }
+  if (/\b(?:play|joy|laugh|delight|surpris)\w*\b/i.test(value)) {
+    return "Playful energy";
+  }
+  if (/\b(?:product|package|reveal|launch|confiden)\w*\b/i.test(value)) {
+    return "Confident reveal";
+  }
+
+  return "Purposeful energy";
 }
 
 function normalizeBgm(value: unknown) {
