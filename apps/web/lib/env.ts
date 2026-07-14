@@ -14,6 +14,7 @@ const envSchema = z.object({
   PUBLIC_APP_URL: z.string().url(),
   REDIS_URL: z.string().url().optional().or(z.literal("")),
   QWEN_VIDEO_BASE_URL: z.string().url().optional().or(z.literal("")),
+  QWEN_VIDEO_RESOLUTION: z.enum(["720P", "1080P"]).optional(),
   QWEN_IMAGE_BASE_URL: z.string().url().optional().or(z.literal("")),
   QWEN_TTS_BASE_URL: z.string().url().optional().or(z.literal("")),
   SENTRY_DSN: z.string().url().optional().or(z.literal("")),

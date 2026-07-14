@@ -105,9 +105,7 @@ model Scene {
   durationSec            Int
   captionText            String
   voiceoverText          String
-  anchorFramePrompt      String
-  transitionOutPrompt    String
-  videoMotionPrompt      String
+  shotPrompt             String
   continuityNotes        String         @default("")
   continuityMode         ContinuityMode @default(CONTINUOUS)
   lockedStyleLanguage    String

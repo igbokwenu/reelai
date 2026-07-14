@@ -275,9 +275,7 @@ model Scene {
   durationSec          Int
   captionText          String
   voiceoverText        String
-  anchorFramePrompt    String
-  transitionOutPrompt  String
-  videoMotionPrompt    String
+  shotPrompt           String
   lockedStyleLanguage  String
   safeZonePreset       SafeZonePreset @default(TIKTOK_REELS)
   status              SceneStatus @default(DRAFT)
@@ -512,12 +510,10 @@ export const StoryboardSchema = z.object({
     .array(
       z.object({
         index: z.number().int(),
-        durationSec: z.number().int().min(4).max(15),
+        durationSec: z.number().int().min(5).max(10),
         captionText: z.string(),
         voiceoverText: z.string().max(600),
-        anchorFramePrompt: z.string(),
-        transitionOutPrompt: z.string(),
-        videoMotionPrompt: z.string(),
+        shotPrompt: z.string(), // one mood-first sentence, 8–36 words
         continuityNotes: z.string(),
       }),
     )
@@ -544,8 +540,9 @@ Implementation:
 - For Qwen async tasks, set `WAITING_PROVIDER` with `providerTaskId`.
 - Poll provider tasks from an API-triggered worker loop for MVP.
 - Claim each polling pass before contacting the provider. A failed scene must not stop healthy sibling tasks from polling, and transient provider/download errors must remain `WAITING_PROVIDER` until the bounded processing window expires.
-- Preflight every selected scene anchor before submitting any video task. Submit no closing-frame constraint. Preserve the currently selected anchor or clip until a full replacement succeeds.
-- Treat anchors as an ordered dependency chain: visual/continuity changes invalidate the edited and downstream anchors; motion/exit changes invalidate the current clip and downstream anchors; timing-only changes invalidate only the current clip.
+- Preflight every selected scene anchor before submitting any video task. Submit no closing-frame constraint and send only the stored one-sentence `shotPrompt` as positive prompt text.
+- Validate new shot directions as one mood-first sentence with one primary subject, one action, exactly one reliable camera move, no sequential-action language, and a 5–10 second duration. Keep brand and continuity prose in anchor generation/reference chaining, not in the video prompt.
+- Treat anchors as an ordered dependency chain: shot/continuity changes invalidate the edited and downstream anchors/clips; timing-only changes invalidate only the current clip.
 - Expose a scene-level video retry for missing or failed clips. The retry creates a new take for only that scene and must not resubmit completed sibling scenes.
 - Store all generated files as `Artifact` rows after upload/download to OSS.
 - UI polls `/api/jobs/[jobId]` every 2 seconds until terminal.
@@ -856,7 +853,7 @@ Exit checklist:
 - [ ] Grounding validation distinguishes negative constraints such as “no logo” from affirmative visual requests.
 - [ ] Auto-recovery is bounded, revalidated before persistence, and visible to the user in the storyboard editor.
 - [ ] Storyboard contains 2 to 4 scenes for MVP.
-- [ ] Each scene has duration, caption, voiceover text, start/end frame prompts, motion prompt, and continuity notes.
+- [ ] Each scene has a 5–10 second duration, caption, voiceover text, one validated shot sentence, and engine-managed continuity metadata.
 - [ ] The storyboard has explicit product, character, and visual-world continuity locks.
 - [ ] The filmstrip shows every first/last frame brief (and generated image when available) in final stitch order.
 - [ ] Every inter-scene handoff is marked continuous, match-cut, or intentional change.
@@ -884,7 +881,7 @@ Exit checklist:
 - [ ] User can generate one continuity-aware anchor keyframe for each approved scene.
 - [ ] Keyframe outputs are copied to OSS and saved as `Artifact` rows.
 - [ ] Regenerating a keyframe creates a new `Take`; it does not overwrite the previous take.
-- [ ] Production presents one recommended story flow with each scene's anchor and natural-exit brief visible together; the user is not required to select among parallel keyframe takes.
+- [ ] Production presents one recommended story flow with each scene's anchor and single shot sentence; the user is not required to select among parallel keyframe takes.
 - [ ] The recommended anchor ID is persisted and supplied as the sole Wan 2.7 image constraint; no last-frame image is sent.
 - [ ] The newest successful anchor and video clip are selected automatically while prior attempts, including legacy closing frames, remain available as history.
 - [ ] User can submit 2 to 4 scenes for i2v generation.

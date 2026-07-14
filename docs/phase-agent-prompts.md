@@ -265,7 +265,7 @@ Exit only when all Phase 4 checklist items pass:
 - User can select exactly one concept.
 - Storyboard generation requires a selected concept.
 - Storyboard contains 2 to 4 scenes for MVP.
-- Each scene has duration, caption, voiceover text, start/end frame prompts, motion prompt, and continuity notes.
+- Each scene has a 5–10 second duration, caption, voiceover text, one concise shot sentence, and engine-managed continuity notes.
 - User can edit scene caption, voiceover, prompts, duration, and BGM settings.
 - Storyboard edits persist after refresh.
 - Policy/claims warnings are visible before generation.
@@ -281,7 +281,7 @@ Goal: generate scene keyframes and i2v video clips, store them durably, and let 
 Build exactly Phase 5:
 
 - Keyframe generation endpoint.
-- Image generation wrapper for preview/start/end frames.
+- Image generation wrapper for previews and one scene anchor.
 - `Take` creation for keyframes.
 - `TakeCompare` for keyframe takes.
 - Video generation endpoint using image-to-video.
@@ -309,7 +309,7 @@ QwenCloud requirements:
 
 Exit only when all Phase 5 checklist items pass:
 
-- User can generate one continuity-aware anchor keyframe for each approved scene; later anchors build on the prior scene's action and exit brief.
+- User can generate one continuity-aware anchor keyframe for each approved scene; later anchors build on the prior reference and engine-managed continuity metadata.
 - Keyframe outputs are copied to OSS and saved as `Artifact` rows.
 - Regenerating a keyframe creates a new `Take`; it does not overwrite the previous take.
 - User can select the preferred keyframe take.

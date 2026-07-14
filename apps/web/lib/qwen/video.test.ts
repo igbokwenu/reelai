@@ -8,19 +8,24 @@ describe("buildVideoSubmissionBody", () => {
     expect(
       buildVideoSubmissionBody({
         model: "wan2.7-i2v",
-        prompt: "A smooth product reveal",
+        prompt:
+          "Quiet confidence: one bottle rotates as the camera slowly pushes in.",
+        negativePrompt: "morphing, warping, flicker, text, watermark",
         imageUrl: "https://example.test/open.png",
+        resolution: "1080P",
         durationSec: 8,
       }),
     ).toEqual({
       model: "wan2.7-i2v",
       input: {
-        prompt: "A smooth product reveal",
+        prompt:
+          "Quiet confidence: one bottle rotates as the camera slowly pushes in.",
+        negative_prompt: "morphing, warping, flicker, text, watermark",
         media: [{ type: "first_frame", url: "https://example.test/open.png" }],
       },
       parameters: {
         duration: 8,
-        resolution: "720P",
+        resolution: "1080P",
         prompt_extend: false,
         watermark: false,
       },
@@ -33,12 +38,11 @@ describe("buildVideoSubmissionBody", () => {
         model: "wan2.6-i2v-flash",
         prompt: "A smooth product reveal",
         imageUrl: "https://example.test/open.png",
-        lastFrameUrl: "https://example.test/close.png",
         durationSec: 99,
       }),
     ).toMatchObject({
       input: { img_url: "https://example.test/open.png" },
-      parameters: { duration: 15, audio: false },
+      parameters: { duration: 10, prompt_extend: false, audio: false },
     });
   });
 });

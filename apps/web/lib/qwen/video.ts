@@ -13,6 +13,10 @@ export const QWEN_VIDEO_BASE_URL = qwenEndpoint(
 
 export const QWEN_I2V_MODEL =
   process.env.QWEN_I2V_MODEL?.trim() || "wan2.7-i2v";
+export const QWEN_VIDEO_RESOLUTION =
+  process.env.QWEN_VIDEO_RESOLUTION?.trim().toUpperCase() === "1080P"
+    ? "1080P"
+    : "720P";
 
 export type VideoTaskSubmission = {
   taskId: string;
@@ -33,8 +37,8 @@ type VideoSubmissionInput = {
   operation: string;
   model?: string;
   prompt: string;
+  negativePrompt: string;
   imageUrl: string;
-  lastFrameUrl?: string;
   durationSec: number;
 };
 
@@ -58,8 +62,8 @@ async function submitImageToVideoTaskOnce({
   operation,
   model = QWEN_I2V_MODEL,
   prompt,
+  negativePrompt,
   imageUrl,
-  lastFrameUrl,
   durationSec,
 }: VideoSubmissionInput): Promise<VideoTaskSubmission> {
   const apiKey = getQwenApiKey();
@@ -77,8 +81,9 @@ async function submitImageToVideoTaskOnce({
         buildVideoSubmissionBody({
           model,
           prompt,
+          negativePrompt,
           imageUrl,
-          lastFrameUrl,
+          resolution: QWEN_VIDEO_RESOLUTION,
           durationSec,
         }),
       ),

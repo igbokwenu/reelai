@@ -1,6 +1,6 @@
 import { handleRoute, notFound, ok } from "@/lib/http/responses";
 import { prisma } from "@/lib/prisma";
-import { storyboardPatchSchema } from "@/lib/schemas/agent";
+import { shotPromptSchema, storyboardPatchSchema } from "@/lib/schemas/agent";
 import { planContinuityInvalidation } from "@/lib/storyboards/continuity-invalidation";
 
 type RouteContext = {
@@ -40,6 +40,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     const existingSceneById = new Map(
       storyboard.scenes.map((scene) => [scene.id, scene]),
     );
+    for (const scene of body.scenes ?? []) {
+      const existing = existingSceneById.get(scene.id)!;
+      if (scene.shotPrompt !== existing.shotPrompt) {
+        shotPromptSchema.parse(scene.shotPrompt);
+      }
+    }
     const invalidation = planContinuityInvalidation(
       storyboard.scenes,
       body.scenes ?? [],
@@ -54,9 +60,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         scene.durationSec !== existing.durationSec ||
         scene.captionText !== existing.captionText ||
         scene.voiceoverText !== existing.voiceoverText ||
-        scene.anchorFramePrompt !== existing.anchorFramePrompt ||
-        scene.transitionOutPrompt !== existing.transitionOutPrompt ||
-        scene.videoMotionPrompt !== existing.videoMotionPrompt ||
+        scene.shotPrompt !== existing.shotPrompt ||
         scene.continuityNotes !== existing.continuityNotes ||
         scene.continuityMode !== existing.continuityMode
       );
@@ -90,9 +94,7 @@ export async function PATCH(request: Request, context: RouteContext) {
             durationSec: scene?.durationSec,
             captionText: scene?.captionText,
             voiceoverText: scene?.voiceoverText,
-            anchorFramePrompt: scene?.anchorFramePrompt,
-            transitionOutPrompt: scene?.transitionOutPrompt,
-            videoMotionPrompt: scene?.videoMotionPrompt,
+            shotPrompt: scene?.shotPrompt,
             continuityNotes: scene?.continuityNotes,
             continuityMode: scene?.continuityMode,
             selectedKeyframeTakeId: stale.anchor ? null : undefined,

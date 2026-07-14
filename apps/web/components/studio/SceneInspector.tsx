@@ -1,14 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import {
-  Captions,
-  Clock3,
-  Film,
-  Link2,
-  MoveRight,
-  type LucideIcon,
-} from "lucide-react";
+import { Captions, Clock3, Film, type LucideIcon } from "lucide-react";
 
 export type ContinuityMode = "CONTINUOUS" | "MATCH_CUT" | "INTENTIONAL_CHANGE";
 
@@ -18,9 +11,7 @@ export type EditableScene = {
   durationSec: number;
   captionText: string;
   voiceoverText: string;
-  anchorFramePrompt: string;
-  transitionOutPrompt: string;
-  videoMotionPrompt: string;
+  shotPrompt: string;
   continuityNotes: string;
   continuityMode: ContinuityMode;
   status?: string;
@@ -67,8 +58,8 @@ export function SceneInspector({
             <input
               aria-label="Scene duration in seconds"
               className="w-10 bg-transparent text-right text-sm font-semibold outline-none"
-              max={15}
-              min={4}
+              max={10}
+              min={5}
               type="number"
               value={scene.durationSec}
               onChange={(event) =>
@@ -108,72 +99,20 @@ export function SceneInspector({
         </section>
 
         <section className="grid gap-3 border-t border-border pt-5">
-          <SectionLabel icon={Film} label="Scene anchor & motion" />
-          <Field label="Scene anchor (the only generated still)">
-            <textarea
-              className="min-h-28 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
-              value={scene.anchorFramePrompt}
-              onChange={(event) =>
-                onChange({ ...scene, anchorFramePrompt: event.target.value })
-              }
-            />
-          </Field>
-          <div className="flex items-center gap-2 px-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            <MoveRight className="size-3.5" aria-hidden="true" />
-            Motion through the shot
-          </div>
-          <Field label="Natural exit / next edit point">
-            <textarea
-              className="min-h-28 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
-              value={scene.transitionOutPrompt}
-              onChange={(event) =>
-                onChange({ ...scene, transitionOutPrompt: event.target.value })
-              }
-            />
-          </Field>
-          <Field label="Camera & motion">
+          <SectionLabel icon={Film} label="AI shot direction" />
+          <Field label="One simple shot sentence">
             <textarea
               className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
-              value={scene.videoMotionPrompt}
+              maxLength={280}
+              value={scene.shotPrompt}
               onChange={(event) =>
-                onChange({ ...scene, videoMotionPrompt: event.target.value })
+                onChange({ ...scene, shotPrompt: event.target.value })
               }
             />
-          </Field>
-        </section>
-
-        <section className="grid gap-3 border-t border-border pt-5">
-          <SectionLabel icon={Link2} label="Stitch & continuity" />
-          <Field label="Transition from previous scene">
-            <select
-              className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
-              value={scene.continuityMode}
-              onChange={(event) =>
-                onChange({
-                  ...scene,
-                  continuityMode: event.target.value as ContinuityMode,
-                })
-              }
-            >
-              <option value="CONTINUOUS">
-                Continuous — preserve the world
-              </option>
-              <option value="MATCH_CUT">
-                Match cut — bridge shape or motion
-              </option>
-              <option value="INTENTIONAL_CHANGE">
-                Intentional change — plot requires a shift
-              </option>
-            </select>
-          </Field>
-          <Field label="What must match (or deliberately change)">
-            <textarea
-              className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
-              value={scene.continuityNotes}
-              onChange={(event) =>
-                onChange({ ...scene, continuityNotes: event.target.value })
-              }
-            />
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              Mood first, then one subject, one action, and one camera move ·
+              8–36 words.
+            </p>
           </Field>
         </section>
       </div>

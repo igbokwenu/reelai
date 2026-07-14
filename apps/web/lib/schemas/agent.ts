@@ -72,14 +72,48 @@ export const creativeConceptRegenerationJsonSchema = {
   },
 } satisfies Record<string, unknown>;
 
+const singleShotSentencePattern = /^[^.!?\n:]{2,40}: [^.!?\n]+[.!?]?$/;
+const reliableCameraPatterns = [
+  /\b(?:(?:fixed|static) camera|camera[^,.]{0,24}(?:fixed|static))\b/i,
+  /\b(?:slow push-in|camera[^,.]{0,24}push(?:es)? in)\b/i,
+  /\b(?:slow pull-back|camera[^,.]{0,24}pull(?:s)? (?:back|out))\b/i,
+  /\b(?:gentle product orbit|camera[^,.]{0,24}orbit(?:s|ing)?)\b/i,
+  /\b(?:handheld follow|handheld camera[^,.]{0,24}follow(?:s|ing)?)\b/i,
+] as const;
+
+export const shotPromptSchema = z
+  .string()
+  .trim()
+  .min(20)
+  .max(280)
+  .refine((value) => singleShotSentencePattern.test(value), {
+    message: "Shot direction must be exactly one sentence.",
+  })
+  .refine(
+    (value) => {
+      const words = value.split(/\s+/).filter(Boolean).length;
+      return words >= 8 && words <= 36;
+    },
+    { message: "Shot direction must contain 8 to 36 words." },
+  )
+  .refine(
+    (value) =>
+      reliableCameraPatterns.filter((pattern) => pattern.test(value)).length ===
+      1,
+    {
+      message: "Shot direction must contain exactly one reliable camera move.",
+    },
+  )
+  .refine((value) => !/\b(?:and|then|before|after)\b/i.test(value), {
+    message: "Shot direction must describe one action without sequencing.",
+  });
+
 export const storyboardSceneSchema = z.object({
   index: z.number().int().min(1).max(4),
-  durationSec: z.number().int().min(4).max(15),
+  durationSec: z.number().int().min(5).max(10),
   captionText: z.string().min(1).max(140),
   voiceoverText: z.string().min(1).max(600),
-  anchorFramePrompt: z.string().min(20).max(1200),
-  transitionOutPrompt: z.string().min(20).max(1200),
-  videoMotionPrompt: z.string().min(20).max(1200),
+  shotPrompt: shotPromptSchema,
   continuityNotes: z.string().min(6).max(700),
   continuityMode: z.enum(["CONTINUOUS", "MATCH_CUT", "INTENTIONAL_CHANGE"]),
 });
@@ -154,31 +188,20 @@ export const storyboardJsonSchema = {
           "durationSec",
           "captionText",
           "voiceoverText",
-          "anchorFramePrompt",
-          "transitionOutPrompt",
-          "videoMotionPrompt",
+          "shotPrompt",
           "continuityNotes",
           "continuityMode",
         ],
         properties: {
           index: { type: "integer", minimum: 1, maximum: 4 },
-          durationSec: { type: "integer", minimum: 4, maximum: 15 },
+          durationSec: { type: "integer", minimum: 5, maximum: 10 },
           captionText: { type: "string", minLength: 1, maxLength: 140 },
           voiceoverText: { type: "string", minLength: 1, maxLength: 600 },
-          anchorFramePrompt: {
+          shotPrompt: {
             type: "string",
             minLength: 20,
-            maxLength: 1200,
-          },
-          transitionOutPrompt: {
-            type: "string",
-            minLength: 20,
-            maxLength: 1200,
-          },
-          videoMotionPrompt: {
-            type: "string",
-            minLength: 20,
-            maxLength: 1200,
+            maxLength: 280,
+            pattern: "^[^.!?\\n:]{2,40}: [^.!?\\n]+[.!?]?$",
           },
           continuityNotes: {
             type: "string",
@@ -207,12 +230,13 @@ export const storyboardPatchSchema = z.object({
     .array(
       z.object({
         id: z.string().min(1),
-        durationSec: z.number().int().min(4).max(15),
+        durationSec: z.number().int().min(5).max(10),
         captionText: z.string().min(1).max(140),
         voiceoverText: z.string().min(1).max(600),
-        anchorFramePrompt: z.string().min(20).max(1200),
-        transitionOutPrompt: z.string().min(20).max(1200),
-        videoMotionPrompt: z.string().min(20).max(1200),
+        // Existing projects may carry a legacy motion brief until it is edited
+        // or the storyboard is regenerated. The route strictly validates every
+        // newly changed shot direction against shotPromptSchema.
+        shotPrompt: z.string().trim().min(20).max(1200),
         continuityNotes: z.string().min(1).max(700),
         continuityMode: z.enum([
           "CONTINUOUS",
@@ -519,7 +543,7 @@ function normalizeStoryboardScene(value: unknown, index: number) {
     }),
     durationSec: integerInRange(
       record.durationSec ?? record.duration_sec ?? record.duration,
-      { fallback: 8, min: 4, max: 15 },
+      { fallback: 8, min: 5, max: 10 },
     ),
     captionText: text(
       record.captionText ?? record.caption ?? record.onScreenText,
@@ -540,41 +564,17 @@ function normalizeStoryboardScene(value: unknown, index: number) {
         max: 600,
       },
     ),
-    anchorFramePrompt: text(
-      record.anchorFramePrompt ??
-        record.anchor_frame_prompt ??
-        record.startFramePrompt ??
-        record.start_frame_prompt ??
-        record.startPrompt ??
-        record.keyframeStartPrompt,
-      {
-        fallback: "",
-        min: 20,
-        max: 1200,
-      },
-    ),
-    transitionOutPrompt: text(
-      record.transitionOutPrompt ??
-        record.transition_out_prompt ??
-        record.endFramePrompt ??
-        record.end_frame_prompt ??
-        record.endPrompt ??
-        record.keyframeEndPrompt,
-      {
-        fallback: "",
-        min: 20,
-        max: 1200,
-      },
-    ),
-    videoMotionPrompt: text(
-      record.videoMotionPrompt ??
+    shotPrompt: text(
+      record.shotPrompt ??
+        record.shot_prompt ??
+        record.videoMotionPrompt ??
         record.video_motion_prompt ??
         record.motionPrompt ??
         record.motion,
       {
         fallback: "",
         min: 20,
-        max: 1200,
+        max: 280,
       },
     ),
     continuityNotes: text(

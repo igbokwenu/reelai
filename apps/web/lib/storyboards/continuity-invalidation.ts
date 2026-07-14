@@ -4,9 +4,7 @@ export type ContinuityScene = {
   id: string;
   index: number;
   durationSec: number;
-  anchorFramePrompt: string;
-  transitionOutPrompt: string;
-  videoMotionPrompt: string;
+  shotPrompt: string;
   continuityNotes: string;
   continuityMode: ContinuityMode;
 };
@@ -19,9 +17,9 @@ export type SceneInvalidation = {
 };
 
 /**
- * Scene anchors form an ordered dependency chain. A visual change invalidates
- * that scene and every downstream anchor; an exit/motion change invalidates the
- * current clip and every later anchor that was designed from that handoff.
+ * Scene anchors form an ordered dependency chain. The one shot sentence drives
+ * both the anchor and clip, so changing it invalidates that scene and every
+ * downstream anchor built from the visual handoff.
  */
 export function planContinuityInvalidation(
   existingScenes: ContinuityScene[],
@@ -54,19 +52,12 @@ export function planContinuityInvalidation(
     const existing = existingById.get(patch.id);
     if (!existing) continue;
 
-    const anchorChanged =
-      patch.anchorFramePrompt !== existing.anchorFramePrompt ||
+    const shotChanged =
+      patch.shotPrompt !== existing.shotPrompt ||
       patch.continuityNotes !== existing.continuityNotes ||
       patch.continuityMode !== existing.continuityMode;
-    const handoffChanged =
-      patch.transitionOutPrompt !== existing.transitionOutPrompt ||
-      patch.videoMotionPrompt !== existing.videoMotionPrompt;
 
-    if (anchorChanged) invalidateAnchorsFrom(existing.index);
-    if (handoffChanged) {
-      invalidateVideo(existing.id);
-      invalidateAnchorsFrom(existing.index + 1);
-    }
+    if (shotChanged) invalidateAnchorsFrom(existing.index);
     if (patch.durationSec !== existing.durationSec) {
       invalidateVideo(existing.id);
     }

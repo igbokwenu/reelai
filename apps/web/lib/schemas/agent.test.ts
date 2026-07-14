@@ -9,6 +9,7 @@ import {
   parseCreativeConceptsOutput,
   parseStoryboardOutput,
   storyboardJsonSchema,
+  storyboardSceneSchema,
   storyboardSchema,
 } from "./agent";
 
@@ -47,12 +48,8 @@ describe("Phase 4 agent schemas", () => {
       durationSec: 8,
       captionText: `Scene ${index}`,
       voiceoverText: "A concise narration chunk for the scene.",
-      anchorFramePrompt:
-        "Vertical branded scene anchor with product detail and clean safe-zone composition.",
-      transitionOutPrompt:
-        "Continue the product motion naturally toward a clean rightward edit point.",
-      videoMotionPrompt:
-        "Slow camera move across the product while captions remain in safe zones.",
+      shotPrompt:
+        "Quiet confidence: the product rotates gently as the camera makes one slow push-in.",
       continuityNotes:
         "Keep the same palette, lighting, product shape, and caption placement.",
       continuityMode: index === 2 ? "MATCH_CUT" : "CONTINUOUS",
@@ -213,7 +210,7 @@ describe("Phase 4 agent schemas", () => {
       end_frame_prompt:
         "Vertical branded ending frame that preserves palette, subject, and lighting.",
       motionPrompt:
-        "Slow camera push with restrained movement and clear caption-safe space.",
+        "Calm focus: the product turns gently as the camera slowly pushes in.",
       continuity_notes:
         "Keep palette, lighting, subject identity, and caption placement consistent.",
     });
@@ -230,8 +227,7 @@ describe("Phase 4 agent schemas", () => {
 
     expect(parsed.scenes).toHaveLength(3);
     expect(parsed.scenes[0]?.durationSec).toBe(8);
-    expect(parsed.scenes[0]?.anchorFramePrompt).toContain("opening frame");
-    expect(parsed.scenes[0]?.transitionOutPrompt).toContain("ending frame");
+    expect(parsed.scenes[0]?.shotPrompt).toContain("Calm focus");
     expect(parsed.bgm.preset).toBe("warm pulse");
     expect(parsed.continuityBible.product).toContain("recurring product");
     expect(parsed.scenes[0]?.continuityMode).toBe("CONTINUOUS");
@@ -272,11 +268,44 @@ describe("Phase 4 agent schemas", () => {
     expect(storyboardJsonSchema.additionalProperties).toBe(false);
     expect(scenes.minItems).toBe(2);
     expect(scenes.maxItems).toBe(4);
-    expect(scenes.items.required).toContain("anchorFramePrompt");
-    expect(scenes.items.required).toContain("transitionOutPrompt");
-    expect(scenes.items.required).toContain("videoMotionPrompt");
+    expect(scenes.items.required).toContain("shotPrompt");
+    expect(scenes.items.properties.shotPrompt.maxLength).toBe(280);
+    expect(scenes.items.properties.shotPrompt.pattern).toBeDefined();
     expect(scenes.items.required).toContain("continuityMode");
     expect(scenes.items.properties.continuityNotes.minLength).toBe(6);
     expect(storyboardJsonSchema.required).toContain("continuityBible");
+  });
+
+  it("accepts one concise shot sentence and rejects compound directions", () => {
+    const base = {
+      index: 1,
+      durationSec: 6,
+      captionText: "One clean beat",
+      voiceoverText: "A concise narration line for this scene.",
+      continuityNotes: "Preserve the same subject identity and lighting.",
+      continuityMode: "CONTINUOUS" as const,
+    };
+
+    expect(
+      storyboardSceneSchema.safeParse({
+        ...base,
+        shotPrompt:
+          "Tense curiosity: one founder lifts the bottle as the camera slowly pushes in.",
+      }).success,
+    ).toBe(true);
+    expect(
+      storyboardSceneSchema.safeParse({
+        ...base,
+        shotPrompt:
+          "Quiet confidence: a founder raises the finished package toward a fixed camera.",
+      }).success,
+    ).toBe(true);
+    expect(
+      storyboardSceneSchema.safeParse({
+        ...base,
+        shotPrompt:
+          "The founder walks forward. The camera pans, zooms, and then orbits.",
+      }).success,
+    ).toBe(false);
   });
 });

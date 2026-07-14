@@ -40,10 +40,8 @@ describe("creative grounding", () => {
       findConceptGroundingViolations(
         [
           {
-            anchorFramePrompt:
+            shotPrompt:
               "Warm human scene with no logo, wordmark, phone, or device screen.",
-            transitionOutPrompt:
-              "Reserve clean negative space for the logo to be composited later; keep the image logo-free until then.",
             continuityNotes:
               "Do not render branded clothing or product packaging; graphics are composited later.",
             policyNote: "Never claim a guaranteed result.",
@@ -59,7 +57,7 @@ describe("creative grounding", () => {
       findConceptGroundingViolations(
         [
           {
-            anchorFramePrompt:
+            shotPrompt:
               "Do not show a logo, but use a branded uniform in the final shot.",
           },
         ],

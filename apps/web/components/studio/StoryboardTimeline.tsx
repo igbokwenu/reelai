@@ -546,7 +546,7 @@ export function StoryboardTimeline({
                 </p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
                   Saving approves all scenes and makes their continuity-aware
-                  anchor and natural-exit briefs available to production.
+                  anchor and single-shot directions available to production.
                 </p>
               </div>
             </div>
@@ -701,22 +701,14 @@ function SceneFilmCard({
           {scene.durationSec}s
         </span>
       </div>
-      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-2">
+      <div className="mt-3">
         <FramePreview artifacts={artifacts} label="Anchor" scene={scene} />
-        <div className="flex aspect-[9/14] flex-col rounded-lg border border-border bg-background/70 p-2.5">
-          <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-primary">
-            Natural exit
-          </span>
-          <p className="mt-auto line-clamp-6 text-[9px] leading-3.5 text-muted-foreground">
-            {scene.transitionOutPrompt}
-          </p>
-        </div>
       </div>
       <p className="mt-3 line-clamp-2 min-h-10 text-sm font-medium leading-5">
         {scene.captionText}
       </p>
       <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-        {scene.videoMotionPrompt}
+        {scene.shotPrompt}
       </p>
     </button>
   );
@@ -739,7 +731,7 @@ function FramePreview({
       candidate.artifactId &&
       artifacts.has(candidate.artifactId),
   );
-  const prompt = scene.anchorFramePrompt;
+  const prompt = scene.shotPrompt;
 
   return (
     <div className="relative aspect-[9/14] overflow-hidden rounded-lg border border-border bg-gradient-to-br from-muted via-background to-primary/10">
@@ -811,15 +803,7 @@ function SelectedSceneSummary({ scene }: { scene: EditableScene | null }) {
       </h3>
       <div className="mt-4 grid gap-4">
         <SummaryBlock label="Voiceover" value={scene.voiceoverText} />
-        <SummaryBlock label="Motion" value={scene.videoMotionPrompt} />
-        <SummaryBlock
-          label={
-            scene.continuityMode === "INTENTIONAL_CHANGE"
-              ? "Intentional change"
-              : "Continuity handoff"
-          }
-          value={scene.continuityNotes}
-        />
+        <SummaryBlock label="One-shot direction" value={scene.shotPrompt} />
       </div>
     </div>
   );

@@ -25,6 +25,8 @@ import {
 } from "@/lib/jobs/production-state";
 
 export const QWEN_KEYFRAME_IMAGE_MODEL = "wan2.7-image-pro";
+const VIDEO_NEGATIVE_PROMPT =
+  "deformed anatomy, extra limbs, duplicated subjects, morphing, warping, flicker, jitter, abrupt camera changes, frozen motion, text, logos, watermark";
 
 type ProductionScene = Scene & {
   takes: Take[];
@@ -573,12 +575,6 @@ async function runVideoSubmissionJob(jobId: string) {
       preflight.push({
         scene,
         imageUrl: artifactUrl(selectedAnchor),
-        nextScene:
-          productionScenes[
-            productionScenes.findIndex(
-              (candidate) => candidate.id === scene.id,
-            ) + 1
-          ] ?? null,
       });
     }
 
@@ -591,7 +587,7 @@ async function runVideoSubmissionJob(jobId: string) {
       const take = await createQueuedTake({
         sceneId: item.scene.id,
         kind: "VIDEO",
-        prompt: buildVideoPrompt(item.scene, item.nextScene),
+        prompt: item.scene.shotPrompt,
       });
       prepared.push({ ...item, take });
     }
@@ -623,6 +619,7 @@ async function runVideoSubmissionJob(jobId: string) {
           model: job.model ?? QWEN_I2V_MODEL,
           prompt: take.prompt,
           imageUrl: item.imageUrl,
+          negativePrompt: VIDEO_NEGATIVE_PROMPT,
           durationSec: scene.durationSec,
         });
       } catch (error) {
@@ -916,7 +913,7 @@ function buildKeyframePrompt(
   scene: ProductionScene,
   previousScene: ProductionScene | null,
 ) {
-  return `${scene.anchorFramePrompt}
+  return `Create a high-resolution opening still at the onset of this single shot: ${scene.shotPrompt}
 
 Locked brand style: ${scene.lockedStyleLanguage}
 Product continuity: ${scene.storyboard.productContinuity}
@@ -924,28 +921,9 @@ Character continuity: ${scene.storyboard.characterContinuity}
 Visual-world continuity: ${scene.storyboard.visualContinuity}
 Transition mode: ${scene.continuityMode}
 Scene continuity: ${scene.continuityNotes}
-${previousScene ? `Previous scene motion: ${previousScene.videoMotionPrompt}\nPrevious scene natural exit: ${previousScene.transitionOutPrompt}` : "This is the establishing anchor for the story."}
-${scene.continuityMode === "INTENTIONAL_CHANGE" ? "Honor only the explicitly described plot change; preserve every other locked identity and style attribute." : "Treat supplied prior-scene imagery as identity, screen-direction, lighting, and spatial guidance. Depict the plausible next edit point after the previous motion; do not merely duplicate the prior composition."}
-Use a vertical 9:16 composition, brand palette fidelity, consistent product/character styling, coherent eyelines and screen direction, ad-safe commercial polish, no extra text or logos. This is the scene's only still-image constraint.`;
-}
-
-function buildVideoPrompt(
-  scene: ProductionScene,
-  nextScene: ProductionScene | null,
-) {
-  return `${scene.videoMotionPrompt}
-
-Begin faithfully from the approved scene anchor and execute the motion naturally over ${scene.durationSec} seconds.
-Natural exit / next edit point: ${scene.transitionOutPrompt}
-${nextScene ? `Upcoming scene anchor context: ${nextScene.anchorFramePrompt}\nShape the outgoing motion, screen direction, subject position, and energy so a ${nextScene.continuityMode.toLowerCase().replace("_", " ")} cut into that scene feels intentional.` : "This is the final scene. Resolve the story naturally on a stable, product-forward or character-forward beat with a short edit-safe tail, without forcing an exact pose."}
-Do not converge on a predetermined closing still. Do not morph, abruptly decelerate, freeze, reverse motion, or add an artificial hold near the end. Maintain purposeful motion through an edit-safe final moment.
-Locked brand style: ${scene.lockedStyleLanguage}
-Product continuity: ${scene.storyboard.productContinuity}
-Character continuity: ${scene.storyboard.characterContinuity}
-Visual-world continuity: ${scene.storyboard.visualContinuity}
-Transition mode: ${scene.continuityMode}
-Continuity notes: ${scene.continuityNotes}
-Keep motion smooth, vertical 9:16, and commercially polished. Generate no text overlays or logos; captions and branding are composited later. Do not introduce unsupported claims.`;
+${previousScene ? `Prior shot context for the handoff: ${previousScene.shotPrompt}` : "This is the story's establishing anchor and immediate hook."}
+${scene.continuityMode === "INTENTIONAL_CHANGE" ? "Honor only the explicitly planned change; preserve every other locked identity and style attribute." : "Use supplied prior-scene imagery only to preserve identity, lighting, spatial logic, and screen direction; compose a distinct next shot rather than copying it."}
+Vertical 9:16, clean silhouette, stable anatomy and product geometry, commercial polish, no readable text or logos.`;
 }
 
 async function createProductionJob({

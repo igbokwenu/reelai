@@ -78,7 +78,7 @@ Agent output:
 - Three divergent creative directions with hook, narrative strategy, pacing, style language, estimated scene count, and one preview keyframe each
 - Script
 - Scene-by-scene storyboard
-- Keyframe prompts for each scene start/end
+- One continuity-aware anchor prompt per scene
 - Video prompts for each scene
 - Voiceover script split into TTS-safe chunks
 - Background music prompt
@@ -111,7 +111,7 @@ Differentiators:
 
 - Parallel creative directions, not one script: the Creative Director Agent pitches three genuinely different concepts with cheap preview frames before any full storyboard or video spend.
 - Optional consistent AI spokesperson: using reference-to-video, the same character can hold their face, outfit, and presence across the reel. Treat this as the main visual wow path when generation quality is stable enough.
-- Continuity-first storyboard: each scene has one visual anchor, a motion brief, and a natural-exit handoff that informs the next scene's anchor without forcing a closing still.
+- Continuity-first storyboard: each scene has one visual anchor and one concise mood/subject/action/camera sentence; continuity metadata informs the next anchor without bloating the video prompt.
 - Brand-aware creative director: website and documents become a reusable Brand Kit, not a one-time analysis.
 - Take-compare editing: every regeneration is additive; the user chooses between takes like an editor.
 - Token-budget planner: the agent proposes a low-cost draft path and a high-quality render path, with a live generation ticker.
@@ -301,7 +301,7 @@ Source: https://docs.qwencloud.com/developer-guides/getting-started/image-models
 Primary path:
 
 - Use image-to-video for continuity.
-- Generate 2 to 4 segments of 5 to 15 seconds for the reliable hackathon MVP.
+- Generate 2 to 4 segments of 5 to 10 seconds for the reliable hackathon MVP, even when the provider supports longer clips.
 - Generate 4 to 8 segments only for final/high-cost 45 to 60 second renders after the shorter path works.
 - Chain scenes by using generated keyframes and/or the previous segment’s final frame.
 - Stitch segments into a 15 to 30 second vertical reel first, with 45 to 60 seconds as a stretch render.
@@ -410,9 +410,7 @@ Important scene fields:
 - `index`
 - `durationSeconds`
 - `visualStyle`
-- `anchorFramePrompt`
-- `transitionOutPrompt`
-- `videoMotionPrompt`
+- `shotPrompt`
 - `voiceoverText`
 - `captionText`
 - `bgmCue`
@@ -632,7 +630,7 @@ Do not print these values in logs or docs.
 
 ### Phase 2: Keyframes
 
-- Generate one continuity-aware anchor keyframe per scene, with every later anchor designed from the preceding action and exit brief.
+- Generate one continuity-aware anchor keyframe per scene, with every later anchor designed from prior visual references and engine-managed continuity metadata.
 - Store images in OSS.
 - Add regenerate/lock controls.
 - Add visual consistency prompt memory.

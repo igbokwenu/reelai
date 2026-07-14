@@ -18,10 +18,11 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Storyboard grounding auto-recovery: missing logo, product, or interface references do not block creation. Reel AI preserves the selected strategy, adapts unsupported execution to source-safe unbranded storytelling, validates the replacement, and explains the adaptation in the editor.
 - Pre-spend concept validation and post-generation visual grounding review; previews that fail review are replaced with an honest local concept card.
 - Exactly three creative concepts before full generation spend, with optional note-guided regeneration of one direction without replacing the other two.
-- Visual 2 to 4 scene storyboard filmstrip with one anchor image per scene, explicit natural-exit and stitch direction, a product/character/visual-world continuity bible, and a human approval loop.
-- Continuity-aware anchors reuse uploaded visual references when available. Every later anchor is designed from the prior scene's action and exit brief, with screen direction, spatial logic, identity, lighting, and match-cut geometry carried across the cut unless the plot explicitly changes them.
-- A recommended Production story flow auto-selects the newest coherent anchor and clip, keeps older anchors, legacy closing frames, and clips as optional history, and supports inline scene tuning with downstream dependency invalidation.
-- Wan 2.7 scene video generation uses only the approved anchor as an image constraint. Motion exits naturally toward the next edit point without forcing the final seconds to morph, decelerate, or freeze onto a closing still.
+- Visual 2 to 4 scene storyboard filmstrip with one anchor image and one concise shot sentence per scene, an engine-managed product/character/visual-world continuity bible, and a human approval loop.
+- A constrained shot engine validates mood-first wording, one primary subject, one distinct action, one reliable camera behavior, no action sequencing, and a 5 to 10 second low-drift duration before new directions can be saved.
+- Continuity-aware anchors reuse uploaded visual references when available. Every later anchor inherits screen direction, spatial logic, identity, lighting, and match-cut geometry from the prior scene unless the plot explicitly changes them; those locks are kept out of the video prompt.
+- A recommended Production story flow auto-selects the newest coherent anchor and clip, keeps older anchors, legacy closing frames, and clips as optional history, and exposes only the single shot sentence for inline tuning with downstream dependency invalidation.
+- Wan 2.7 scene video generation receives the approved shot sentence verbatim plus the anchor image. Artifact avoidance lives in the dedicated negative-prompt field, and prompt rewriting stays disabled so the provider cannot expand one action into a mangled compound shot.
 - Remotion uses clean direct scene cuts rather than fading every clip in from black, preserving continuous and match-cut handoffs in the stitched output.
 - Remotion final render path for 9:16 MP4 export.
 - Alibaba OSS-compatible artifact storage with a local dev fallback.
@@ -59,9 +60,9 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
-Application-only updates that do not add a Prisma migration require only a restart of `pnpm dev`. Web development, typecheck, and build commands regenerate Prisma Client automatically so editor types stay aligned with `prisma/schema.prisma`. After switching to a branch with schema changes, run `pnpm db:generate` immediately if an already-open editor still shows missing Prisma fields, then restart its TypeScript server. The continuity-first single-anchor update includes a migration that preserves existing prompt text, keeps prior takes/artifacts, and retires only the obsolete selected-closing-frame pointer. Existing local checkouts must stop `pnpm dev`, run `pnpm db:migrate` once, and then restart `pnpm dev`.
+Application-only updates that do not add a Prisma migration require only a restart of `pnpm dev`. Web development, typecheck, and build commands regenerate Prisma Client automatically so editor types stay aligned with `prisma/schema.prisma`. After switching to a branch with schema changes, run `pnpm db:generate` immediately if an already-open editor still shows missing Prisma fields, then restart its TypeScript server. The continuity-first anchor and single-shot-direction updates include migrations that preserve prior takes/artifacts, migrate the former motion brief into `shotPrompt`, and retire obsolete scene prompt columns. Existing local checkouts must stop `pnpm dev`, run `pnpm db:migrate` once, and then restart `pnpm dev`.
 
-Existing storyboards remain usable after migration: the former opening brief becomes the scene anchor and the former closing brief becomes the natural-exit brief. For the best continuity on an older project, regenerate its storyboard and scene anchors once so the new prompts are authored natively for anchor-to-anchor flow. Reseeding is not required.
+Existing storyboards remain generatable after migration. Their former motion brief becomes the shot direction and durations are safely clamped to 5–10 seconds; unchanged legacy wording is accepted until it is edited. For the best quality, regenerate an older storyboard and its anchors once so every shot is authored natively under the new one-sentence rules. Reseeding is not required.
 
 The seed creates:
 
@@ -88,6 +89,7 @@ Optional:
 - `QWEN_BASE_URL`: structured text endpoint override. Defaults in code to `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`.
 - `QWEN_VIDEO_BASE_URL`, `QWEN_IMAGE_BASE_URL`, `QWEN_TTS_BASE_URL`: media endpoint overrides. Default in code to `https://dashscope-intl.aliyuncs.com/api/v1`.
 - `QWEN_I2V_MODEL`: scene-video model override. Defaults to `wan2.7-i2v`; set a dated Wan 2.7 ID if that is what your QwenCloud region exposes.
+- `QWEN_VIDEO_RESOLUTION`: `720P` by default; set `1080P` for higher-resolution live exports after considering the additional per-second generation cost.
 - `SENTRY_DSN`: production error monitoring.
 
 ## QwenCloud Usage

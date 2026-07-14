@@ -176,12 +176,8 @@ async function main() {
             captionText: "Better mornings start before the meeting.",
             voiceoverText:
               "Before the first standup, Northstar cold brew is already ready.",
-            anchorFramePrompt:
-              "Vertical office desk in warm morning light, laptop opening, no product yet.",
-            transitionOutPrompt:
-              "The bottle lands beside the laptop as the hand continues rightward, leaving clean motion and matching amber highlights for the next cut.",
-            videoMotionPrompt:
-              "Slow push-in from desk clutter to the clean bottle reveal.",
+            shotPrompt:
+              "Eager anticipation: one hand places the chilled bottle beside the laptop as the camera slowly pushes in.",
             continuityNotes:
               "Keep amber highlights and black label styling consistent.",
             continuityMode: "CONTINUOUS",
@@ -196,12 +192,8 @@ async function main() {
             captionText: "Small-batch cold brew, no coffee run.",
             voiceoverText:
               "Small-batch flavor shows up on your schedule, without another coffee run.",
-            anchorFramePrompt:
-              "Team member opens an office fridge stocked with cold brew bottles.",
-            transitionOutPrompt:
-              "The pour continues through frame with the bottle and glass moving left-to-right, ending on lively liquid motion rather than a held pose.",
-            videoMotionPrompt:
-              "Match cut from fridge door opening to coffee pouring over ice.",
+            shotPrompt:
+              "Refreshing relief: one teammate pours the cold brew over ice as the camera gently orbits the glass.",
             continuityNotes:
               "Use the same bottle shape and amber/oat palette from scene one.",
             continuityMode: "MATCH_CUT",
@@ -216,12 +208,8 @@ async function main() {
             captionText: "Subscribe once. Keep the team stocked.",
             voiceoverText:
               "Subscribe once, keep the fridge stocked, and get back to the work.",
-            anchorFramePrompt:
-              "Three teammates raise cold brew bottles around a planning table.",
-            transitionOutPrompt:
-              "Resolve naturally on the team setting the same bottle near camera, with a steady product-forward composition and a brief edit-safe tail.",
-            videoMotionPrompt:
-              "Gentle handheld team moment ending on a stable product hero shot.",
+            shotPrompt:
+              "Warm confidence: one teammate raises the bottle toward camera while a handheld follow keeps the product centered.",
             continuityNotes:
               "End with readable label space and safe caption zone.",
             continuityMode: "CONTINUOUS",

@@ -9,34 +9,21 @@ const scenes: ContinuityScene[] = [1, 2, 3].map((index) => ({
   id: `scene-${index}`,
   index,
   durationSec: 6,
-  anchorFramePrompt: `Anchor frame prompt for scene ${index}`,
-  transitionOutPrompt: `Natural transition out for scene ${index}`,
-  videoMotionPrompt: `Purposeful camera motion for scene ${index}`,
+  shotPrompt: `Urgent focus: the founder lifts one bottle as the camera slowly pushes in`,
   continuityNotes: `Continuity details for scene ${index}`,
   continuityMode: "CONTINUOUS",
 }));
 
 describe("planContinuityInvalidation", () => {
-  it("cascades an anchor change through downstream scenes", () => {
+  it("cascades a shot-direction change through downstream scenes", () => {
     const patch = {
       ...scenes[1]!,
-      anchorFramePrompt: "A new scene two anchor",
+      shotPrompt:
+        "Quiet confidence: the founder sets down one bottle as the camera remains fixed",
     };
     const result = planContinuityInvalidation(scenes, [patch], false);
 
     expect(result.get("scene-1")).toEqual({ anchor: false, video: false });
-    expect(result.get("scene-2")).toEqual({ anchor: true, video: true });
-    expect(result.get("scene-3")).toEqual({ anchor: true, video: true });
-  });
-
-  it("invalidates the current clip and later anchors for a handoff change", () => {
-    const patch = {
-      ...scenes[0]!,
-      transitionOutPrompt: "Exit scene one on a faster rightward move",
-    };
-    const result = planContinuityInvalidation(scenes, [patch], false);
-
-    expect(result.get("scene-1")).toEqual({ anchor: false, video: true });
     expect(result.get("scene-2")).toEqual({ anchor: true, video: true });
     expect(result.get("scene-3")).toEqual({ anchor: true, video: true });
   });

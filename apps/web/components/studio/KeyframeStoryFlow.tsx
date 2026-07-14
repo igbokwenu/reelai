@@ -24,9 +24,7 @@ import { Button } from "@/components/ui/button";
 export type ProductionScene = TakeCompareScene & {
   durationSec: number;
   voiceoverText: string;
-  anchorFramePrompt: string;
-  transitionOutPrompt: string;
-  videoMotionPrompt: string;
+  shotPrompt: string;
   continuityNotes: string;
   continuityMode: "CONTINUOUS" | "MATCH_CUT" | "INTENTIONAL_CHANGE";
 };
@@ -61,8 +59,8 @@ export function KeyframeStoryFlow({
             Recommended story flow
           </div>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            One anchor starts each scene. Motion exits naturally, and the next
-            anchor continues the visual thread without forcing an ending still.
+            Every clip follows one concise direction: one subject, one action,
+            and one camera move from a continuity-locked anchor.
           </p>
         </div>
         <span className="w-fit rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">
@@ -122,21 +120,16 @@ export function KeyframeStoryFlow({
                   </span>
                 </div>
 
-                <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-2">
+                <div className="mt-3">
                   <FramePreview
                     artifactById={artifactById}
                     label="Scene anchor"
                     take={anchorTake}
                   />
-                  <div className="flex aspect-[9/16] flex-col rounded-lg border border-border bg-background/70 p-2.5">
-                    <span className="text-[9px] font-semibold uppercase tracking-[0.13em] text-primary">
-                      Natural exit
-                    </span>
-                    <p className="mt-auto line-clamp-7 text-[10px] leading-4 text-muted-foreground">
-                      {scene.transitionOutPrompt}
-                    </p>
-                  </div>
                 </div>
+                <p className="mt-3 rounded-lg border border-border bg-background/55 p-2.5 text-[11px] leading-5 text-muted-foreground">
+                  {scene.shotPrompt}
+                </p>
 
                 <div className="mt-3 flex items-center justify-between gap-2 text-xs">
                   <span
@@ -295,76 +288,36 @@ function SceneTuner({
         <ChevronDown className="size-3.5 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
       <div className="grid gap-3 border-t border-border p-3">
-        <TuningField label="Scene anchor direction">
+        <TuningField label="One simple shot sentence">
           <textarea
             className="min-h-24 w-full rounded-md border border-border bg-background px-2.5 py-2 text-xs leading-5 outline-none focus:border-primary/60"
-            value={draft.anchorFramePrompt}
+            maxLength={280}
+            value={draft.shotPrompt}
             onChange={(event) =>
-              setDraft({ ...draft, anchorFramePrompt: event.target.value })
+              setDraft({ ...draft, shotPrompt: event.target.value })
             }
           />
         </TuningField>
-        <TuningField label="Natural exit / next edit point">
-          <textarea
-            className="min-h-24 w-full rounded-md border border-border bg-background px-2.5 py-2 text-xs leading-5 outline-none focus:border-primary/60"
-            value={draft.transitionOutPrompt}
+        <p className="text-[10px] leading-4 text-muted-foreground">
+          Mood first, then one primary subject, one action, and one camera move
+          · 8–36 words.
+        </p>
+        <TuningField label="Seconds">
+          <input
+            className="h-9 w-20 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-primary/60"
+            max={10}
+            min={5}
+            type="number"
+            value={draft.durationSec}
             onChange={(event) =>
-              setDraft({ ...draft, transitionOutPrompt: event.target.value })
-            }
-          />
-        </TuningField>
-        <TuningField label="Camera & subject motion">
-          <textarea
-            className="min-h-20 w-full rounded-md border border-border bg-background px-2.5 py-2 text-xs leading-5 outline-none focus:border-primary/60"
-            value={draft.videoMotionPrompt}
-            onChange={(event) =>
-              setDraft({ ...draft, videoMotionPrompt: event.target.value })
-            }
-          />
-        </TuningField>
-        <div className="grid grid-cols-[minmax(0,1fr)_72px] gap-2">
-          <TuningField label="Stitch to prior scene">
-            <select
-              className="h-9 w-full rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-primary/60"
-              value={draft.continuityMode}
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  continuityMode: event.target
-                    .value as ProductionScene["continuityMode"],
-                })
-              }
-            >
-              <option value="CONTINUOUS">Continuous</option>
-              <option value="MATCH_CUT">Match cut</option>
-              <option value="INTENTIONAL_CHANGE">Plot change</option>
-            </select>
-          </TuningField>
-          <TuningField label="Seconds">
-            <input
-              className="h-9 w-full rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-primary/60"
-              max={15}
-              min={4}
-              type="number"
-              value={draft.durationSec}
-              onChange={(event) =>
-                setDraft({ ...draft, durationSec: Number(event.target.value) })
-              }
-            />
-          </TuningField>
-        </div>
-        <TuningField label="Continuity note">
-          <textarea
-            className="min-h-16 w-full rounded-md border border-border bg-background px-2.5 py-2 text-xs leading-5 outline-none focus:border-primary/60"
-            value={draft.continuityNotes}
-            onChange={(event) =>
-              setDraft({ ...draft, continuityNotes: event.target.value })
+              setDraft({ ...draft, durationSec: Number(event.target.value) })
             }
           />
         </TuningField>
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] leading-4 text-muted-foreground">
-            Anchor or handoff edits also invalidate dependent downstream scenes.
+            Shot edits regenerate this anchor, clip, and dependent downstream
+            scenes.
           </p>
           <Button disabled={isSaving} onClick={save} size="sm" type="button">
             {isSaving ? (
