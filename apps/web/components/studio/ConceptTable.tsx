@@ -204,6 +204,12 @@ export function ConceptTable({
           }
           onClick={generateConcepts}
           size="sm"
+          tooltip={
+            concepts.length === 3
+              ? "Replaces all three concepts with new directions from the current Brand Kit."
+              : "Creates three distinct creative directions from the current Brand Kit."
+          }
+          tooltipSide="bottom"
         >
           {isStarting || isRunning ? (
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />

@@ -15,6 +15,7 @@ import {
 import { memo, type ReactNode, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { GuideTooltip } from "@/components/ui/guide-tooltip";
 
 type StageId =
   "brand" | "concepts" | "storyboard" | "production" | "final" | "assets";
@@ -152,57 +153,63 @@ export function ProjectWorkflow({
             const Icon = stage.icon;
             const isActive = stage.id === activeStage.id;
             return (
-              <button
-                aria-controls={`workflow-panel-${stage.id}`}
-                aria-current={isActive ? "step" : undefined}
-                aria-selected={isActive}
-                className={`group relative min-w-0 rounded-xl px-3 py-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                  isActive
-                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/10"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
+              <GuideTooltip
+                className="min-w-0"
+                content={`Opens ${stage.label}. ${stage.description}`}
                 key={stage.id}
-                id={`workflow-tab-${stage.id}`}
-                onClick={() => selectStage(stage.id)}
-                role="tab"
-                type="button"
+                side="bottom"
               >
-                <span className="flex items-center gap-2">
+                <button
+                  aria-controls={`workflow-panel-${stage.id}`}
+                  aria-current={isActive ? "step" : undefined}
+                  aria-selected={isActive}
+                  className={`group relative w-full min-w-0 rounded-xl px-3 py-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/10"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                  id={`workflow-tab-${stage.id}`}
+                  onClick={() => selectStage(stage.id)}
+                  role="tab"
+                  type="button"
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={`flex size-7 shrink-0 items-center justify-center rounded-lg border ${
+                        isActive
+                          ? "border-primary-foreground/15 bg-primary-foreground/10"
+                          : stage.state === "complete"
+                            ? "border-primary/30 bg-primary/10 text-primary"
+                            : "border-border bg-background/60"
+                      }`}
+                    >
+                      {stage.state === "complete" && !isActive ? (
+                        <Check className="size-3.5" aria-hidden="true" />
+                      ) : (
+                        <Icon className="size-3.5" aria-hidden="true" />
+                      )}
+                    </span>
+                    <span className="truncate text-sm font-semibold">
+                      {stage.label}
+                    </span>
+                  </span>
                   <span
-                    className={`flex size-7 shrink-0 items-center justify-center rounded-lg border ${
+                    className={`mt-2 block truncate text-[10px] font-medium uppercase tracking-[0.12em] ${
                       isActive
-                        ? "border-primary-foreground/15 bg-primary-foreground/10"
-                        : stage.state === "complete"
-                          ? "border-primary/30 bg-primary/10 text-primary"
-                          : "border-border bg-background/60"
+                        ? "text-primary-foreground/65"
+                        : "text-muted-foreground"
                     }`}
                   >
-                    {stage.state === "complete" && !isActive ? (
-                      <Check className="size-3.5" aria-hidden="true" />
-                    ) : (
-                      <Icon className="size-3.5" aria-hidden="true" />
-                    )}
+                    {stage.state === "complete"
+                      ? "Complete"
+                      : stage.state === "current"
+                        ? "Ready now"
+                        : stage.state === "available"
+                          ? "Anytime"
+                          : "Up next"}
                   </span>
-                  <span className="truncate text-sm font-semibold">
-                    {stage.label}
-                  </span>
-                </span>
-                <span
-                  className={`mt-2 block truncate text-[10px] font-medium uppercase tracking-[0.12em] ${
-                    isActive
-                      ? "text-primary-foreground/65"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  {stage.state === "complete"
-                    ? "Complete"
-                    : stage.state === "current"
-                      ? "Ready now"
-                      : stage.state === "available"
-                        ? "Anytime"
-                        : "Up next"}
-                </span>
-              </button>
+                </button>
+              </GuideTooltip>
             );
           })}
         </div>
@@ -247,6 +254,12 @@ export function ProjectWorkflow({
             disabled={activeIndex === 0}
             onClick={() => selectStage(stages[activeIndex - 1].id)}
             size="sm"
+            tooltip={
+              activeIndex === 0
+                ? "You are already at the first stage."
+                : `Moves to ${stages[activeIndex - 1].label}. Your edits stay preserved.`
+            }
+            tooltipSide="bottom"
             variant="outline"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
@@ -259,6 +272,12 @@ export function ProjectWorkflow({
             disabled={activeIndex === stages.length - 1}
             onClick={() => selectStage(stages[activeIndex + 1].id)}
             size="sm"
+            tooltip={
+              activeIndex === stages.length - 1
+                ? "You are already at the last stage."
+                : `Moves to ${stages[activeIndex + 1].label}. Your edits stay preserved.`
+            }
+            tooltipSide="bottom"
           >
             Next
             <ArrowRight className="size-4" aria-hidden="true" />

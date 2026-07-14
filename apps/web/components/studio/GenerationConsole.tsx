@@ -277,6 +277,12 @@ export function GenerationConsole({
               }
               onClick={() => startGeneration("keyframes")}
               size="sm"
+              tooltip={
+                hasRecommendedAnchors
+                  ? "Regenerates every scene anchor and replaces the recommended visual sequence."
+                  : "Generates one continuity-aware anchor image for every approved scene."
+              }
+              tooltipSide="bottom"
               variant={hasRecommendedAnchors ? "outline" : "default"}
             >
               {starting === "keyframes" ? (
@@ -294,6 +300,14 @@ export function GenerationConsole({
               disabled={!hasRecommendedAnchors || productionBusy}
               onClick={() => startGeneration("videos")}
               size="sm"
+              tooltip={
+                completedClips === productionScenes.length
+                  ? "Regenerates the video clip for every scene from its selected anchor."
+                  : completedClips > 0
+                    ? "Generates clips only for scenes that do not have a completed video."
+                    : "Generates a video clip for every scene from its selected anchor."
+              }
+              tooltipSide="bottom"
             >
               {starting === "videos" ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />

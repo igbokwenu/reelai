@@ -84,6 +84,8 @@ export function ArtifactStore({ artifacts }: { artifacts: Artifact[] }) {
             <Button
               onClick={() => setIsGalleryOpen(true)}
               size="sm"
+              tooltip={`Opens the full library of all ${artifacts.length} stored project files.`}
+              tooltipSide="bottom"
               type="button"
               variant="outline"
             >

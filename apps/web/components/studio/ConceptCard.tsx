@@ -138,6 +138,12 @@ export function ConceptCard({
                     }
                   }}
                   size="sm"
+                  tooltip={
+                    concept.selected
+                      ? "Replaces this selected concept using your note and returns its storyboard to draft for review."
+                      : "Replaces only this concept using your adjustment note."
+                  }
+                  tooltipSide="bottom"
                   variant="outline"
                 >
                   {isRegenerating ? (
@@ -167,6 +173,14 @@ export function ConceptCard({
             disabled={concept.selected || isBusy || requiresRegeneration}
             onClick={() => onSelect(concept.id)}
             size="sm"
+            tooltip={
+              concept.selected
+                ? "This direction currently drives the storyboard."
+                : requiresRegeneration
+                  ? "Regenerate this concept before selecting it."
+                  : "Makes this the creative direction used to build the storyboard."
+            }
+            tooltipSide="bottom"
             variant={concept.selected ? "outline" : "default"}
           >
             {concept.selected ? (
@@ -184,6 +198,8 @@ export function ConceptCard({
             disabled={isBusy || isAdjusting}
             onClick={() => setIsAdjusting(true)}
             size="sm"
+            tooltip="Opens an optional note so you can regenerate only this direction."
+            tooltipSide="bottom"
             variant="outline"
           >
             {isRegenerating ? (

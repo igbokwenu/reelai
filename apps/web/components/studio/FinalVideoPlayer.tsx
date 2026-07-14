@@ -236,6 +236,8 @@ export function FinalVideoPlayer({
             disabled={starting !== null || Boolean(activeJob)}
             onClick={startNarration}
             size="sm"
+            tooltip="Generates a timed voice track for each scene that has voiceover text."
+            tooltipSide="bottom"
           >
             {starting === "narration" ? (
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -248,6 +250,8 @@ export function FinalVideoPlayer({
             disabled={!canRender || starting !== null || Boolean(activeJob)}
             onClick={startRender}
             size="sm"
+            tooltip="Combines selected clips, captions, narration, disclosure, and optional music into the final 9:16 MP4."
+            tooltipSide="bottom"
           >
             {starting === "render" ? (
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -395,7 +399,12 @@ export function FinalVideoPlayer({
                 Stored as FINAL_RENDER · {finalArtifact.mimeType}
               </p>
             </div>
-            <Button asChild size="sm">
+            <Button
+              asChild
+              size="sm"
+              tooltip="Downloads the latest finished reel as an MP4 file."
+              tooltipSide="bottom"
+            >
               <a href={`/api/artifacts/${finalArtifact.id}/file`} download>
                 <Download className="size-4" aria-hidden="true" />
                 Download MP4

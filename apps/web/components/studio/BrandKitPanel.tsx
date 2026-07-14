@@ -129,6 +129,12 @@ export function BrandKitPanel({
           disabled={isStarting || isRunning}
           onClick={generateBrandKit}
           size="sm"
+          tooltip={
+            brandKit
+              ? "Rebuilds the Brand Kit from the current website and sources."
+              : "Researches the website and sources to create your reusable Brand Kit."
+          }
+          tooltipSide="bottom"
         >
           {isStarting || isRunning ? (
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />

@@ -12,6 +12,7 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - URL-first project creation that automatically queues Brand Kit research; project and business names can be inferred from the website.
 - Focused two-column landing workspace with optional pipeline guidance and confirmed project deletion, including local/OSS artifact cleanup.
 - Focused horizontal project workflow with six navigable stages: Brand, Concepts, Storyboard, Production, Final, and Assets. Stage readiness and completion are visible at a glance, and switching stages preserves in-progress client state.
+- Premium contextual action guidance across consequential controls. Mouse hover and keyboard focus explain outcomes in plain language, including replacement, deletion, generation, and downstream effects; disabled controls remain discoverable and the guidance is screen-reader and reduced-motion aware.
 - Reusable Brand Kit with value props, palette, claims, policy risks, locked style language, and citations.
 - Multi-page website evidence collection covering metadata, visible copy, CSS color candidates, logos/social images, and QwenCloud visual analysis.
 - Evidence-capability guardrails: website-only projects cannot manufacture product UI, logos, branded uniforms, badges, packaging, or unsupported trust claims.
@@ -76,6 +77,8 @@ The domain-neutral creative grammar, structured cast planning, richer motion-hie
 
 The range-aware render media path is also application-only. Run `pnpm install` to install the Remotion Media dependency, then restart `pnpm dev`; no database migration or seed is required.
 
+The contextual action guidance layer is application-only and adds no package or database dependency. Next.js hot reload should pick it up during `pnpm dev`; otherwise restart `pnpm dev` once. Do not run `pnpm install`, `pnpm db:migrate`, `pnpm db:generate`, or `pnpm db:seed` for this update. See [docs/contextual-guidance.md](docs/contextual-guidance.md) for interaction behavior and the contributor pattern for future actions.
+
 The seed creates:
 
 - `Demo Launch Reel`, a populated Northstar Coffee public demo fixture.
@@ -134,6 +137,8 @@ pnpm format
 The Playwright suite may reuse an existing `pnpm dev` server and therefore its configured database. Browser-test projects are named with the `[ReelAI E2E]` prefix and are removed through the application API at both the start and end of every run, including their stored artifacts. This works for local and deployed smoke tests and prevents fixtures such as `example.com` from appearing in the Projects list. Do not use that reserved prefix for projects you want to keep. If a dev server or test runner is interrupted mid-generation, jobs abandoned for more than 10 minutes no longer prevent their project from being deleted.
 
 Inside a selected project, use the horizontal stage rail or the Previous/Next controls to move through the workflow. Brand Kit essentials (summary, audience, tone, value props, and palette) remain visible by default; visual motifs, approved claims, policy risks, and citations are grouped into expandable guardrail panels. Project uploads and generated artifacts live in the Assets stage.
+
+Hover over or keyboard-focus a consequential action to open the Reel AI guide. The tooltip describes the outcome before you commit, and `Escape` dismisses it from the keyboard.
 
 Run a deployed smoke test against an existing URL:
 

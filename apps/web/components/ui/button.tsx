@@ -2,6 +2,7 @@ import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 
+import { GuideTooltip, type TooltipSide } from "@/components/ui/guide-tooltip";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
@@ -32,6 +33,9 @@ export interface ButtonProps
     React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  tooltip?: string;
+  tooltipClassName?: string;
+  tooltipSide?: TooltipSide;
 }
 
 function Button({
@@ -39,16 +43,31 @@ function Button({
   variant,
   size,
   asChild = false,
+  tooltip,
+  tooltipClassName,
+  tooltipSide,
   ...props
 }: ButtonProps) {
   const Comp = asChild ? Slot : "button";
 
-  return (
+  const button = (
     <Comp
       className={cn(buttonVariants({ variant, size, className }))}
       data-slot="button"
       {...props}
     />
+  );
+
+  return tooltip ? (
+    <GuideTooltip
+      className={tooltipClassName}
+      content={tooltip}
+      side={tooltipSide}
+    >
+      {button}
+    </GuideTooltip>
+  ) : (
+    button
   );
 }
 

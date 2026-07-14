@@ -80,7 +80,9 @@ function TakeGroup({
 }) {
   const router = useRouter();
   const [selectingTakeId, setSelectingTakeId] = useState<string | null>(null);
-  const artifactById = new Map(artifacts.map((artifact) => [artifact.id, artifact]));
+  const artifactById = new Map(
+    artifacts.map((artifact) => [artifact.id, artifact]),
+  );
 
   async function selectTake(takeId: string) {
     setSelectingTakeId(takeId);
@@ -123,7 +125,10 @@ function TakeGroup({
                   {isVideo ? (
                     <Video className="size-4 text-primary" aria-hidden="true" />
                   ) : (
-                    <ImageIcon className="size-4 text-primary" aria-hidden="true" />
+                    <ImageIcon
+                      className="size-4 text-primary"
+                      aria-hidden="true"
+                    />
                   )}
                   Attempt {take.attempt}
                 </div>
@@ -155,7 +160,7 @@ function TakeGroup({
                 <div className="mt-3 flex aspect-[9/16] items-center justify-center rounded-md border border-dashed border-border text-xs text-muted-foreground">
                   {take.status === "RUNNING" || take.status === "QUEUED"
                     ? "Generating"
-                    : take.notes ?? "No artifact"}
+                    : (take.notes ?? "No artifact")}
                 </div>
               ) : null}
 
@@ -164,7 +169,7 @@ function TakeGroup({
               </p>
 
               <Button
-                className="mt-3 w-full"
+                className="w-full"
                 disabled={
                   take.status !== "COMPLETE" ||
                   !take.artifactId ||
@@ -173,6 +178,13 @@ function TakeGroup({
                 }
                 onClick={() => selectTake(take.id)}
                 size="sm"
+                tooltip={
+                  isSelected
+                    ? "This take is already the selected output for the scene."
+                    : "Makes this take the version used by the scene and final reel."
+                }
+                tooltipClassName="mt-3 w-full"
+                tooltipSide="bottom"
                 type="button"
               >
                 {selectingTakeId === take.id ? (

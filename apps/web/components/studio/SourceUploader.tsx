@@ -97,9 +97,11 @@ export function SourceUploader({ projectId }: { projectId: string }) {
           <p className="mt-2 text-sm text-destructive">{uploadError}</p>
         ) : null}
         <Button
-          className="mt-3"
           disabled={!isHydrated || isUploading}
           size="sm"
+          tooltip="Uploads this file into the project so future AI generations can use it as source material."
+          tooltipClassName="mt-3"
+          tooltipSide="bottom"
           type="submit"
         >
           {isUploading ? (
@@ -138,9 +140,11 @@ export function SourceUploader({ projectId }: { projectId: string }) {
           <p className="mt-2 text-sm text-destructive">{urlError}</p>
         ) : null}
         <Button
-          className="mt-3"
           disabled={!isHydrated || isRegistering}
           size="sm"
+          tooltip="Adds this webpage as source material for future Brand Kit and creative generation."
+          tooltipClassName="mt-3"
+          tooltipSide="bottom"
           type="submit"
         >
           {isRegistering ? (

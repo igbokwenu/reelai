@@ -28,6 +28,7 @@ import {
   type EditableScene,
 } from "@/components/studio/SceneInspector";
 import { Button } from "@/components/ui/button";
+import { GuideTooltip } from "@/components/ui/guide-tooltip";
 
 type Storyboard = {
   id: string;
@@ -283,6 +284,12 @@ export function StoryboardTimeline({
             disabled={!selectedConcept || isStarting || isRunning}
             onClick={generateStoryboard}
             size="sm"
+            tooltip={
+              draft
+                ? "Rebuilds the full scene plan from the selected concept, replacing the current draft."
+                : "Builds an editable scene plan from the selected creative direction."
+            }
+            tooltipSide="bottom"
             variant="outline"
           >
             {isStarting || isRunning ? (
@@ -295,7 +302,13 @@ export function StoryboardTimeline({
             {draft ? "Regenerate plan" : "Generate storyboard"}
           </Button>
           {draft ? (
-            <Button disabled={isSaving} onClick={saveStoryboard} size="sm">
+            <Button
+              disabled={isSaving}
+              onClick={saveStoryboard}
+              size="sm"
+              tooltip="Saves every storyboard edit and approves the plan for production."
+              tooltipSide="bottom"
+            >
               {isSaving ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />
               ) : saved ? (
@@ -551,7 +564,13 @@ export function StoryboardTimeline({
                 </p>
               </div>
             </div>
-            <Button disabled={isSaving} onClick={saveStoryboard} size="sm">
+            <Button
+              disabled={isSaving}
+              onClick={saveStoryboard}
+              size="sm"
+              tooltip="Saves every scene and continuity edit, then keeps the plan approved for production."
+              tooltipSide="bottom"
+            >
               {isSaving ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />
               ) : (
@@ -686,34 +705,39 @@ function SceneFilmCard({
   onSelect: () => void;
 }) {
   return (
-    <button
-      aria-pressed={isSelected}
-      className={`w-[326px] rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-        isSelected
-          ? "border-primary bg-primary/[0.08] shadow-[0_0_0_1px_rgba(183,255,60,0.08)]"
-          : "border-border bg-card/75 hover:border-border/80 hover:bg-card"
-      }`}
-      onClick={onSelect}
-      type="button"
+    <GuideTooltip
+      className="w-[326px] shrink-0"
+      content={`Selects scene ${scene.index} so you can review and edit its timing, caption, voiceover, and shot direction.`}
     >
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
-          Scene {String(scene.index).padStart(2, "0")}
-        </span>
-        <span className="rounded-full bg-background/80 px-2 py-1 text-[10px] text-muted-foreground">
-          {scene.durationSec}s
-        </span>
-      </div>
-      <div className="mt-3">
-        <FramePreview artifacts={artifacts} label="Anchor" scene={scene} />
-      </div>
-      <p className="mt-3 line-clamp-2 min-h-10 text-sm font-medium leading-5">
-        {scene.captionText}
-      </p>
-      <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-        {scene.shotPrompt}
-      </p>
-    </button>
+      <button
+        aria-pressed={isSelected}
+        className={`w-full rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+          isSelected
+            ? "border-primary bg-primary/[0.08] shadow-[0_0_0_1px_rgba(183,255,60,0.08)]"
+            : "border-border bg-card/75 hover:border-border/80 hover:bg-card"
+        }`}
+        onClick={onSelect}
+        type="button"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+            Scene {String(scene.index).padStart(2, "0")}
+          </span>
+          <span className="rounded-full bg-background/80 px-2 py-1 text-[10px] text-muted-foreground">
+            {scene.durationSec}s
+          </span>
+        </div>
+        <div className="mt-3">
+          <FramePreview artifacts={artifacts} label="Anchor" scene={scene} />
+        </div>
+        <p className="mt-3 line-clamp-2 min-h-10 text-sm font-medium leading-5">
+          {scene.captionText}
+        </p>
+        <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+          {scene.shotPrompt}
+        </p>
+      </button>
+    </GuideTooltip>
   );
 }
 

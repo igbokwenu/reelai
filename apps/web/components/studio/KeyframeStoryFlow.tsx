@@ -59,8 +59,8 @@ export function KeyframeStoryFlow({
             Recommended story flow
           </div>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Every clip follows one controlled motion hierarchy: one focal
-            action arc, optional simple supporting motion, and one camera move.
+            Every clip follows one controlled motion hierarchy: one focal action
+            arc, optional simple supporting motion, and one camera move.
           </p>
         </div>
         <span className="w-fit rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">
@@ -181,6 +181,12 @@ export function KeyframeStoryFlow({
                       disabled={isProductionBusy}
                       onClick={() => onRetrySceneVideo(scene.id)}
                       size="sm"
+                      tooltip={
+                        failedVideo
+                          ? `Regenerates only scene ${scene.index}'s failed clip and keeps completed scenes unchanged.`
+                          : `Generates only scene ${scene.index}'s missing clip and keeps completed scenes unchanged.`
+                      }
+                      tooltipSide="bottom"
                       type="button"
                       variant="outline"
                     >
@@ -319,7 +325,14 @@ function SceneTuner({
             Shot edits regenerate this anchor, clip, and dependent downstream
             scenes.
           </p>
-          <Button disabled={isSaving} onClick={save} size="sm" type="button">
+          <Button
+            disabled={isSaving}
+            onClick={save}
+            size="sm"
+            tooltip="Saves this shot direction and duration. Changed dependencies will be regenerated."
+            tooltipSide="bottom"
+            type="button"
+          >
             {isSaving ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : saved ? (
