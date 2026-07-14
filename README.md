@@ -20,8 +20,10 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Exactly three creative concepts before full generation spend, with optional note-guided regeneration of one direction without replacing the other two.
 - Visual 2 to 4 scene storyboard filmstrip with one anchor image and one directed shot sentence per scene, an engine-managed product/character/visual-world continuity bible, and a human approval loop.
 - A constrained shot engine validates a 14–60 word motion hierarchy: one focal action arc, optional low-complexity foreground/background behavior, at most one motivated two-beat progression, one reliable camera behavior, a visible story change, and a 5 to 10 second low-drift duration.
+- The creative grammar is domain-neutral: people/services, products/retail/food, software, places/hospitality/property, expertise/B2B/education, and creator/event/abstract-brand work each receive offer-appropriate motion devices instead of one universal problem/relief template.
+- Structured cast planning keeps product-only ads free of token people and gives every human role stable appearance/wardrobe anchors. Multi-person scenes require distinct face/silhouette signatures; neutral complexion or fictional ethnic-appearance anchors are allowed without inferring ethnicity for real reference-backed people or using stereotypes.
 - Near-valid storyboard output is repaired deterministically before persistence: the first clear action is preserved, short mood fragments are normalized, and an omitted or conflicting camera instruction falls back to a stable fixed-camera setup. Missing creative direction still fails validation.
-- Continuity-aware anchors reuse uploaded visual references when available. Every later anchor inherits screen direction, spatial logic, identity, lighting, and match-cut geometry from the prior scene unless the plot explicitly changes them; those locks are kept out of the video prompt.
+- Continuity-aware anchors reuse uploaded visual references when available. Every later anchor can reference the two most recent anchors to recover recurring identities after a scene gap while inheriting screen direction, spatial logic, lighting, and match-cut geometry; those locks are kept out of the video prompt.
 - A recommended Production story flow auto-selects the newest coherent anchor and clip, keeps older anchors, legacy closing frames, and clips as optional history, and exposes only the single shot sentence for inline tuning with downstream dependency invalidation.
 - Wan 2.7 scene video generation receives the approved shot sentence verbatim plus the anchor image. Artifact avoidance lives in the dedicated negative-prompt field, and prompt rewriting stays disabled so the provider cannot expand one action into a mangled compound shot.
 - Remotion uses clean direct scene cuts rather than fading every clip in from black, preserving continuous and match-cut handoffs in the stitched output.
@@ -66,7 +68,7 @@ Application-only updates that do not add a Prisma migration require only a resta
 
 Existing storyboards remain generatable after migration. Their former motion brief becomes the shot direction and durations are safely clamped to 5–10 seconds; unchanged legacy wording is accepted until it is edited. For the best quality, regenerate an older storyboard and its anchors once so every shot is authored natively under the new one-sentence rules. Reseeding is not required.
 
-The richer motion-hierarchy guardrails and last-scene logo lockup are application-only changes. Existing databases and artifacts remain compatible; restart `pnpm dev` after pulling them, with no additional migration or seed command.
+The domain-neutral creative grammar, structured cast planning, richer motion-hierarchy guardrails, recent-anchor identity recovery, and last-scene logo lockup are application-only changes. Existing databases and artifacts remain compatible; restart `pnpm dev` after pulling them, with no additional migration or seed command.
 
 The seed creates:
 

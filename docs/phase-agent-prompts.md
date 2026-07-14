@@ -266,6 +266,7 @@ Exit only when all Phase 4 checklist items pass:
 - Storyboard generation requires a selected concept.
 - Storyboard contains 2 to 4 scenes for MVP.
 - Each scene has a 5–10 second duration, caption, voiceover text, one directed 14–60 word motion hierarchy, and engine-managed continuity notes. The shot may include one focal action arc plus one simple supporting behavior in a separate depth plane, but only one camera behavior.
+- Storyboard planning selects a domain-appropriate execution lane instead of defaulting to human service-ad staging, and emits an explicit NO_PEOPLE/SINGLE_PERSON/MULTI_PERSON cast plan. Multi-person members must have distinct physical and silhouette/wardrobe anchors without stereotyping or inferring a referenced person's ethnicity.
 - User can edit scene caption, voiceover, prompts, duration, and BGM settings.
 - Storyboard edits persist after refresh.
 - Policy/claims warnings are visible before generation.

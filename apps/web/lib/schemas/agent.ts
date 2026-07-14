@@ -83,9 +83,98 @@ const reliableCameraPatterns = [
 const passiveFramingPattern =
   /\b(?:shows?|captures?|depicts?|features?|illuminates?|can be seen|is seen)\b/i;
 const visibleStoryBeatPattern =
-  /\b(?:foreground|background|behind (?:her|him|them|the)|enters? (?:the )?frame|exits? (?:the )?frame|walks? (?:away|out)|steps? (?:away|out)|rises?|stands? up|sits? down|reacts?|relaxes?|releases?|brightens?|recoils?|reveals?|unfolds?|opens?|closes?|topples?|spills?|drops?|lifts?|raises?|turns?|rotates?|slides?|crosses? (?:the )?frame|moves? into|moves? out of)\b/i;
+  /\b(?:foreground|background|behind (?:her|him|them|the)|enters? (?:the )?frame|exits? (?:the )?frame|walks? (?:away|out)|steps? (?:away|out)|rises?|stands? up|sits? down|reacts?|relaxes?|releases?|brightens?|recoils?|reveals?|unfolds?|opens?|closes?|topples?|spills?|drops?|lifts?|raises?|turns?|rotates?|slides?|crosses? (?:the )?frame|moves? into|moves? out of|pours?|streams?|bubbles?|steams?|sizzles?|sprays?|dispenses?|stacks?|assembles?|arranges?|packs?|unboxes?|peels?|snaps?|clicks?|locks?|glides?|rolls?|lands?|swirls?|curls?|tosses?|stirs?|writes?|draws?|types?|taps?|points?|guides?|demonstrates?|wipes?|polishes?|ripples?|blooms?)\b/i;
 const sequencePattern =
   /\b(?:then|afterward|afterwards|next|finally|followed by)\b/gi;
+
+const castMemberSchema = z.object({
+  role: z.string().trim().min(2).max(40),
+  recurrence: z.enum(["RECURRING", "SCENE_ONLY"]),
+  ageBand: z.string().trim().min(2).max(32),
+  referenceBasis: z.enum(["REFERENCE_BACKED", "FICTIONAL_CAST"]),
+  appearanceAnchors: z
+    .array(z.string().trim().min(2).max(48))
+    .min(3)
+    .max(5),
+  complexionOrHeritageAnchor: z.string().trim().min(2).max(72).nullable(),
+  wardrobeAnchor: z.string().trim().min(3).max(80),
+  distinguishingFeature: z.string().trim().min(8).max(140),
+});
+
+export const castPlanSchema = z
+  .object({
+    mode: z.enum(["NO_PEOPLE", "SINGLE_PERSON", "MULTI_PERSON"]),
+    members: z.array(castMemberSchema).max(4),
+  })
+  .superRefine((value, ctx) => {
+    const expected =
+      value.mode === "NO_PEOPLE"
+        ? [0, 0]
+        : value.mode === "SINGLE_PERSON"
+          ? [1, 1]
+          : [2, 4];
+
+    if (value.members.length < expected[0] || value.members.length > expected[1]) {
+      ctx.addIssue({
+        code: "custom",
+        message: `${value.mode} requires ${expected[0] === expected[1] ? expected[0] : `${expected[0]}-${expected[1]}`} cast members.`,
+        path: ["members"],
+      });
+    }
+
+    const roles = value.members.map((member) => member.role.toLowerCase());
+    if (new Set(roles).size !== roles.length) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Every cast member needs a unique role label.",
+        path: ["members"],
+      });
+    }
+
+    const signatures = value.members.map((member) =>
+      [
+        ...member.appearanceAnchors,
+        member.complexionOrHeritageAnchor ?? "",
+        member.wardrobeAnchor,
+        member.distinguishingFeature,
+      ]
+        .join("|")
+        .toLowerCase(),
+    );
+    if (new Set(signatures).size !== signatures.length) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Cast members need visibly distinct identity signatures.",
+        path: ["members"],
+      });
+    }
+
+    const tokenSets = signatures.map(
+      (signature) =>
+        new Set(
+          signature
+            .split(/[^a-z0-9]+/)
+            .filter((token) => token.length > 2),
+        ),
+    );
+    for (let left = 0; left < tokenSets.length; left += 1) {
+      for (let right = left + 1; right < tokenSets.length; right += 1) {
+        const a = tokenSets[left]!;
+        const b = tokenSets[right]!;
+        const intersection = [...a].filter((token) => b.has(token)).length;
+        const union = new Set([...a, ...b]).size;
+
+        if (union > 0 && intersection / union >= 0.65) {
+          ctx.addIssue({
+            code: "custom",
+            message:
+              "Cast identity signatures are too similar; vary physical appearance and silhouette/wardrobe anchors.",
+            path: ["members", right],
+          });
+        }
+      }
+    }
+  });
 
 function countReliableCameraBehaviors(value: string) {
   return reliableCameraPatterns.filter(([, pattern]) => pattern.test(value))
@@ -172,7 +261,8 @@ export const storyboardSchema = z
     }),
     continuityBible: z.object({
       product: z.string().min(6).max(700),
-      characters: z.string().min(6).max(700),
+      characters: z.string().min(20).max(500),
+      cast: castPlanSchema,
       visualWorld: z.string().min(6).max(700),
     }),
     scenes: z.array(storyboardSceneSchema).min(2).max(4),
@@ -227,10 +317,86 @@ export const storyboardJsonSchema = {
     continuityBible: {
       type: "object",
       additionalProperties: false,
-      required: ["product", "characters", "visualWorld"],
+      required: ["product", "characters", "cast", "visualWorld"],
       properties: {
         product: { type: "string", minLength: 6, maxLength: 700 },
-        characters: { type: "string", minLength: 6, maxLength: 700 },
+        characters: { type: "string", minLength: 20, maxLength: 500 },
+        cast: {
+          type: "object",
+          additionalProperties: false,
+          description:
+            "A domain-neutral cast plan. Use NO_PEOPLE for product, place, or abstract scenes with no people; do not add token humans. MULTI_PERSON members must be visibly distinct and keep stable role labels across scenes.",
+          required: ["mode", "members"],
+          properties: {
+            mode: {
+              type: "string",
+              enum: ["NO_PEOPLE", "SINGLE_PERSON", "MULTI_PERSON"],
+            },
+            members: {
+              type: "array",
+              minItems: 0,
+              maxItems: 4,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: [
+                  "role",
+                  "recurrence",
+                  "ageBand",
+                  "referenceBasis",
+                  "appearanceAnchors",
+                  "complexionOrHeritageAnchor",
+                  "wardrobeAnchor",
+                  "distinguishingFeature",
+                ],
+                properties: {
+                  role: { type: "string", minLength: 2, maxLength: 40 },
+                  recurrence: {
+                    type: "string",
+                    enum: ["RECURRING", "SCENE_ONLY"],
+                  },
+                  ageBand: { type: "string", minLength: 2, maxLength: 32 },
+                  referenceBasis: {
+                    type: "string",
+                    enum: ["REFERENCE_BACKED", "FICTIONAL_CAST"],
+                    description:
+                      "REFERENCE_BACKED means an uploaded/reference person must be matched without inferring ethnicity; FICTIONAL_CAST permits deliberate fictional casting.",
+                  },
+                  appearanceAnchors: {
+                    type: "array",
+                    minItems: 3,
+                    maxItems: 5,
+                    items: {
+                      type: "string",
+                      minLength: 2,
+                      maxLength: 48,
+                    },
+                  },
+                  complexionOrHeritageAnchor: {
+                    description:
+                      "Optional neutral skin-tone or broad ethnic-appearance anchor for fictional casting. For reference-backed people, use visible complexion only and never infer ethnicity.",
+                    anyOf: [
+                      { type: "string", minLength: 2, maxLength: 72 },
+                      { type: "null" },
+                    ],
+                  },
+                  wardrobeAnchor: {
+                    type: "string",
+                    minLength: 3,
+                    maxLength: 80,
+                  },
+                  distinguishingFeature: {
+                    type: "string",
+                    minLength: 8,
+                    maxLength: 140,
+                    description:
+                      "A stable feature that prevents this person from resembling other cast members; multi-person casts need a physical distinction plus a silhouette or wardrobe distinction.",
+                  },
+                },
+              },
+            },
+          },
+        },
         visualWorld: { type: "string", minLength: 6, maxLength: 700 },
       },
     },
@@ -284,7 +450,7 @@ export const storyboardPatchSchema = z.object({
   bgmEnabled: z.boolean().optional(),
   bgmPrompt: z.string().max(400).nullable().optional(),
   productContinuity: z.string().min(1).max(700).optional(),
-  characterContinuity: z.string().min(1).max(700).optional(),
+  characterContinuity: z.string().min(1).max(2400).optional(),
   visualContinuity: z.string().min(1).max(700).optional(),
   scenes: z
     .array(
@@ -654,6 +820,18 @@ function normalizeStoryboardScene(value: unknown, index: number) {
 
 function normalizeContinuityBible(value: unknown) {
   const record = asRecord(value) ?? {};
+  const characters = text(
+    record.characters ??
+      record.character ??
+      record.characterContinuity ??
+      record.character_continuity,
+    {
+      fallback:
+        "Keep recurring characters' identity, wardrobe, age, hair, and defining features stable across scenes.",
+      min: 20,
+      max: 500,
+    },
+  );
 
   return {
     product: text(
@@ -665,17 +843,10 @@ function normalizeContinuityBible(value: unknown) {
         max: 700,
       },
     ),
-    characters: text(
-      record.characters ??
-        record.character ??
-        record.characterContinuity ??
-        record.character_continuity,
-      {
-        fallback:
-          "Keep recurring characters' identity, wardrobe, age, hair, and defining features stable across scenes.",
-        min: 6,
-        max: 700,
-      },
+    characters,
+    cast: normalizeCastPlan(
+      record.cast ?? record.castPlan ?? record.cast_plan,
+      characters,
     ),
     visualWorld: text(
       record.visualWorld ??
@@ -691,6 +862,108 @@ function normalizeContinuityBible(value: unknown) {
       },
     ),
   };
+}
+
+function normalizeCastPlan(value: unknown, characterSummary: string) {
+  const record = asRecord(value);
+
+  if (!record) {
+    return /\bno (?:recurring )?(?:human )?(?:characters?|people)\b/i.test(
+      characterSummary,
+    )
+      ? { mode: "NO_PEOPLE", members: [] }
+      : { mode: "", members: [] };
+  }
+
+  const members = Array.isArray(record.members)
+    ? record.members.slice(0, 4).map((value) => {
+        const member = asRecord(value) ?? {};
+        const complexion =
+          member.complexionOrHeritageAnchor ??
+          member.complexion_or_heritage_anchor ??
+          member.skinTone ??
+          member.skin_tone ??
+          null;
+
+        return {
+          role: text(member.role ?? member.label ?? member.character, {
+            fallback: "",
+            min: 2,
+            max: 40,
+          }),
+          recurrence: normalizeEnum(
+            member.recurrence ?? member.persistence,
+            ["RECURRING", "SCENE_ONLY"] as const,
+          ),
+          ageBand: text(member.ageBand ?? member.age_band ?? member.age, {
+            fallback: "",
+            min: 2,
+            max: 32,
+          }),
+          referenceBasis: normalizeEnum(
+            member.referenceBasis ?? member.reference_basis ?? member.basis,
+            ["REFERENCE_BACKED", "FICTIONAL_CAST"] as const,
+          ),
+          appearanceAnchors: (Array.isArray(member.appearanceAnchors)
+            ? member.appearanceAnchors
+            : Array.isArray(member.appearance_anchors)
+              ? member.appearance_anchors
+              : []
+          )
+            .slice(0, 5)
+            .map((anchor) =>
+              text(anchor, { fallback: "", min: 2, max: 48 }),
+            ),
+          complexionOrHeritageAnchor:
+            complexion === null || complexion === undefined
+              ? null
+              : text(complexion, { fallback: "", min: 2, max: 72 }),
+          wardrobeAnchor: text(
+            member.wardrobeAnchor ?? member.wardrobe_anchor ?? member.wardrobe,
+            { fallback: "", min: 3, max: 80 },
+          ),
+          distinguishingFeature: text(
+            member.distinguishingFeature ??
+              member.distinguishing_feature ??
+              member.distinction,
+            { fallback: "", min: 8, max: 140 },
+          ),
+        };
+      })
+    : [];
+
+  const requestedMode = normalizeEnum(record.mode, [
+    "NO_PEOPLE",
+    "SINGLE_PERSON",
+    "MULTI_PERSON",
+  ] as const);
+  const inferredMode =
+    members.length === 0
+      ? "NO_PEOPLE"
+      : members.length === 1
+        ? "SINGLE_PERSON"
+        : "MULTI_PERSON";
+  const modeMatchesCount =
+    (requestedMode === "NO_PEOPLE" && members.length === 0) ||
+    (requestedMode === "SINGLE_PERSON" && members.length === 1) ||
+    (requestedMode === "MULTI_PERSON" && members.length >= 2);
+
+  return {
+    mode: modeMatchesCount ? requestedMode : inferredMode,
+    members,
+  };
+}
+
+function normalizeEnum<const T extends readonly string[]>(
+  value: unknown,
+  options: T,
+) {
+  const normalized = String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+  return (options as readonly string[]).includes(normalized) ? normalized : "";
 }
 
 function normalizeContinuityMode(value: unknown) {

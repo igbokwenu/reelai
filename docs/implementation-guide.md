@@ -506,6 +506,24 @@ export const StoryboardSchema = z.object({
     preset: z.string(),
     prompt: z.string(),
   }),
+  continuityBible: z.object({
+    product: z.string(),
+    characters: z.string(),
+    cast: z.object({
+      mode: z.enum(["NO_PEOPLE", "SINGLE_PERSON", "MULTI_PERSON"]),
+      members: z.array(z.object({
+        role: z.string(),
+        recurrence: z.enum(["RECURRING", "SCENE_ONLY"]),
+        ageBand: z.string(),
+        referenceBasis: z.enum(["REFERENCE_BACKED", "FICTIONAL_CAST"]),
+        appearanceAnchors: z.array(z.string()).min(3).max(5),
+        complexionOrHeritageAnchor: z.string().nullable(),
+        wardrobeAnchor: z.string(),
+        distinguishingFeature: z.string(),
+      })).max(4),
+    }),
+    visualWorld: z.string(),
+  }),
   scenes: z
     .array(
       z.object({
@@ -542,6 +560,9 @@ Implementation:
 - Claim each polling pass before contacting the provider. A failed scene must not stop healthy sibling tasks from polling, and transient provider/download errors must remain `WAITING_PROVIDER` until the bounded processing window expires.
 - Preflight every selected scene anchor before submitting any video task. Submit no closing-frame constraint and send only the stored one-sentence `shotPrompt` as positive prompt text.
 - Validate new shot directions as one 14–60 word mood-first sentence with one focal action arc, optional simple supporting motion in a separate depth plane, one visible story change, at most one motivated two-beat progression, exactly one reliable camera move, and a 5–10 second duration. Use at least two camera behaviors across a storyboard. Keep brand and continuity prose in anchor generation/reference chaining, not in the video prompt.
+- Choose a domain execution lane from verified offer evidence. Product-only and space-only concepts must not gain token people; software without verified UI must visualize the real-world consequence instead of fabricating screens; service/B2B work must use concrete behavior or artifacts rather than generic smiling meetings.
+- Require a structured cast plan. Multi-person cast members need unique role labels and identity signatures with at least one physical and one silhouette/wardrobe distinction. Optional fictional complexion or broad ethnic-appearance anchors must remain neutral; never infer ethnicity for a referenced person or connect protected traits to behavior.
+- Feed up to the two most recent generated anchors into later keyframe generation, subject to the three-reference limit, so recurring identities can return after a scene gap.
 - Treat anchors as an ordered dependency chain: shot/continuity changes invalidate the edited and downstream anchors/clips; timing-only changes invalidate only the current clip.
 - Expose a scene-level video retry for missing or failed clips. The retry creates a new take for only that scene and must not resubmit completed sibling scenes.
 - Store all generated files as `Artifact` rows after upload/download to OSS.

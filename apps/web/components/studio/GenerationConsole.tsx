@@ -338,7 +338,7 @@ export function GenerationConsole({
         />
         <ContinuityLock
           icon={UserRoundCheck}
-          label="Character identity"
+          label="Cast identities"
           text={storyboard.characterContinuity}
         />
         <ContinuityLock

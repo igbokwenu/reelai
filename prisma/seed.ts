@@ -161,7 +161,7 @@ async function main() {
       productContinuity:
         "Use the same clear glass cold-brew bottle, black label geometry, amber liquid level, and condensation treatment in every product appearance.",
       characterContinuity:
-        "Keep the same three-person creative team, their neutral workwear, hair, and accessories consistent across the office scenes.",
+        "Keep the same fictional three-person creative team across office scenes. Cast mode: MULTI_PERSON. Lead [adult early 30s]: dark brown skin, oval face, short coiled hair, tall lean build, oat overshirt, thin round glasses. Teammate A [adult early 30s]: light olive skin, square face, straight dark bob, shorter broad build, rust cardigan, silver watch. Teammate B [adult late 20s]: medium brown skin, heart-shaped face, long braids, athletic build, navy sweater, yellow earrings. Never merge faces, silhouettes, or wardrobe anchors.",
       visualContinuity:
         "Warm morning light from camera left, black/amber/oat palette, realistic 35mm lifestyle photography, and shallow depth of field throughout.",
       bgmEnabled: true,

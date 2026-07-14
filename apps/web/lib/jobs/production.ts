@@ -26,7 +26,7 @@ import {
 
 export const QWEN_KEYFRAME_IMAGE_MODEL = "wan2.7-image-pro";
 const VIDEO_NEGATIVE_PROMPT =
-  "deformed anatomy, extra limbs, duplicated subjects, morphing, warping, flicker, jitter, abrupt camera changes, frozen motion, text, logos, watermark";
+  "deformed anatomy, extra limbs, duplicated subjects, cloned faces, look-alike characters, identity swapping, morphing, warping, flicker, jitter, abrupt camera changes, frozen motion, text, logos, watermark";
 
 type ProductionScene = Scene & {
   takes: Take[];
@@ -449,7 +449,7 @@ async function runKeyframeJob(jobId: string) {
       job.projectId,
     );
     const created: Array<{ scene: ProductionScene; anchorTake: Take }> = [];
-    let previousAnchorReferenceUrl: string | null = null;
+    const recentAnchorReferenceUrls: string[] = [];
 
     for (const [index, scene] of scenes.entries()) {
       const previousScene = index > 0 ? scenes[index - 1]! : null;
@@ -459,15 +459,15 @@ async function runKeyframeJob(jobId: string) {
         kind: "KEYFRAME_START",
         prompt: buildKeyframePrompt(scene, previousScene),
         referenceImageUrls:
-          previousAnchorReferenceUrl &&
+          recentAnchorReferenceUrls.length > 0 &&
           scene.continuityMode !== "INTENTIONAL_CHANGE"
-            ? [previousAnchorReferenceUrl, ...groundingReferenceUrls].slice(
-                0,
-                3,
-              )
+            ? [
+                ...recentAnchorReferenceUrls.slice(-2).reverse(),
+                ...groundingReferenceUrls,
+              ].slice(0, 3)
             : groundingReferenceUrls,
       });
-      previousAnchorReferenceUrl = anchorTake.providerImageUrl;
+      recentAnchorReferenceUrls.push(anchorTake.providerImageUrl);
       created.push({ scene, anchorTake: anchorTake.take });
       const progress = await prisma.generationJob.updateMany({
         where: { id: job.id, status: "RUNNING" },
@@ -921,6 +921,7 @@ Character continuity: ${scene.storyboard.characterContinuity}
 Visual-world continuity: ${scene.storyboard.visualContinuity}
 Transition mode: ${scene.continuityMode}
 Scene continuity: ${scene.continuityNotes}
+Cast identity rule: treat every role in the cast ledger as a separate person. Preserve recurring face geometry, visible complexion, hair, build, age band, wardrobe, and distinguishing feature exactly. In multi-person frames, enforce different silhouettes and facial structures; never clone one face onto another body or merge identities. Respect an explicit fictional complexion/heritage anchor, but never infer ethnicity for a reference-backed person or use physical traits as personality shorthand.
 ${previousScene ? `Prior shot context for the handoff: ${previousScene.shotPrompt}` : "This is the story's establishing anchor and immediate hook."}
 ${scene.continuityMode === "INTENTIONAL_CHANGE" ? "Honor only the explicitly planned change; preserve every other locked identity and style attribute." : "Use supplied prior-scene imagery only to preserve identity, lighting, spatial logic, and screen direction; compose a distinct next shot rather than copying it."}
 Vertical 9:16, clean silhouette, stable anatomy and product geometry, commercial polish, no readable text or logos.`;

@@ -451,9 +451,9 @@ export function StoryboardTimeline({
                   Continuity bible
                 </div>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  These invariants are injected into every keyframe and motion
-                  prompt. Scene-level intentional changes override only what the
-                  plot requires.
+                  These invariants guide every scene anchor; video prompts stay
+                  focused on motion. Scene-level intentional changes override
+                  only what the plot requires.
                 </p>
               </div>
               <span className="w-fit rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
@@ -469,7 +469,8 @@ export function StoryboardTimeline({
               />
               <ContinuityField
                 icon={UserRoundCheck}
-                label="Character lock"
+                label="Cast & character lock"
+                maxLength={2400}
                 value={draft.characterContinuity}
                 onChange={(value) =>
                   updateDraft({ characterContinuity: value })
@@ -644,11 +645,13 @@ function ConceptNorthStar({
 function ContinuityField({
   icon: Icon,
   label,
+  maxLength = 700,
   value,
   onChange,
 }: {
   icon: typeof PackageCheck;
   label: string;
+  maxLength?: number;
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -660,12 +663,12 @@ function ContinuityField({
       </span>
       <textarea
         className="min-h-28 resize-y border-0 bg-transparent text-xs leading-5 text-muted-foreground outline-none"
-        maxLength={700}
+        maxLength={maxLength}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
       <span className="text-right text-[10px] text-muted-foreground">
-        {value.length}/700
+        {value.length}/{maxLength}
       </span>
     </label>
   );

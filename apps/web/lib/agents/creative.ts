@@ -533,6 +533,10 @@ async function saveStoryboard({
   if (existing) {
     await prisma.scene.deleteMany({ where: { storyboardId: existing.id } });
   }
+  const characterContinuity = formatCharacterContinuity(
+    output.continuityBible.characters,
+    output.continuityBible.cast,
+  );
 
   const storyboard = await prisma.storyboard.upsert({
     where: { projectId },
@@ -543,7 +547,7 @@ async function saveStoryboard({
       bgmEnabled: output.bgm.enabled,
       bgmPrompt: `${output.bgm.preset}: ${output.bgm.prompt}`,
       productContinuity: output.continuityBible.product,
-      characterContinuity: output.continuityBible.characters,
+      characterContinuity,
       visualContinuity: output.continuityBible.visualWorld,
       status: "DRAFT",
       scenes: {
@@ -567,7 +571,7 @@ async function saveStoryboard({
       bgmEnabled: output.bgm.enabled,
       bgmPrompt: `${output.bgm.preset}: ${output.bgm.prompt}`,
       productContinuity: output.continuityBible.product,
-      characterContinuity: output.continuityBible.characters,
+      characterContinuity,
       visualContinuity: output.continuityBible.visualWorld,
       status: "DRAFT",
       scenes: {
@@ -587,6 +591,24 @@ async function saveStoryboard({
   });
 
   return storyboard;
+}
+
+function formatCharacterContinuity(
+  summary: StoryboardOutput["continuityBible"]["characters"],
+  cast: StoryboardOutput["continuityBible"]["cast"],
+) {
+  if (cast.mode === "NO_PEOPLE") {
+    return `${summary} Cast mode: NO_PEOPLE; do not add token background people.`;
+  }
+
+  const ledger = cast.members.map((member) => {
+    const complexion = member.complexionOrHeritageAnchor
+      ? `; complexion/heritage anchor: ${member.complexionOrHeritageAnchor}`
+      : "";
+    return `${member.role} [${member.recurrence}, ${member.ageBand}, ${member.referenceBasis}]: ${member.appearanceAnchors.join(", ")}; wardrobe: ${member.wardrobeAnchor}; distinguishing feature: ${member.distinguishingFeature}${complexion}`;
+  });
+
+  return `${summary} Cast mode: ${cast.mode}. Cast ledger — ${ledger.join(" | ")}`;
 }
 
 async function createPreviewFrameArtifact({
@@ -953,7 +975,20 @@ Requirements:
 - Do not drift into a different concept, a generic ad, or a list of disconnected scenes.
 - Voiceover text must be 600 characters or less per scene.
 - Each scene needs a caption, voiceover, one shotPrompt, and engine-only continuity metadata.
-- Build a continuityBible before the scenes. Separately lock recurring product attributes, recurring character identity/wardrobe, and the shared visual world. If a category is absent, explicitly say that no recurring product or character is required.
+- Build a continuityBible before the scenes. Separately lock recurring product attributes, a structured cast plan, and the shared visual world. If a category is absent, explicitly say so rather than inventing a product or token people.
+- Select the execution lane that fits the verified offer; do not default every business to a stressed-person / relieved-person service story:
+  - PEOPLE_OR_SERVICE: use behavior, blocking, reaction, trust, access, or transfer of responsibility.
+  - PRODUCT_RETAIL_OR_FOOD: use tactile handling, packaging geometry, material response, preparation, scale, texture, or a clean use-result reveal.
+  - SOFTWARE_OR_DIGITAL: with verified interface references, use one readable device interaction; without them, show the physical human or workflow consequence and reserve UI/text for compositing.
+  - PLACE_HOSPITALITY_OR_PROPERTY: use entry, spatial reveal, foreground wipes, doors/curtains, guest or staff movement, light, or atmosphere without an empty-room slideshow.
+  - EXPERTISE_B2B_OR_EDUCATION: use a concrete artifact, demonstration, decision, annotation, assembly, or visible workflow progression instead of generic meetings and handshakes.
+  - CREATOR_EVENT_OR_ABSTRACT_BRAND: use performance, process, rhythm, materials, practical visual metaphor, or environmental change grounded in the concept.
+- Across every lane, derive visual interest from what the offer actually does. Do not add people to a product/space shot merely to make it feel active, and do not force product spins into human-service stories.
+- continuityBible.cast is mandatory. Use NO_PEOPLE with zero members, SINGLE_PERSON with one member, or MULTI_PERSON with two to four members. Include every visible person who needs stable or distinct identity, including scene-only supporting characters.
+- Every cast member needs a unique role label, age band, reference basis, three to five stable appearance anchors, one wardrobe anchor, and a distinguishing feature. Reuse the exact role label in shotPrompt and continuityNotes.
+- For MULTI_PERSON casts—especially characters with similar age or gender presentation—give each person at least one physical distinction (for example face shape, hair texture/style, facial hair, build, height, freckles, glasses, or mobility aid) plus one silhouette/wardrobe distinction. Do not rely on clothing color alone, and never use near-duplicate faces.
+- complexionOrHeritageAnchor is optional. For FICTIONAL_CAST, it may use a neutral skin-tone or broad ethnic-appearance description when useful for clear, inclusive casting. For REFERENCE_BACKED people, describe visible complexion only and never infer ethnicity from a name, job, website, or location. Never connect ethnicity or physical traits to personality, ability, social status, or stereotyped behavior.
+- Preserve each recurring person's face geometry, complexion, hair, build, age band, wardrobe anchor, and distinguishing feature unchanged across anchors. A scene-only supporting person must remain distinct within that shot but must not silently replace a recurring role later.
 - Set continuityMode on every scene: CONTINUOUS for a seamless handoff, MATCH_CUT when the composition/action intentionally bridges from the prior scene, or INTENTIONAL_CHANGE only when the plot requires a different character, location, time, or visual world.
 - shotPrompt is the only creative direction sent to video generation. It must be exactly one substantive sentence of 14 to 60 words: begin with a specific mood/emotional anchor, identify the focal subject, describe a visible story beat, and specify exactly one camera behavior.
 - Use only one reliable camera behavior per shot: fixed camera, slow push-in, slow pull-back, gentle product orbit, or handheld follow. Never combine pan, tilt, zoom, dolly, orbit, rack focus, or handheld movement in one scene.
@@ -973,6 +1008,7 @@ Requirements:
 - A CONTINUOUS or MATCH_CUT scene must name the invariant product, character, wardrobe, palette, lighting, and spatial details it inherits from the previous scene. INTENTIONAL_CHANGE must name exactly what changes and what still remains visually consistent.
 - Do not design or request a closing image. The engine derives one high-resolution opening anchor from shotPrompt and animates from that image.
 - For every scene after the first, use continuityNotes to define how the next anchor inherits identity, screen direction, position, scale, eyeline, lighting, and dominant color from the prior scene. Keep this metadata out of shotPrompt.
+- When two or more people share a frame, continuityNotes must map each cast role to a separate screen position/depth plane and repeat the distinguishing anchors needed to prevent face or silhouette cloning.
 - Preserve screen direction and the 180-degree line unless continuityMode explicitly calls for an intentional change. Avoid jump cuts caused by near-identical framing; vary shot size deliberately while retaining identity and spatial logic.
 - Prompts must keep product and character identity stable and respect the locked brand style unless INTENTIONAL_CHANGE explicitly justifies the difference.
 - Use the brand palette colors and visual motifs in scene descriptions.

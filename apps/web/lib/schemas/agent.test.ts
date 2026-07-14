@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  castPlanSchema,
   creativeConceptRegenerationInputSchema,
   creativeConceptRegenerationJsonSchema,
   creativeConceptsSchema,
@@ -12,6 +13,26 @@ import {
   storyboardSceneSchema,
   storyboardSchema,
 } from "./agent";
+
+const founderCast = {
+  mode: "SINGLE_PERSON",
+  members: [
+    {
+      role: "founder",
+      recurrence: "RECURRING",
+      ageBand: "adult in their 30s",
+      referenceBasis: "FICTIONAL_CAST",
+      appearanceAnchors: [
+        "angular face",
+        "short coiled hair",
+        "tall lean build",
+      ],
+      complexionOrHeritageAnchor: "deep brown skin",
+      wardrobeAnchor: "oat overshirt over a black tee",
+      distinguishingFeature: "thin round glasses and a narrow jawline",
+    },
+  ],
+};
 
 describe("Phase 4 agent schemas", () => {
   it("requires exactly three creative concepts", () => {
@@ -77,6 +98,7 @@ describe("Phase 4 agent schemas", () => {
             "Keep the same product shape, finish, proportions, and color.",
           characters:
             "Keep the same cast, wardrobe, hair, and defining features.",
+          cast: founderCast,
           visualWorld:
             "Keep warm side light, a restrained palette, and the same lens language.",
         },
@@ -98,6 +120,7 @@ describe("Phase 4 agent schemas", () => {
             "Keep the same product shape, finish, proportions, and color.",
           characters:
             "Keep the same cast, wardrobe, hair, and defining features.",
+          cast: founderCast,
           visualWorld:
             "Keep warm side light, a restrained palette, and the same lens language.",
         },
@@ -231,6 +254,15 @@ describe("Phase 4 agent schemas", () => {
         mood: "warm pulse",
         description: "Light upbeat background bed.",
       },
+      continuity_bible: {
+        product:
+          "Keep the same recurring product geometry and finish across scenes.",
+        characters:
+          "Keep the fictional founder's identity and wardrobe stable across scenes.",
+        cast_plan: founderCast,
+        visual_world:
+          "Keep warm morning light and the same restrained studio palette.",
+      },
       storyboard_scenes: [scene(1), scene(2), scene(3)],
     });
 
@@ -241,6 +273,7 @@ describe("Phase 4 agent schemas", () => {
     );
     expect(parsed.bgm.preset).toBe("warm pulse");
     expect(parsed.continuityBible.product).toContain("recurring product");
+    expect(parsed.continuityBible.cast.mode).toBe("SINGLE_PERSON");
     expect(parsed.scenes[0]?.continuityMode).toBe("CONTINUOUS");
   });
 
@@ -285,6 +318,101 @@ describe("Phase 4 agent schemas", () => {
     expect(scenes.items.required).toContain("continuityMode");
     expect(scenes.items.properties.continuityNotes.minLength).toBe(6);
     expect(storyboardJsonSchema.required).toContain("continuityBible");
+    expect(
+      storyboardJsonSchema.properties.continuityBible.required,
+    ).toContain("cast");
+  });
+
+  it("requires unique cast identities without forcing people into every ad", () => {
+    expect(
+      castPlanSchema.safeParse({ mode: "NO_PEOPLE", members: [] }).success,
+    ).toBe(true);
+
+    const shared = {
+      recurrence: "RECURRING",
+      ageBand: "adults in their 30s",
+      referenceBasis: "FICTIONAL_CAST",
+      appearanceAnchors: [
+        "oval face",
+        "shoulder-length curls",
+        "medium build",
+      ],
+      complexionOrHeritageAnchor: "warm brown skin",
+      wardrobeAnchor: "navy work jacket",
+      distinguishingFeature: "rectangular glasses and a dimpled chin",
+    };
+    const distinctCast = {
+      mode: "MULTI_PERSON",
+      members: [
+        { ...shared, role: "designer" },
+        {
+          ...shared,
+          role: "client",
+          appearanceAnchors: [
+            "square face",
+            "close-cropped straight hair",
+            "short broad build",
+          ],
+          complexionOrHeritageAnchor: "light olive skin",
+          wardrobeAnchor: "rust cardigan with a silver watch",
+          distinguishingFeature: "strong brows and a small cheek scar",
+        },
+      ],
+    };
+
+    expect(castPlanSchema.safeParse(distinctCast).success).toBe(true);
+    expect(
+      castPlanSchema.safeParse({
+        ...distinctCast,
+        members: [
+          distinctCast.members[0],
+          { ...distinctCast.members[0], role: "client" },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      castPlanSchema.safeParse({
+        ...distinctCast,
+        members: [
+          distinctCast.members[0],
+          {
+            ...distinctCast.members[0],
+            role: "client",
+            appearanceAnchors: [
+              "oval face",
+              "shoulder-length curls",
+              "slim medium build",
+            ],
+            wardrobeAnchor: "navy work blazer",
+            distinguishingFeature: "rectangular glasses and a dimpled jaw",
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts interesting single-shot motion across non-service domains", () => {
+    const base = {
+      index: 1,
+      durationSec: 6,
+      captionText: "One clean beat",
+      voiceoverText: "A concise narration line for this scene.",
+      continuityNotes: "Preserve the established subject and visual world.",
+      continuityMode: "CONTINUOUS" as const,
+    };
+    const prompts = [
+      "Sensory anticipation: amber sauce pours across the plated dish while steam curls through the foreground as the camera slowly pushes in.",
+      "Expansive calm: sheer curtains glide apart to reveal the ocean-facing suite while the camera slowly pulls back through the doorway.",
+      "Practical clarity: an architect slides the marked drawing into the foreground while a fixed camera holds the scale model behind it.",
+      "Confident control: a founder taps one verified dashboard control while the device moves into the foreground as the camera slowly pushes in.",
+      "Tactile craft: the artisan unfolds the finished textile across the workbench while a fixed camera holds its changing pattern geometry.",
+    ];
+
+    for (const shotPrompt of prompts) {
+      expect(
+        storyboardSceneSchema.safeParse({ ...base, shotPrompt }).success,
+      ).toBe(true);
+    }
   });
 
   it("allows controlled supporting motion while rejecting banal or overloaded directions", () => {
