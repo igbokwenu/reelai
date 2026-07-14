@@ -127,7 +127,12 @@ export function sanitizeTtsFailure(error: unknown) {
     return error.message;
   }
 
-  if (error instanceof Error && /^Scene \d+:/.test(error.message)) {
+  if (
+    error instanceof Error &&
+    /^(?:Scene \d+:|Provider narration audio|TTS WAV|TTS returned|At least one WAV)/.test(
+      error.message,
+    )
+  ) {
     return error.message;
   }
 

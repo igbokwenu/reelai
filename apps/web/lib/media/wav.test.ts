@@ -23,6 +23,14 @@ describe("WAV timing", () => {
     expect(waveform).toHaveLength(12);
     expect(waveform.every((value) => value === 0.04)).toBe(true);
   });
+
+  it("accepts Qwen streaming WAV placeholder lengths", () => {
+    const wav = makeWav(24_000, 1);
+    wav.writeUInt32LE(0x7fffffbf, 4);
+    wav.writeUInt32LE(0x7fffff9b, 40);
+
+    expect(parseWav(wav).durationSec).toBe(1);
+  });
 });
 
 function makeWav(sampleRate: number, durationSec: number) {

@@ -31,6 +31,15 @@ export function parseWav(buffer: Buffer): ParsedWav {
     const chunkEnd = chunkStart + chunkSize;
 
     if (chunkEnd > buffer.length) {
+      // Qwen's streaming WAV output uses a large placeholder size in the RIFF
+      // and data headers because the final length is not known when synthesis
+      // begins. Once downloaded, the end of the file is the authoritative end
+      // of the data chunk.
+      if (chunkId === "data" && chunkStart < buffer.length) {
+        data = buffer.subarray(chunkStart);
+        break;
+      }
+
       throw new Error("TTS WAV contains an invalid chunk length.");
     }
 
