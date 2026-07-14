@@ -27,6 +27,7 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - A recommended Production story flow auto-selects the newest coherent anchor and clip, keeps older anchors, legacy closing frames, and clips as optional history, and exposes only the single shot sentence for inline tuning with downstream dependency invalidation.
 - Wan 2.7 scene video generation receives the approved shot sentence verbatim plus the anchor image. Artifact avoidance lives in the dedicated negative-prompt field, and prompt rewriting stays disabled so the provider cannot expand one action into a mangled compound shot.
 - Remotion uses clean direct scene cuts rather than fading every clip in from black, preserving continuous and match-cut handoffs in the stitched output.
+- Render media is read through Reel AI's same-origin, byte-range-aware artifact endpoint and decoded with Remotion Media. This avoids downloading an entire OSS clip for every frame, tolerates slower remote storage with bounded retries and a 120-second media timeout, and limits render concurrency to keep local exports stable.
 - Qwen TTS narration is generated and stored per scene. Reel AI measures the real WAV duration, gives each line a short lead-in/tail, applies at most a natural 1.20× fit, rejects overlong copy instead of clipping it, and ducks BGM beneath speech. Silent scenes remain silent, while legacy one-track narration stays render-compatible.
 - Final renders place the latest uploaded logo, or a directly verified website logo asset—not an AI recreation—over the last scene with a short animated brand lockup; the business name remains the fallback when no logo asset is available.
 - Remotion final render path for 9:16 MP4 export.
@@ -72,6 +73,8 @@ Existing storyboards remain generatable after migration. Their former motion bri
 Scene-timed narration adds the nullable `Scene.narrationArtifactId` link. Existing audio and renders are preserved, but a local checkout must stop `pnpm dev`, run `pnpm db:migrate` once, and restart `pnpm dev`. Then click **Generate Scene Narration** before the next render to replace any legacy project-wide track with measured scene clips. No seed is required.
 
 The domain-neutral creative grammar, structured cast planning, richer motion-hierarchy guardrails, recent-anchor identity recovery, and last-scene logo lockup are application-only changes. Existing databases and artifacts remain compatible; restart `pnpm dev` after pulling them, with no additional migration or seed command.
+
+The range-aware render media path is also application-only. Run `pnpm install` to install the Remotion Media dependency, then restart `pnpm dev`; no database migration or seed is required.
 
 The seed creates:
 

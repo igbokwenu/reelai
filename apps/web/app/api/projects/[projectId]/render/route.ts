@@ -16,7 +16,9 @@ const renderRequestSchema = z.object({
 export async function POST(request: Request, context: RouteContext) {
   return handleRoute(async () => {
     const { projectId } = await context.params;
-    const body = renderRequestSchema.parse(await request.json().catch(() => ({})));
+    const body = renderRequestSchema.parse(
+      await request.json().catch(() => ({})),
+    );
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       select: { id: true },
@@ -28,6 +30,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     const job = await createAndRunFinalRenderJob({
       projectId,
+      artifactBaseUrl: new URL(request.url).origin,
       aiDisclosureEnabled: body.aiDisclosureEnabled,
       bgmEnabled: body.bgmEnabled,
     });

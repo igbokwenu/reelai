@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { fetchWithRetry } from "@/lib/http/fetch-with-retry";
+
 const localArtifactRoot = path.join(process.cwd(), ".data", "artifacts");
 
 export type StoredObject = {
@@ -143,15 +145,25 @@ async function uploadToOss({
     .digest("base64");
   const url = `https://${bucket}.${region}.aliyuncs.com/${key}`;
 
-  const response = await fetch(url, {
-    method: "PUT",
-    headers: {
-      Authorization: `OSS ${accessKeyId}:${signature}`,
-      "Content-Type": mimeType,
-      Date: date,
-    },
-    body: new Uint8Array(body),
-  });
+  let response: Response;
+
+  try {
+    response = await fetchWithRetry(
+      url,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `OSS ${accessKeyId}:${signature}`,
+          "Content-Type": mimeType,
+          Date: date,
+        },
+        body: new Uint8Array(body),
+      },
+      { attempts: 3, baseDelayMs: 750 },
+    );
+  } catch {
+    throw new Error("OSS upload failed after three network attempts.");
+  }
 
   if (!response.ok) {
     throw new Error(`OSS upload failed with status ${response.status}`);

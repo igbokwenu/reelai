@@ -18,7 +18,12 @@ export type RenderedReel = {
   durationSec: number;
 };
 
-export async function renderReel(input: ReelCompositionInput): Promise<RenderedReel> {
+const RENDER_MEDIA_TIMEOUT_MS = 120_000;
+const RENDER_CONCURRENCY = 2;
+
+export async function renderReel(
+  input: ReelCompositionInput,
+): Promise<RenderedReel> {
   const [{ bundle }, { renderMedia, renderStill, selectComposition }] =
     await Promise.all([
       runtimeImport<typeof import("@remotion/bundler")>("@remotion/bundler"),
@@ -34,6 +39,7 @@ export async function renderReel(input: ReelCompositionInput): Promise<RenderedR
     serveUrl,
     id: "ReelComposition",
     inputProps: input,
+    timeoutInMilliseconds: RENDER_MEDIA_TIMEOUT_MS,
   });
   const workDir = path.join(
     os.tmpdir(),
@@ -56,6 +62,8 @@ export async function renderReel(input: ReelCompositionInput): Promise<RenderedR
       inputProps: input,
       outputLocation,
       serveUrl,
+      timeoutInMilliseconds: RENDER_MEDIA_TIMEOUT_MS,
+      concurrency: RENDER_CONCURRENCY,
     });
     await renderStill({
       composition: {
@@ -70,6 +78,7 @@ export async function renderReel(input: ReelCompositionInput): Promise<RenderedR
       inputProps: input,
       output: thumbnailLocation,
       serveUrl,
+      timeoutInMilliseconds: RENDER_MEDIA_TIMEOUT_MS,
     });
 
     return {

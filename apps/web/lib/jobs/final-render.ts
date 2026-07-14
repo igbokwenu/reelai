@@ -73,10 +73,12 @@ export async function createAndRunNarrationJob(projectId: string) {
 
 export async function createAndRunFinalRenderJob({
   projectId,
+  artifactBaseUrl,
   aiDisclosureEnabled = true,
   bgmEnabled = false,
 }: {
   projectId: string;
+  artifactBaseUrl: string;
   aiDisclosureEnabled?: boolean;
   bgmEnabled?: boolean;
 }) {
@@ -88,6 +90,7 @@ export async function createAndRunFinalRenderJob({
     projectId,
     storyboard,
     narration,
+    artifactBaseUrl,
     aiDisclosureEnabled,
     bgmEnabled,
   });
@@ -476,12 +479,14 @@ async function buildReelCompositionInput({
   projectId,
   storyboard,
   narration,
+  artifactBaseUrl,
   aiDisclosureEnabled,
   bgmEnabled,
 }: {
   projectId: string;
   storyboard: StoryboardWithScenes;
   narration: RenderNarration;
+  artifactBaseUrl: string;
   aiDisclosureEnabled: boolean;
   bgmEnabled: boolean;
 }): Promise<ReelCompositionInput> {
@@ -502,7 +507,7 @@ async function buildReelCompositionInput({
     });
 
     scenes.push({
-      videoUrl: artifactUrl(artifact),
+      videoUrl: artifactUrl(artifact, artifactBaseUrl),
       captionText: scene.captionText,
       startTimeSec,
       durationSec: scene.durationSec,
@@ -510,6 +515,7 @@ async function buildReelCompositionInput({
         ? {
             audioUrl: artifactUrl(
               narration.sceneNarrations.get(scene.id)!.artifact,
+              artifactBaseUrl,
             ),
             sourceDurationSec: narration.sceneNarrations.get(scene.id)!.timing
               .sourceDurationSec,
@@ -545,7 +551,9 @@ async function buildReelCompositionInput({
         orderBy: { createdAt: "desc" },
       })
     : null;
-  const uploadedLogoUrl = logoArtifact ? artifactUrl(logoArtifact) : null;
+  const uploadedLogoUrl = logoArtifact
+    ? artifactUrl(logoArtifact, artifactBaseUrl)
+    : null;
   const verifiedWebsiteLogoUrl = uploadedLogoUrl
     ? null
     : await findVerifiedWebsiteLogoUrl(project.websiteUrl);
@@ -554,9 +562,9 @@ async function buildReelCompositionInput({
   return {
     scenes,
     narrationUrl: narration.legacyArtifact
-      ? artifactUrl(narration.legacyArtifact)
+      ? artifactUrl(narration.legacyArtifact, artifactBaseUrl)
       : undefined,
-    bgmUrl: bgm ? artifactUrl(bgm) : undefined,
+    bgmUrl: bgm ? artifactUrl(bgm, artifactBaseUrl) : undefined,
     brandWatermark: {
       text: project.businessName,
       logoUrl: uploadedLogoUrl ?? verifiedWebsiteLogoUrl ?? undefined,
@@ -670,20 +678,8 @@ function asRecord(value: unknown) {
     : null;
 }
 
-function artifactUrl(artifact: Artifact) {
-  if (artifact.publicUrl?.startsWith("http")) {
-    return artifact.publicUrl;
-  }
-
-  const publicAppUrl = process.env.PUBLIC_APP_URL;
-
-  if (publicAppUrl && !publicAppUrl.toLowerCase().includes("placeholder")) {
-    return `${publicAppUrl.replace(/\/$/, "")}/api/artifacts/${artifact.id}/file`;
-  }
-
-  throw new Error(
-    "PUBLIC_APP_URL must be configured so the renderer can read durable artifacts.",
-  );
+function artifactUrl(artifact: Artifact, artifactBaseUrl: string) {
+  return `${artifactBaseUrl.replace(/\/$/, "")}/api/artifacts/${artifact.id}/file`;
 }
 
 async function getOrCreateSampleBgmArtifact(projectId: string) {

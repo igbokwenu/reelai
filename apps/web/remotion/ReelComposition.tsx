@@ -1,10 +1,10 @@
 "use client";
 
+import { Video } from "@remotion/media";
 import {
   AbsoluteFill,
   Audio,
   interpolate,
-  OffthreadVideo,
   Sequence,
   spring,
   staticFile,
@@ -126,12 +126,14 @@ function SceneLayer({
 
   return (
     <AbsoluteFill>
-      <OffthreadVideo
+      <Video
+        delayRenderRetries={2}
+        delayRenderTimeoutInMilliseconds={120_000}
         muted
+        objectFit="cover"
         src={scene.videoUrl}
         style={{
           height: "100%",
-          objectFit: "cover",
           width: "100%",
         }}
       />
