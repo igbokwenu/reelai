@@ -6,11 +6,10 @@ import { qwenEndpoint } from "@/lib/qwen/endpoints";
 import { QWEN_TTS_MAX_CHARS, chunkTtsText } from "@/lib/qwen/tts-chunking";
 
 export const QWEN_TTS_MODEL = "qwen3-tts-flash";
-export const QWEN_TTS_NATIVE_BASE_URL =
-  qwenEndpoint(
-    process.env.QWEN_TTS_BASE_URL,
-    "https://dashscope-intl.aliyuncs.com/api/v1",
-  );
+export const QWEN_TTS_NATIVE_BASE_URL = qwenEndpoint(
+  process.env.QWEN_TTS_BASE_URL,
+  "https://dashscope-intl.aliyuncs.com/api/v1",
+);
 
 type TtsResult = {
   audioUrl: string;
@@ -90,7 +89,9 @@ export async function synthesizeSpeechWithQwen({
   }
 
   const data = (await response.json()) as {
-    output?: { audio?: { url?: string; format?: string; sample_rate?: number } };
+    output?: {
+      audio?: { url?: string; format?: string; sample_rate?: number };
+    };
     usage?: unknown;
   };
   const audio = data.output?.audio;
@@ -123,6 +124,10 @@ export async function synthesizeSpeechWithQwen({
 
 export function sanitizeTtsFailure(error: unknown) {
   if (error instanceof QwenTtsError) {
+    return error.message;
+  }
+
+  if (error instanceof Error && /^Scene \d+:/.test(error.message)) {
     return error.message;
   }
 

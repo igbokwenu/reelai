@@ -1,6 +1,6 @@
 # Reel AI Implementation Guide
 
-Updated: July 5, 2026
+Updated: July 14, 2026
 
 This is the build contract for Reel AI. When implementation agents need to choose between options, follow this guide first, then `docs/reel-ai-blueprint.md`, then the QwenCloud docs in `docs/qwencloud-reference-links.md`.
 
@@ -511,16 +511,20 @@ export const StoryboardSchema = z.object({
     characters: z.string(),
     cast: z.object({
       mode: z.enum(["NO_PEOPLE", "SINGLE_PERSON", "MULTI_PERSON"]),
-      members: z.array(z.object({
-        role: z.string(),
-        recurrence: z.enum(["RECURRING", "SCENE_ONLY"]),
-        ageBand: z.string(),
-        referenceBasis: z.enum(["REFERENCE_BACKED", "FICTIONAL_CAST"]),
-        appearanceAnchors: z.array(z.string()).min(3).max(5),
-        complexionOrHeritageAnchor: z.string().nullable(),
-        wardrobeAnchor: z.string(),
-        distinguishingFeature: z.string(),
-      })).max(4),
+      members: z
+        .array(
+          z.object({
+            role: z.string(),
+            recurrence: z.enum(["RECURRING", "SCENE_ONLY"]),
+            ageBand: z.string(),
+            referenceBasis: z.enum(["REFERENCE_BACKED", "FICTIONAL_CAST"]),
+            appearanceAnchors: z.array(z.string()).min(3).max(5),
+            complexionOrHeritageAnchor: z.string().nullable(),
+            wardrobeAnchor: z.string(),
+            distinguishingFeature: z.string(),
+          }),
+        )
+        .max(4),
     }),
     visualWorld: z.string(),
   }),
@@ -672,7 +676,14 @@ type ReelCompositionInput = {
     captionText: string;
     startTimeSec: number;
     durationSec: number;
+    narration?: {
+      audioUrl: string;
+      offsetSec: number;
+      playbackRate: number;
+      sourceDurationSec: number;
+    };
   }>;
+  // Backward compatibility for renders created before scene-timed narration.
   narrationUrl?: string;
   bgmUrl?: string;
   brandWatermark?: {
@@ -936,12 +947,15 @@ Exit checklist:
 
 - [ ] Narration is generated from scene voiceover text.
 - [ ] TTS chunks respect model text limits.
-- [ ] Narration audio is stored as an `Artifact`.
+- [ ] Narration audio is stored as a durable `Artifact` per non-silent scene.
+- [ ] Real WAV duration is measured and every audio window ends inside its owning scene.
+- [ ] Timing correction never exceeds 1.20×; overlong copy fails with scene-specific guidance instead of clipping.
 - [ ] UI shows narration status and waveform/metadata.
 - [ ] Final render combines selected scene videos in order.
 - [ ] Captions are visible and safe-zone-aware.
 - [ ] AI disclosure can be toggled and defaults on for export.
 - [ ] Optional BGM can be disabled or included.
+- [ ] Included BGM ducks beneath scene narration and returns smoothly between lines.
 - [ ] Final MP4 is stored in OSS as `FINAL_RENDER`.
 - [ ] User can play and download the final reel.
 - [ ] Manual demo path works end to end for a 15 to 30 second reel.

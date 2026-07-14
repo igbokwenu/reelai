@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BGM_BASE_VOLUME,
+  BGM_DUCKED_VOLUME,
+  getBgmVolume,
   getBrandWatermarkWindow,
+  getSceneNarrationWindow,
   type ReelCompositionInput,
 } from "./schema";
 
@@ -46,5 +50,36 @@ describe("brand watermark timing", () => {
         30,
       ),
     ).toEqual({ from: 0, durationInFrames: 420 });
+  });
+});
+
+describe("scene narration timing", () => {
+  const input: ReelCompositionInput = {
+    ...baseInput,
+    bgmUrl: "https://assets.example/music.wav",
+    scenes: [
+      {
+        ...baseInput.scenes[0],
+        narration: {
+          audioUrl: "https://assets.example/scene-1.wav",
+          offsetSec: 0.16,
+          playbackRate: 1,
+          sourceDurationSec: 4,
+        },
+      },
+      baseInput.scenes[1],
+    ],
+  };
+
+  it("locks the audio window to its owning scene", () => {
+    expect(getSceneNarrationWindow(input.scenes[0], 30)).toEqual({
+      from: 5,
+      durationInFrames: 120,
+    });
+  });
+
+  it("ducks BGM only while narration is active", () => {
+    expect(getBgmVolume(input, 60, 30)).toBe(BGM_DUCKED_VOLUME);
+    expect(getBgmVolume(input, 170, 30)).toBe(BGM_BASE_VOLUME);
   });
 });

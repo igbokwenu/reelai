@@ -1,6 +1,6 @@
 # Reel AI
 
-Reel AI is an AI showrunner studio for short-form business ads and story-led social videos. It takes a business website and optional brand materials, builds a reusable Brand Kit, pitches three distinct creative concepts, creates an editable storyboard, generates QwenCloud-powered keyframes/video/narration, and exports a vertical 9:16 reel with captions, safe zones, optional BGM, and AI disclosure.
+Reel AI is an AI showrunner studio for short-form business ads and story-led social videos. It takes a business website and optional brand materials, builds a reusable Brand Kit, pitches three distinct creative concepts, creates an editable storyboard, generates QwenCloud-powered keyframes/video/scene-timed narration, and exports a vertical 9:16 reel with captions, safe zones, optional BGM, and AI disclosure.
 
 The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The repo is intentionally public-submission friendly: no committed secrets, visible server-side QwenCloud usage, reproducible Docker deployment, and a judging checklist.
 
@@ -27,6 +27,7 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - A recommended Production story flow auto-selects the newest coherent anchor and clip, keeps older anchors, legacy closing frames, and clips as optional history, and exposes only the single shot sentence for inline tuning with downstream dependency invalidation.
 - Wan 2.7 scene video generation receives the approved shot sentence verbatim plus the anchor image. Artifact avoidance lives in the dedicated negative-prompt field, and prompt rewriting stays disabled so the provider cannot expand one action into a mangled compound shot.
 - Remotion uses clean direct scene cuts rather than fading every clip in from black, preserving continuous and match-cut handoffs in the stitched output.
+- Qwen TTS narration is generated and stored per scene. Reel AI measures the real WAV duration, gives each line a short lead-in/tail, applies at most a natural 1.20× fit, rejects overlong copy instead of clipping it, and ducks BGM beneath speech. Silent scenes remain silent, while legacy one-track narration stays render-compatible.
 - Final renders place the latest uploaded logo, or a directly verified website logo asset—not an AI recreation—over the last scene with a short animated brand lockup; the business name remains the fallback when no logo asset is available.
 - Remotion final render path for 9:16 MP4 export.
 - Alibaba OSS-compatible artifact storage with a local dev fallback.
@@ -67,6 +68,8 @@ Open `http://localhost:3000`.
 Application-only updates that do not add a Prisma migration require only a restart of `pnpm dev`. Web development, typecheck, and build commands regenerate Prisma Client automatically so editor types stay aligned with `prisma/schema.prisma`. After switching to a branch with schema changes, run `pnpm db:generate` immediately if an already-open editor still shows missing Prisma fields, then restart its TypeScript server. The continuity-first anchor and single-shot-direction updates include migrations that preserve prior takes/artifacts, migrate the former motion brief into `shotPrompt`, and retire obsolete scene prompt columns. Existing local checkouts must stop `pnpm dev`, run `pnpm db:migrate` once, and then restart `pnpm dev`.
 
 Existing storyboards remain generatable after migration. Their former motion brief becomes the shot direction and durations are safely clamped to 5–10 seconds; unchanged legacy wording is accepted until it is edited. For the best quality, regenerate an older storyboard and its anchors once so every shot is authored natively under the new one-sentence rules. Reseeding is not required.
+
+Scene-timed narration adds the nullable `Scene.narrationArtifactId` link. Existing audio and renders are preserved, but a local checkout must stop `pnpm dev`, run `pnpm db:migrate` once, and restart `pnpm dev`. Then click **Generate Scene Narration** before the next render to replace any legacy project-wide track with measured scene clips. No seed is required.
 
 The domain-neutral creative grammar, structured cast planning, richer motion-hierarchy guardrails, recent-anchor identity recovery, and last-scene logo lockup are application-only changes. Existing databases and artifacts remain compatible; restart `pnpm dev` after pulling them, with no additional migration or seed command.
 

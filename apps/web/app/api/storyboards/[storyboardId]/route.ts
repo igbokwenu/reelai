@@ -67,7 +67,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
     const narrationChanged = (body.scenes ?? []).some((scene) => {
       const existing = existingSceneById.get(scene.id)!;
-      return scene.voiceoverText !== existing.voiceoverText;
+      return (
+        scene.voiceoverText !== existing.voiceoverText ||
+        scene.durationSec !== existing.durationSec
+      );
     });
     const renderChanged = sceneOutputChanged || continuityChanged;
 
@@ -125,6 +128,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         }),
       ...(narrationChanged
         ? [
+            prisma.scene.updateMany({
+              where: { storyboardId },
+              data: { narrationArtifactId: null },
+            }),
             prisma.generationJob.updateMany({
               where: {
                 projectId: storyboard.projectId,
@@ -133,7 +140,8 @@ export async function PATCH(request: Request, context: RouteContext) {
               },
               data: {
                 status: "CANCELLED",
-                error: "Storyboard narration changed; regenerate narration.",
+                error:
+                  "Storyboard narration or timing changed; regenerate scene narration.",
               },
             }),
           ]

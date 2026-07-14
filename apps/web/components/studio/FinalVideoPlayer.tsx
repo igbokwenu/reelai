@@ -34,6 +34,8 @@ type Render = {
 
 type Scene = {
   id: string;
+  index: number;
+  durationSec: number;
   status: string;
   captionText: string;
   voiceoverText: string;
@@ -92,9 +94,14 @@ export function FinalVideoPlayer({
   const activeJob = [narrationJob, renderJob].find((job) =>
     ["QUEUED", "RUNNING", "WAITING_PROVIDER"].includes(job?.status ?? ""),
   );
-  const narrationArtifact = useMemo(
+  const legacyNarrationArtifact = useMemo(
     () => findNarrationArtifact(artifacts, narrationJob),
     [artifacts, narrationJob],
+  );
+  const sceneNarrations = useMemo(
+    () =>
+      findSceneNarrations(artifacts, narrationJob, storyboard?.scenes ?? []),
+    [artifacts, narrationJob, storyboard?.scenes],
   );
   const completeRender =
     renders.find(
@@ -177,6 +184,9 @@ export function FinalVideoPlayer({
     }
 
     setNarrationJob(data.job);
+    if (data.job.status === "FAILED") {
+      setError(data.job.error ?? "Scene narration generation failed.");
+    }
     router.refresh();
   }
 
@@ -198,6 +208,9 @@ export function FinalVideoPlayer({
     }
 
     setRenderJob(data.job);
+    if (data.job.status === "FAILED") {
+      setError(data.job.error ?? "Final render failed.");
+    }
     router.refresh();
   }
 
@@ -229,7 +242,7 @@ export function FinalVideoPlayer({
             ) : (
               <Volume2 className="size-4" aria-hidden="true" />
             )}
-            Generate Narration
+            Generate Scene Narration
           </Button>
           <Button
             disabled={!canRender || starting !== null || Boolean(activeJob)}
@@ -253,7 +266,7 @@ export function FinalVideoPlayer({
         />
         <StatusTile
           label="Scenes"
-          value={`${completedScenes.length}/4 complete`}
+          value={`${completedScenes.length}/${storyboard.scenes.length} complete`}
         />
         <StatusTile label="Safe zones" value="TikTok/Reels" />
         <StatusTile label="Render" value={formatStatus(renderJob?.status)} />
@@ -273,27 +286,64 @@ export function FinalVideoPlayer({
         <div className="rounded-md border border-border bg-background/50 p-4">
           <div className="mb-3 flex items-center gap-2 text-sm font-medium">
             <Volume2 className="size-4 text-primary" aria-hidden="true" />
-            Narration Preview
+            Scene Narration Preview
           </div>
-          {narrationArtifact ? (
+          {sceneNarrations.length > 0 ? (
+            <div className="grid gap-3">
+              {sceneNarrations.map(({ artifact, scene, timing }) => (
+                <div
+                  className="rounded-md border border-border bg-card/55 p-3"
+                  key={scene.id}
+                >
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+                      Scene {scene.index}
+                    </p>
+                    <span className="text-[11px] text-muted-foreground">
+                      {formatSeconds(timing.sourceDurationSec)} source
+                      {timing.playbackRate > 1
+                        ? ` · ${timing.playbackRate.toFixed(2)}× fitted`
+                        : " · natural pace"}
+                    </span>
+                  </div>
+                  <audio
+                    className="w-full"
+                    controls
+                    preload="metadata"
+                    src={`/api/artifacts/${artifact.id}/file`}
+                  />
+                  <Waveform artifact={artifact} />
+                  <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
+                    {scene.voiceoverText}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : legacyNarrationArtifact ? (
             <>
               <audio
                 className="w-full"
                 controls
                 preload="metadata"
-                src={`/api/artifacts/${narrationArtifact.id}/file`}
+                src={`/api/artifacts/${legacyNarrationArtifact.id}/file`}
               />
-              <Waveform artifact={narrationArtifact} />
+              <Waveform artifact={legacyNarrationArtifact} />
               <p className="mt-2 text-xs text-muted-foreground">
-                {narrationArtifact.durationSec
-                  ? `${Math.round(narrationArtifact.durationSec)}s estimated`
+                {legacyNarrationArtifact.durationSec
+                  ? `${Math.round(legacyNarrationArtifact.durationSec)}s legacy narration`
                   : "Duration metadata pending"}{" "}
-                · Stored as durable audio artifact
+                · Regenerate to use scene-locked timing
               </p>
             </>
+          ) : narrationJob?.status === "COMPLETE" &&
+            storyboard.scenes.every((scene) => !scene.voiceoverText.trim()) ? (
+            <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+              All scenes are intentionally silent. The reel can be rendered with
+              captions and optional BGM only.
+            </div>
           ) : (
             <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-              No narration artifact yet.
+              No scene narration artifacts yet.
             </div>
           )}
         </div>
@@ -413,6 +463,49 @@ function findNarrationArtifact(artifacts: Artifact[], job: Job | null) {
   );
 }
 
+function findSceneNarrations(
+  artifacts: Artifact[],
+  job: Job | null,
+  scenes: Scene[],
+) {
+  const output = asRecord(job?.output);
+  const manifest = output?.sceneNarrations;
+  if (!Array.isArray(manifest)) return [];
+
+  const artifactById = new Map(
+    artifacts.map((artifact) => [artifact.id, artifact]),
+  );
+  const sceneById = new Map(scenes.map((scene) => [scene.id, scene]));
+
+  return manifest.flatMap((value) => {
+    const record = asRecord(value);
+    const artifact =
+      typeof record?.artifactId === "string"
+        ? artifactById.get(record.artifactId)
+        : null;
+    const scene =
+      typeof record?.sceneId === "string"
+        ? sceneById.get(record.sceneId)
+        : null;
+    if (!record || !artifact || !scene) return [];
+
+    return [
+      {
+        artifact,
+        scene,
+        timing: {
+          playbackRate:
+            typeof record.playbackRate === "number" ? record.playbackRate : 1,
+          sourceDurationSec:
+            typeof record.sourceDurationSec === "number"
+              ? record.sourceDurationSec
+              : (artifact.durationSec ?? 0),
+        },
+      },
+    ];
+  });
+}
+
 function findThumbnailArtifact(artifacts: Artifact[], render: Render | null) {
   const settings = asRecord(render?.settings);
   const id = settings?.thumbnailArtifactId;
@@ -456,4 +549,8 @@ function formatStatus(value: string | null | undefined) {
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatSeconds(value: number) {
+  return `${value.toFixed(1)}s`;
 }

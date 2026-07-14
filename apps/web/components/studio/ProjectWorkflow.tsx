@@ -104,7 +104,8 @@ export function ProjectWorkflow({
       id: "final",
       eyebrow: "05 · Deliver",
       label: "Final",
-      description: "Add narration and export the finished vertical reel.",
+      description:
+        "Sync scene narration and export the finished vertical reel.",
       icon: PlayCircle,
       state: finalComplete
         ? "complete"

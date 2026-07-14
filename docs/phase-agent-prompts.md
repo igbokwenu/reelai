@@ -344,7 +344,8 @@ Build exactly Phase 6:
 Product requirements:
 
 - Narrative voiceover only. Do not implement lip sync.
-- TTS text must be chunked according to model limits.
+- TTS text must be chunked according to model limits and generated separately for each non-silent scene.
+- Measure the real audio duration and keep every spoken line inside its scene. Use only a bounded natural-speed correction; reject overlong lines rather than clipping words or allowing cross-scene drift.
 - Captions must be safe-zone-aware.
 - AI disclosure defaults on but can be toggled.
 - BGM can be disabled; uploaded/sample BGM may be included.
@@ -361,7 +362,7 @@ Remotion requirements:
 
 - Build a typed `ReelCompositionInput`.
 - Combine selected scene video takes in order.
-- Mix narration and optional BGM.
+- Sequence scene narration at the owning scene boundary and duck optional BGM beneath speech.
 - Render final MP4 and thumbnail.
 - Store render output in OSS.
 
@@ -369,7 +370,8 @@ Exit only when all Phase 6 checklist items pass:
 
 - Narration is generated from scene voiceover text.
 - TTS chunks respect model text limits.
-- Narration audio is stored as an `Artifact`.
+- Narration audio is stored as a durable `Artifact` per non-silent scene.
+- Measured narration windows end inside their owning scenes without clipped words.
 - UI shows narration status and waveform/metadata.
 - Final render combines selected scene videos in order.
 - Captions are visible and safe-zone-aware.

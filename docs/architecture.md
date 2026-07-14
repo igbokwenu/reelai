@@ -1,6 +1,6 @@
 # Reel AI Architecture
 
-Updated: July 13, 2026
+Updated: July 14, 2026
 
 This document describes the target MVP architecture. The implementation source of truth is `docs/implementation-guide.md`.
 
@@ -59,12 +59,13 @@ flowchart TB
 
    The continuity bible also carries a structured cast plan with explicit no-person, single-person, and multi-person modes. Each human role has a recurrence flag, age band, reference basis, three to five appearance anchors, optional neutral complexion/fictional heritage anchor, wardrobe anchor, and distinguishing feature. Multi-person signatures must be unique. Ethnicity is never inferred for a reference-backed person or used as a proxy for behavior or status. Keyframe prompts serialize this ledger into the existing character-continuity field, enforce face/silhouette separation, and can reference the two most recent anchors so a recurring person can return after a scene gap without being replaced by the prior scene's supporting character. No database migration is required.
    Provider JSON that contains substantive scene intent but narrowly misses the prose contract is canonicalized before final validation: Reel AI preserves the first clear action, promotes a short opening fragment to the mood anchor, and defaults an omitted or conflicting camera brief to a fixed camera. Missing or generic directions still fail rather than being silently fabricated.
+
 10. Video jobs preflight each selected anchor and submit exactly the stored `shotPrompt` as the positive Wan i2v prompt. The provider receives no closing frame and no appended brand, transition, exit, caption, or continuity paragraphs. Prompt rewriting is disabled to preserve the approved sentence, while a dedicated negative prompt suppresses morphing, duplicate anatomy, flicker, jitter, abrupt camera changes, generated text, and watermarks. Healthy sibling tasks continue polling when one scene fails, transient submission failures receive bounded retries, and scene-level retries preserve completed siblings and prior selected clips.
 
 This separation follows QwenCloud's [first-frame image-to-video guidance](https://docs.qwencloud.com/developer-guides/video-generation/image-to-video): the image establishes the subject, environment, and composition while the prompt describes the desired motion. Wan 2.7's [API contract](https://docs.qwencloud.com/api-reference/video-generation/wan27-image-to-video/create-task) provides dedicated `negative_prompt` and `prompt_extend` controls, so Reel AI keeps artifact suppression and prompt rewriting out of the approved creative sentence.
 
-11. TTS job generates narration audio.
-12. Render job uses Remotion to produce the final 9:16 MP4 and thumbnail. The latest uploaded `LOGO` image—or a directly discovered website asset explicitly labeled as a logo/wordmark—is composited as a timed last-scene lockup with the business name; generative image/video prompts continue to prohibit synthetic logo drawing. Without a verified logo asset, the business-name lockup remains as the fallback.
+11. One TTS job generates a durable narration artifact for each non-silent scene. It measures the WAV bytes, records a scene-local start offset and playback rate, caps timing correction at 1.20×, and rejects a line that cannot fit naturally. Editing voiceover text or scene duration invalidates the manifest and its scene links.
+12. Render job uses Remotion to sequence each narration artifact inside its owning scene, add short audio fades, and duck optional BGM during speech. Legacy project-wide narration remains supported for existing projects. Remotion then produces the final 9:16 MP4 and thumbnail. The latest uploaded `LOGO` image—or a directly discovered website asset explicitly labeled as a logo/wordmark—is composited as a timed last-scene lockup with the business name; generative image/video prompts continue to prohibit synthetic logo drawing. Without a verified logo asset, the business-name lockup remains as the fallback.
 13. Final artifacts are stored in OSS and displayed in the studio.
 
 ## Evidence capability model
@@ -85,7 +86,7 @@ These restrictions are enforced in prompts, deterministic validation, preview me
 - Storyboards are fully editable field by field after generation, including their global continuity bible and per-scene transition modes, but AI regeneration currently replaces the whole 2-to-4-scene plan. Per-scene note-guided regeneration is the next high-value modular addition; it must include adjacent-scene continuity and invalidate only downstream takes for that scene.
 - Production is additive and modular without making history the primary workflow: anchor and video attempts create takes rather than destructively replacing prior artifacts, while the newest complete anchor and clip become the recommended path automatically. Changing the one shot sentence or continuity metadata invalidates that scene and downstream anchors/clips; timing-only changes invalidate only that clip. Historical takes remain visible in a collapsed archive. Final render validates the entire ordered storyboard, uses direct cuts without per-scene fade-from-black, and never exports a filtered subset of completed scenes.
 - Brand Kits can be regenerated but not field-edited. A future editor should distinguish source-backed claims/citations from user-owned tone, palette, and style overrides instead of exposing an unsafe generic JSON edit.
-- Narration and final render are appropriately project-level operations today because their timing and composition depend on the complete approved storyboard.
+- Narration generation remains one project-level job for consistent voice and atomic replacement, but its outputs and render windows are scene-level. Final render consumes the complete approved storyboard and the current scene narration manifest.
 
 ## Project and Brand Kit boundary
 

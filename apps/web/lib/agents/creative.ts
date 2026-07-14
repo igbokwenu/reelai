@@ -973,8 +973,8 @@ Requirements:
 - Total duration must be 15 to 30 seconds, with every scene lasting 5 to 10 seconds. Prefer 5 to 8 seconds; use 9 to 10 only for exceptionally simple motion.
 - The storyboard must clearly execute the selected concept's strategy, narrative arc, and visual style.
 - Do not drift into a different concept, a generic ad, or a list of disconnected scenes.
-- Voiceover text must be 600 characters or less per scene.
-- Each scene needs a caption, voiceover, one shotPrompt, and engine-only continuity metadata.
+- Write voiceover for natural spoken timing, not just the 600-character API ceiling: target at most 2.5 words per second of scene duration (about 12 words for 5 seconds, 15 for 6, 20 for 8, or 25 for 10). Keep each line self-contained inside its scene; never let a sentence depend on audio continuing into the next scene.
+- Each scene needs a caption, a concise voiceover, one shotPrompt, and engine-only continuity metadata.
 - Build a continuityBible before the scenes. Separately lock recurring product attributes, a structured cast plan, and the shared visual world. If a category is absent, explicitly say so rather than inventing a product or token people.
 - Select the execution lane that fits the verified offer; do not default every business to a stressed-person / relieved-person service story:
   - PEOPLE_OR_SERVICE: use behavior, blocking, reaction, trust, access, or transfer of responsibility.

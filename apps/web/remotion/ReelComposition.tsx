@@ -3,6 +3,7 @@
 import {
   AbsoluteFill,
   Audio,
+  interpolate,
   OffthreadVideo,
   Sequence,
   spring,
@@ -12,7 +13,12 @@ import {
 } from "remotion";
 
 import type { ReelCompositionInput } from "./schema";
-import { getBrandWatermarkWindow } from "./schema";
+import {
+  getBgmVolume,
+  getBrandWatermarkWindow,
+  getSceneNarrationWindow,
+  NARRATION_MIX_VOLUME,
+} from "./schema";
 
 export function ReelComposition(input: ReelCompositionInput) {
   const { fps } = useVideoConfig();
@@ -27,6 +33,8 @@ export function ReelComposition(input: ReelCompositionInput) {
           Math.round(scene.durationSec * fps),
         );
 
+        const narrationWindow = getSceneNarrationWindow(scene, fps);
+
         return (
           <Sequence
             durationInFrames={durationInFrames}
@@ -38,12 +46,30 @@ export function ReelComposition(input: ReelCompositionInput) {
               scene={scene}
               safeZonePreset={input.safeZonePreset}
             />
+            {scene.narration && narrationWindow ? (
+              <Sequence
+                durationInFrames={narrationWindow.durationInFrames}
+                from={Math.max(0, narrationWindow.from - from)}
+              >
+                <Audio
+                  playbackRate={scene.narration.playbackRate}
+                  src={scene.narration.audioUrl}
+                  volume={(frame) =>
+                    narrationEnvelope(
+                      frame,
+                      narrationWindow.durationInFrames,
+                      fps,
+                    )
+                  }
+                />
+              </Sequence>
+            ) : null}
           </Sequence>
         );
       })}
 
       {input.narrationUrl ? <Audio src={input.narrationUrl} /> : null}
-      {input.bgmUrl ? <Audio src={input.bgmUrl} volume={0.18} /> : null}
+      {input.bgmUrl ? <BgmLayer input={input} /> : null}
 
       {brandWindow ? (
         <Sequence
@@ -56,6 +82,29 @@ export function ReelComposition(input: ReelCompositionInput) {
       {input.aiDisclosureEnabled ? <Disclosure /> : null}
     </AbsoluteFill>
   );
+}
+
+function BgmLayer({ input }: { input: ReelCompositionInput }) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  return <Audio src={input.bgmUrl!} volume={getBgmVolume(input, frame, fps)} />;
+}
+
+function narrationEnvelope(frame: number, duration: number, fps: number) {
+  const fadeFrames = Math.max(1, Math.round(fps * 0.06));
+  const fadeIn = interpolate(frame, [0, fadeFrames], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const fadeOut = interpolate(
+    frame,
+    [Math.max(0, duration - fadeFrames), duration],
+    [1, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  return Math.min(fadeIn, fadeOut) * NARRATION_MIX_VOLUME;
 }
 
 function SceneLayer({

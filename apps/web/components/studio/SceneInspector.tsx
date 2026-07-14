@@ -95,6 +95,11 @@ export function SceneInspector({
               }
             />
             <Counter current={scene.voiceoverText.length} max={600} />
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              {wordCount(scene.voiceoverText)}/
+              {Math.floor(scene.durationSec * 2.5)} recommended words for a
+              natural read · leave blank for an intentionally silent scene.
+            </p>
           </Field>
         </section>
 
@@ -150,4 +155,8 @@ function Counter({ current, max }: { current: number; max: number }) {
       {current}/{max}
     </span>
   );
+}
+
+function wordCount(value: string) {
+  return value.trim() ? value.trim().split(/\s+/).length : 0;
 }

@@ -3,10 +3,12 @@ import "server-only";
 import type { Artifact, Prisma, Scene, Storyboard, Take } from "@prisma/client";
 
 import { researchWebsite } from "@/lib/brand/website-research";
+import { createStoredArtifact } from "@/lib/media/artifacts";
 import {
-  createStoredArtifact,
-  createArtifactFromUrl,
-} from "@/lib/media/artifacts";
+  fitNarrationToScene,
+  type SceneNarrationTiming,
+} from "@/lib/media/narration-timing";
+import { buildWavWaveform, concatenateWav, parseWav } from "@/lib/media/wav";
 import { prisma } from "@/lib/prisma";
 import {
   QWEN_TTS_MAX_CHARS,
@@ -20,18 +22,35 @@ import type { ReelCompositionInput } from "@/remotion/schema";
 
 type SceneWithTakes = Scene & { takes: Take[] };
 type StoryboardWithScenes = Storyboard & { scenes: SceneWithTakes[] };
+type NarrationScenePlan = {
+  scene: SceneWithTakes;
+  chunks: string[];
+};
+type SceneNarrationOutput = SceneNarrationTiming & {
+  sceneId: string;
+  sceneIndex: number;
+  artifactId: string;
+};
+type RenderNarration = {
+  legacyArtifact: Artifact | null;
+  sceneNarrations: Map<
+    string,
+    { artifact: Artifact; timing: SceneNarrationOutput }
+  >;
+};
 
 export async function createAndRunNarrationJob(projectId: string) {
   const storyboard = await getRenderableStoryboard(projectId, {
     requireVideos: false,
   });
-  const chunks = chunkTtsText(
-    storyboard.scenes.map((scene) => scene.voiceoverText).join("\n\n"),
+  const scenePlans = storyboard.scenes.map((scene) => ({
+    scene,
+    chunks: chunkTtsText(scene.voiceoverText),
+  }));
+  const chunkCount = scenePlans.reduce(
+    (total, scene) => total + scene.chunks.length,
+    0,
   );
-
-  if (chunks.length === 0) {
-    throw new Error("Storyboard has no narration text to synthesize.");
-  }
 
   const job = await prisma.generationJob.create({
     data: {
@@ -40,15 +59,16 @@ export async function createAndRunNarrationJob(projectId: string) {
       status: "QUEUED",
       model: QWEN_TTS_MODEL,
       input: {
-        operation: "narration_tts",
-        chunkCount: chunks.length,
+        operation: "scene_narration_tts",
+        version: 2,
+        chunkCount,
         maxChars: QWEN_TTS_MAX_CHARS,
         sceneIds: storyboard.scenes.map((scene) => scene.id),
       },
     },
   });
 
-  return runNarrationJob(job.id, chunks);
+  return runNarrationJob(job.id, storyboard.id, scenePlans);
 }
 
 export async function createAndRunFinalRenderJob({
@@ -63,7 +83,7 @@ export async function createAndRunFinalRenderJob({
   const storyboard = await getRenderableStoryboard(projectId, {
     requireVideos: true,
   });
-  const narration = await getLatestNarrationArtifact(projectId);
+  const narration = await getLatestNarration(projectId, storyboard);
   const input = await buildReelCompositionInput({
     projectId,
     storyboard,
@@ -81,7 +101,11 @@ export async function createAndRunFinalRenderJob({
         bgmEnabled,
         logoIncluded: Boolean(input.brandWatermark?.logoUrl),
         safeZonePreset: input.safeZonePreset,
-        narrationArtifactId: narration?.id ?? null,
+        narrationArtifactIds: [...narration.sceneNarrations.values()].map(
+          (item) => item.artifact.id,
+        ),
+        legacyNarrationArtifactId: narration.legacyArtifact?.id ?? null,
+        narrationTimingVersion: narration.sceneNarrations.size > 0 ? 2 : 1,
       },
     },
   });
@@ -105,7 +129,11 @@ export async function createAndRunFinalRenderJob({
   return runFinalRenderJob(job.id, render.id, input);
 }
 
-async function runNarrationJob(jobId: string, chunks: string[]) {
+async function runNarrationJob(
+  jobId: string,
+  storyboardId: string,
+  scenePlans: NarrationScenePlan[],
+) {
   await prisma.generationJob.update({
     where: { id: jobId },
     data: { status: "RUNNING", startedAt: new Date(), error: null },
@@ -115,71 +143,137 @@ async function runNarrationJob(jobId: string, chunks: string[]) {
   });
 
   try {
-    const generated = [];
+    const sceneNarrations: SceneNarrationOutput[] = [];
+    let globalChunkIndex = 0;
 
-    for (const [index, chunk] of chunks.entries()) {
-      const result = await synthesizeSpeechWithQwen({
-        model: job.model ?? QWEN_TTS_MODEL,
-        text: chunk,
-      });
-      const artifact = await createArtifactFromUrl({
+    for (const plan of scenePlans) {
+      if (plan.chunks.length === 0) continue;
+
+      const generated = [];
+      for (const [sceneChunkIndex, chunk] of plan.chunks.entries()) {
+        globalChunkIndex += 1;
+        const result = await synthesizeSpeechWithQwen({
+          model: job.model ?? QWEN_TTS_MODEL,
+          text: chunk,
+        });
+        const providerAudio = await fetch(result.audioUrl);
+        if (!providerAudio.ok) {
+          throw new Error("Provider narration audio could not be downloaded.");
+        }
+        const audioBuffer = Buffer.from(await providerAudio.arrayBuffer());
+        const artifact = await createStoredArtifact({
+          projectId: job.projectId,
+          fileName: `scene-${plan.scene.index}-narration-chunk-${globalChunkIndex}.wav`,
+          mimeType:
+            providerAudio.headers.get("content-type") ??
+            `audio/${result.audioFormat}`,
+          type: "AUDIO",
+          body: audioBuffer,
+          metadata: {
+            operation: "scene_narration_tts_chunk",
+            sceneId: plan.scene.id,
+            sceneIndex: plan.scene.index,
+            sceneChunkIndex,
+            sceneChunkCount: plan.chunks.length,
+            model: result.model,
+            providerAudioUrl: result.audioUrl,
+            providerRequestId: result.providerRequestId,
+            sampleRate: result.sampleRate,
+            usage: toJsonSafe(result.usage),
+          },
+        });
+        generated.push({ artifact, audioBuffer });
+      }
+
+      const audioBuffers = generated.map((item) => item.audioBuffer);
+      const combinedAudio =
+        audioBuffers.length === 1
+          ? audioBuffers[0]
+          : concatenateWav(audioBuffers);
+      const durationSec = parseWav(combinedAudio).durationSec;
+      let timing: SceneNarrationTiming;
+
+      try {
+        timing = fitNarrationToScene({
+          sceneDurationSec: plan.scene.durationSec,
+          sourceDurationSec: durationSec,
+        });
+      } catch (error) {
+        const detail =
+          error instanceof Error ? error.message : "Narration is too long.";
+        const recommendedWords = Math.max(
+          3,
+          Math.floor((plan.scene.durationSec - 0.38) * 2.5),
+        );
+        throw new Error(
+          `Scene ${plan.scene.index}: ${detail} Shorten this voiceover to about ${recommendedWords} words, then generate narration again.`,
+        );
+      }
+
+      const narration = await createStoredArtifact({
         projectId: job.projectId,
-        fileName: `narration-chunk-${index + 1}.wav`,
-        mimeType: `audio/${result.audioFormat}`,
+        fileName: `scene-${plan.scene.index}-narration-${Date.now()}.wav`,
+        mimeType: "audio/wav",
         type: "AUDIO",
-        url: result.audioUrl,
+        body: combinedAudio,
+        durationSec,
         metadata: {
-          operation: "narration_tts_chunk",
-          chunkIndex: index,
-          chunkCount: chunks.length,
-          model: result.model,
-          providerAudioUrl: result.audioUrl,
-          providerRequestId: result.providerRequestId,
-          sampleRate: result.sampleRate,
-          usage: toJsonSafe(result.usage),
+          operation: "scene_narration_tts",
+          timingVersion: 2,
+          sceneId: plan.scene.id,
+          sceneIndex: plan.scene.index,
+          model: job.model ?? QWEN_TTS_MODEL,
+          chunkCount: plan.chunks.length,
+          chunkArtifactIds: generated.map((item) => item.artifact.id),
+          sourceDurationSec: timing.sourceDurationSec,
+          audibleDurationSec: timing.audibleDurationSec,
+          offsetSec: timing.offsetSec,
+          playbackRate: timing.playbackRate,
+          waveform: buildWavWaveform(combinedAudio),
         },
       });
 
-      generated.push({ artifact, result });
+      sceneNarrations.push({
+        ...timing,
+        sceneId: plan.scene.id,
+        sceneIndex: plan.scene.index,
+        artifactId: narration.id,
+      });
     }
 
-    const audioBuffers = await Promise.all(
-      generated.map((item) => fetchArtifactBuffer(item.artifact)),
-    );
-    const combinedAudio =
-      audioBuffers.length === 1
-        ? audioBuffers[0]
-        : concatenateWav(audioBuffers);
-    const durationSec = estimateNarrationDurationSec(chunks.join(" "));
-    const narration = await createStoredArtifact({
-      projectId: job.projectId,
-      fileName: `narration-${Date.now()}.wav`,
-      mimeType: "audio/wav",
-      type: "AUDIO",
-      body: combinedAudio,
-      durationSec,
-      metadata: {
-        operation: "narration_tts",
-        model: job.model ?? QWEN_TTS_MODEL,
-        chunkCount: chunks.length,
-        maxChars: QWEN_TTS_MAX_CHARS,
-        chunkArtifactIds: generated.map((item) => item.artifact.id),
-        waveform: buildWaveform(chunks.join(" ")),
-      },
-    });
-
-    return prisma.generationJob.update({
-      where: { id: jobId },
-      data: {
-        status: "COMPLETE",
-        output: {
-          narrationArtifactId: narration.id,
-          chunkCount: chunks.length,
-          durationSec,
+    const completedAt = new Date();
+    const transaction = await prisma.$transaction([
+      prisma.scene.updateMany({
+        where: { storyboardId },
+        data: { narrationArtifactId: null },
+      }),
+      ...sceneNarrations.map((narration) =>
+        prisma.scene.update({
+          where: { id: narration.sceneId },
+          data: { narrationArtifactId: narration.artifactId },
+        }),
+      ),
+      prisma.generationJob.update({
+        where: { id: jobId },
+        data: {
+          status: "COMPLETE",
+          output: {
+            version: 2,
+            sceneNarrations,
+            sceneCount: sceneNarrations.length,
+            silentSceneCount: scenePlans.length - sceneNarrations.length,
+            chunkCount: globalChunkIndex,
+            durationSec: sceneNarrations.reduce(
+              (total, narration) => total + narration.audibleDurationSec,
+              0,
+            ),
+          },
+          completedAt,
         },
-        completedAt: new Date(),
-      },
-    });
+      }),
+    ]);
+
+    return transaction.at(-1)!;
   } catch (error) {
     return prisma.generationJob.update({
       where: { id: jobId },
@@ -233,6 +327,16 @@ async function runFinalRenderJob(
         renderer: "remotion",
         aiDisclosureEnabled: input.aiDisclosureEnabled,
         bgmIncluded: Boolean(input.bgmUrl),
+        bgmDuckedUnderNarration: Boolean(
+          input.bgmUrl && input.scenes.some((scene) => scene.narration),
+        ),
+        narrationTimingVersion: input.scenes.some((scene) => scene.narration)
+          ? 2
+          : input.narrationUrl
+            ? 1
+            : null,
+        sceneNarrationCount: input.scenes.filter((scene) => scene.narration)
+          .length,
         safeZonePreset: input.safeZonePreset,
       },
     });
@@ -377,7 +481,7 @@ async function buildReelCompositionInput({
 }: {
   projectId: string;
   storyboard: StoryboardWithScenes;
-  narration: Artifact | null;
+  narration: RenderNarration;
   aiDisclosureEnabled: boolean;
   bgmEnabled: boolean;
 }): Promise<ReelCompositionInput> {
@@ -402,6 +506,19 @@ async function buildReelCompositionInput({
       captionText: scene.captionText,
       startTimeSec,
       durationSec: scene.durationSec,
+      narration: narration.sceneNarrations.has(scene.id)
+        ? {
+            audioUrl: artifactUrl(
+              narration.sceneNarrations.get(scene.id)!.artifact,
+            ),
+            sourceDurationSec: narration.sceneNarrations.get(scene.id)!.timing
+              .sourceDurationSec,
+            offsetSec: narration.sceneNarrations.get(scene.id)!.timing
+              .offsetSec,
+            playbackRate: narration.sceneNarrations.get(scene.id)!.timing
+              .playbackRate,
+          }
+        : undefined,
     });
     startTimeSec += scene.durationSec;
   }
@@ -436,7 +553,9 @@ async function buildReelCompositionInput({
 
   return {
     scenes,
-    narrationUrl: narration ? artifactUrl(narration) : undefined,
+    narrationUrl: narration.legacyArtifact
+      ? artifactUrl(narration.legacyArtifact)
+      : undefined,
     bgmUrl: bgm ? artifactUrl(bgm) : undefined,
     brandWatermark: {
       text: project.businessName,
@@ -459,33 +578,96 @@ async function findVerifiedWebsiteLogoUrl(websiteUrl: string | null) {
   return visual?.url ?? null;
 }
 
-async function getLatestNarrationArtifact(projectId: string) {
+async function getLatestNarration(
+  projectId: string,
+  storyboard: StoryboardWithScenes,
+): Promise<RenderNarration> {
   const job = await prisma.generationJob.findFirst({
     where: { projectId, type: "TTS", status: "COMPLETE" },
     orderBy: { completedAt: "desc" },
   });
-  const output = job?.output;
+  const output = asRecord(job?.output);
+  const sceneNarrations = parseSceneNarrationOutput(output?.sceneNarrations);
+
+  if (sceneNarrations.length > 0) {
+    const currentSceneById = new Map(
+      storyboard.scenes.map((scene) => [scene.id, scene]),
+    );
+    const artifactIds = sceneNarrations.map((item) => item.artifactId);
+    const artifacts = await prisma.artifact.findMany({
+      where: { id: { in: artifactIds }, projectId, type: "AUDIO" },
+    });
+    const artifactById = new Map(
+      artifacts.map((artifact) => [artifact.id, artifact]),
+    );
+    const currentNarrations = new Map<
+      string,
+      { artifact: Artifact; timing: SceneNarrationOutput }
+    >();
+
+    for (const timing of sceneNarrations) {
+      const scene = currentSceneById.get(timing.sceneId);
+      const artifact = artifactById.get(timing.artifactId);
+      if (scene?.narrationArtifactId === timing.artifactId && artifact) {
+        currentNarrations.set(timing.sceneId, { artifact, timing });
+      }
+    }
+
+    return { legacyArtifact: null, sceneNarrations: currentNarrations };
+  }
+
   const narrationArtifactId =
-    output && typeof output === "object" && !Array.isArray(output)
-      ? (output as { narrationArtifactId?: unknown }).narrationArtifactId
+    typeof output?.narrationArtifactId === "string"
+      ? output.narrationArtifactId
       : null;
 
-  if (typeof narrationArtifactId !== "string") {
-    return null;
+  if (!narrationArtifactId) {
+    return { legacyArtifact: null, sceneNarrations: new Map() };
   }
 
-  return prisma.artifact.findUnique({ where: { id: narrationArtifactId } });
+  return {
+    legacyArtifact: await prisma.artifact.findFirst({
+      where: { id: narrationArtifactId, projectId, type: "AUDIO" },
+    }),
+    sceneNarrations: new Map(),
+  };
 }
 
-async function fetchArtifactBuffer(artifact: Artifact) {
-  const url = artifactUrl(artifact);
-  const response = await fetch(url);
+function parseSceneNarrationOutput(value: unknown): SceneNarrationOutput[] {
+  if (!Array.isArray(value)) return [];
 
-  if (!response.ok) {
-    throw new Error("Stored audio artifact could not be read.");
-  }
+  return value.flatMap((item) => {
+    const record = asRecord(item);
+    if (
+      typeof record?.sceneId !== "string" ||
+      typeof record.artifactId !== "string" ||
+      typeof record.sceneIndex !== "number" ||
+      typeof record.offsetSec !== "number" ||
+      typeof record.playbackRate !== "number" ||
+      typeof record.sourceDurationSec !== "number" ||
+      typeof record.audibleDurationSec !== "number"
+    ) {
+      return [];
+    }
 
-  return Buffer.from(await response.arrayBuffer());
+    return [
+      {
+        sceneId: record.sceneId,
+        artifactId: record.artifactId,
+        sceneIndex: record.sceneIndex,
+        offsetSec: record.offsetSec,
+        playbackRate: record.playbackRate,
+        sourceDurationSec: record.sourceDurationSec,
+        audibleDurationSec: record.audibleDurationSec,
+      },
+    ];
+  });
+}
+
+function asRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function artifactUrl(artifact: Artifact) {
@@ -571,80 +753,6 @@ function generateSampleBgmWav() {
   wav.writeUInt32LE(data.length, 40);
   data.copy(wav, 44);
   return wav;
-}
-
-function concatenateWav(buffers: Buffer[]) {
-  const parsed = buffers.map(parseWav);
-  const first = parsed[0];
-
-  if (
-    !first ||
-    parsed.some(
-      (item) =>
-        item.audioFormat !== first.audioFormat ||
-        item.channels !== first.channels ||
-        item.sampleRate !== first.sampleRate ||
-        item.bitsPerSample !== first.bitsPerSample,
-    )
-  ) {
-    return Buffer.concat(buffers);
-  }
-
-  const data = Buffer.concat(parsed.map((item) => item.data));
-  const out = Buffer.alloc(44 + data.length);
-  out.write("RIFF", 0);
-  out.writeUInt32LE(36 + data.length, 4);
-  out.write("WAVE", 8);
-  out.write("fmt ", 12);
-  out.writeUInt32LE(16, 16);
-  out.writeUInt16LE(first.audioFormat, 20);
-  out.writeUInt16LE(first.channels, 22);
-  out.writeUInt32LE(first.sampleRate, 24);
-  out.writeUInt32LE(first.byteRate, 28);
-  out.writeUInt16LE(first.blockAlign, 32);
-  out.writeUInt16LE(first.bitsPerSample, 34);
-  out.write("data", 36);
-  out.writeUInt32LE(data.length, 40);
-  data.copy(out, 44);
-  return out;
-}
-
-function parseWav(buffer: Buffer) {
-  if (buffer.toString("ascii", 0, 4) !== "RIFF") {
-    throw new Error("TTS returned non-WAV chunks; cannot concatenate safely.");
-  }
-
-  const dataOffset = buffer.indexOf("data");
-
-  if (dataOffset < 0) {
-    throw new Error("TTS WAV chunk is missing audio data.");
-  }
-  const dataLength = buffer.readUInt32LE(dataOffset + 4);
-
-  return {
-    audioFormat: buffer.readUInt16LE(20),
-    channels: buffer.readUInt16LE(22),
-    sampleRate: buffer.readUInt32LE(24),
-    byteRate: buffer.readUInt32LE(28),
-    blockAlign: buffer.readUInt16LE(32),
-    bitsPerSample: buffer.readUInt16LE(34),
-    data: buffer.subarray(dataOffset + 8, dataOffset + 8 + dataLength),
-  };
-}
-
-function buildWaveform(text: string) {
-  const words = text.split(/\s+/).filter(Boolean);
-  const bars = Array.from({ length: 48 }, (_, index) => {
-    const word = words[index % Math.max(words.length, 1)] ?? "";
-    return 0.18 + ((word.length * 13 + index * 7) % 70) / 100;
-  });
-
-  return bars.map((bar) => Number(bar.toFixed(2)));
-}
-
-function estimateNarrationDurationSec(text: string) {
-  const words = text.split(/\s+/).filter(Boolean).length;
-  return Math.max(3, Math.round((words / 2.6) * 10) / 10);
 }
 
 function toJsonSafe(value: unknown): Prisma.InputJsonValue {

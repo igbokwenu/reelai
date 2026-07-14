@@ -74,11 +74,20 @@ export const creativeConceptRegenerationJsonSchema = {
 
 const singleShotSentencePattern = /^[^.!?\n:]{2,50}: [^.!?\n]+[.!?]?$/;
 const reliableCameraPatterns = [
-  ["fixed", /\b(?:(?:fixed|static) camera|camera[^,.]{0,24}(?:fixed|static))\b/i],
+  [
+    "fixed",
+    /\b(?:(?:fixed|static) camera|camera[^,.]{0,24}(?:fixed|static))\b/i,
+  ],
   ["push-in", /\b(?:slow push-in|camera[^,.]{0,24}push(?:es)? in)\b/i],
-  ["pull-back", /\b(?:slow pull-back|camera[^,.]{0,24}pull(?:s)? (?:back|out))\b/i],
+  [
+    "pull-back",
+    /\b(?:slow pull-back|camera[^,.]{0,24}pull(?:s)? (?:back|out))\b/i,
+  ],
   ["orbit", /\b(?:gentle product orbit|camera[^,.]{0,24}orbit(?:s|ing)?)\b/i],
-  ["handheld-follow", /\b(?:handheld follow|handheld camera[^,.]{0,24}follow(?:s|ing)?)\b/i],
+  [
+    "handheld-follow",
+    /\b(?:handheld follow|handheld camera[^,.]{0,24}follow(?:s|ing)?)\b/i,
+  ],
 ] as const;
 const passiveFramingPattern =
   /\b(?:shows?|captures?|depicts?|features?|illuminates?|can be seen|is seen)\b/i;
@@ -92,10 +101,7 @@ const castMemberSchema = z.object({
   recurrence: z.enum(["RECURRING", "SCENE_ONLY"]),
   ageBand: z.string().trim().min(2).max(32),
   referenceBasis: z.enum(["REFERENCE_BACKED", "FICTIONAL_CAST"]),
-  appearanceAnchors: z
-    .array(z.string().trim().min(2).max(48))
-    .min(3)
-    .max(5),
+  appearanceAnchors: z.array(z.string().trim().min(2).max(48)).min(3).max(5),
   complexionOrHeritageAnchor: z.string().trim().min(2).max(72).nullable(),
   wardrobeAnchor: z.string().trim().min(3).max(80),
   distinguishingFeature: z.string().trim().min(8).max(140),
@@ -114,7 +120,10 @@ export const castPlanSchema = z
           ? [1, 1]
           : [2, 4];
 
-    if (value.members.length < expected[0] || value.members.length > expected[1]) {
+    if (
+      value.members.length < expected[0] ||
+      value.members.length > expected[1]
+    ) {
       ctx.addIssue({
         code: "custom",
         message: `${value.mode} requires ${expected[0] === expected[1] ? expected[0] : `${expected[0]}-${expected[1]}`} cast members.`,
@@ -152,9 +161,7 @@ export const castPlanSchema = z
     const tokenSets = signatures.map(
       (signature) =>
         new Set(
-          signature
-            .split(/[^a-z0-9]+/)
-            .filter((token) => token.length > 2),
+          signature.split(/[^a-z0-9]+/).filter((token) => token.length > 2),
         ),
     );
     for (let left = 0; left < tokenSets.length; left += 1) {
@@ -200,14 +207,12 @@ export const shotPromptSchema = z
     },
     { message: "Shot direction must contain 14 to 60 words." },
   )
-  .refine(
-    (value) => countReliableCameraBehaviors(value) === 1,
-    {
-      message: "Shot direction must contain exactly one reliable camera move.",
-    },
-  )
+  .refine((value) => countReliableCameraBehaviors(value) === 1, {
+    message: "Shot direction must contain exactly one reliable camera move.",
+  })
   .refine((value) => (value.match(sequencePattern) ?? []).length <= 1, {
-    message: "Shot direction may contain at most one simple two-beat progression.",
+    message:
+      "Shot direction may contain at most one simple two-beat progression.",
   })
   .refine((value) => (value.match(/\band\b/gi) ?? []).length <= 1, {
     message:
@@ -230,13 +235,23 @@ export const storyboardSceneSchema = z
     voiceoverText: z.string().min(1).max(600),
     shotPrompt: shotPromptSchema,
     continuityNotes: z.string().min(6).max(700),
-    continuityMode: z.enum([
-      "CONTINUOUS",
-      "MATCH_CUT",
-      "INTENTIONAL_CHANGE",
-    ]),
+    continuityMode: z.enum(["CONTINUOUS", "MATCH_CUT", "INTENTIONAL_CHANGE"]),
   })
   .superRefine((value, ctx) => {
+    const voiceoverWords = value.voiceoverText
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean).length;
+    const voiceoverWordBudget = Math.floor(value.durationSec * 2.5);
+
+    if (voiceoverWords > voiceoverWordBudget) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Voiceover must use at most ${voiceoverWordBudget} words for a natural ${value.durationSec}-second read.`,
+        path: ["voiceoverText"],
+      });
+    }
+
     if (
       value.durationSec <= 6 &&
       (value.shotPrompt.match(sequencePattern) ?? []).length > 0
@@ -458,7 +473,7 @@ export const storyboardPatchSchema = z.object({
         id: z.string().min(1),
         durationSec: z.number().int().min(5).max(10),
         captionText: z.string().min(1).max(140),
-        voiceoverText: z.string().min(1).max(600),
+        voiceoverText: z.string().max(600),
         // Existing projects may carry a legacy motion brief until it is edited
         // or the storyboard is regenerated. The route strictly validates every
         // newly changed shot direction against shotPromptSchema.
@@ -891,10 +906,10 @@ function normalizeCastPlan(value: unknown, characterSummary: string) {
             min: 2,
             max: 40,
           }),
-          recurrence: normalizeEnum(
-            member.recurrence ?? member.persistence,
-            ["RECURRING", "SCENE_ONLY"] as const,
-          ),
+          recurrence: normalizeEnum(member.recurrence ?? member.persistence, [
+            "RECURRING",
+            "SCENE_ONLY",
+          ] as const),
           ageBand: text(member.ageBand ?? member.age_band ?? member.age, {
             fallback: "",
             min: 2,
@@ -911,9 +926,7 @@ function normalizeCastPlan(value: unknown, characterSummary: string) {
               : []
           )
             .slice(0, 5)
-            .map((anchor) =>
-              text(anchor, { fallback: "", min: 2, max: 48 }),
-            ),
+            .map((anchor) => text(anchor, { fallback: "", min: 2, max: 48 })),
           complexionOrHeritageAnchor:
             complexion === null || complexion === undefined
               ? null
@@ -1025,10 +1038,11 @@ function normalizeGeneratedShotPrompt(value: unknown) {
     .split(/\s+/)
     .slice(0, 6)
     .join(" ");
-  action = action
-    .replace(/^(?:shows?|captures?|depicts?|features?)\s+/i, "")
-    .replace(/[:.!?]+/g, "")
-    .trim() || action;
+  action =
+    action
+      .replace(/^(?:shows?|captures?|depicts?|features?)\s+/i, "")
+      .replace(/[:.!?]+/g, "")
+      .trim() || action;
 
   const candidate = `${mood}: ${action}.`;
   if (shotPromptSchema.safeParse(candidate).success) {
@@ -1047,10 +1061,14 @@ function normalizeGeneratedShotPrompt(value: unknown) {
 }
 
 function inferShotMood(value: string) {
-  if (/\b(?:overwhelm|frustrat|tense|cry|panic|pressure|stress)\w*\b/i.test(value)) {
+  if (
+    /\b(?:overwhelm|frustrat|tense|cry|panic|pressure|stress)\w*\b/i.test(value)
+  ) {
     return "Tense pressure";
   }
-  if (/\b(?:relief|release|calm|safe|trust|reassur|gentle|warm)\w*\b/i.test(value)) {
+  if (
+    /\b(?:relief|release|calm|safe|trust|reassur|gentle|warm)\w*\b/i.test(value)
+  ) {
     return "Reassuring warmth";
   }
   if (/\b(?:quiet|serene|rest|coffee|breathe|peace)\w*\b/i.test(value)) {
