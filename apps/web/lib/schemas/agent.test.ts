@@ -210,7 +210,9 @@ describe("Phase 4 agent schemas", () => {
       end_frame_prompt:
         "Vertical branded ending frame that preserves palette, subject, and lighting.",
       motionPrompt:
-        "Calm focus: the product turns gently as the camera slowly pushes in.",
+        index === 1
+          ? "Tense anticipation. One founder lifts the bottle."
+          : "Calm focus: the product turns gently as the camera slowly pushes in.",
       continuity_notes:
         "Keep palette, lighting, subject identity, and caption placement consistent.",
     });
@@ -227,7 +229,9 @@ describe("Phase 4 agent schemas", () => {
 
     expect(parsed.scenes).toHaveLength(3);
     expect(parsed.scenes[0]?.durationSec).toBe(8);
-    expect(parsed.scenes[0]?.shotPrompt).toContain("Calm focus");
+    expect(parsed.scenes[0]?.shotPrompt).toBe(
+      "Tense anticipation: One founder lifts the bottle, while a fixed camera holds the composition.",
+    );
     expect(parsed.bgm.preset).toBe("warm pulse");
     expect(parsed.continuityBible.product).toContain("recurring product");
     expect(parsed.scenes[0]?.continuityMode).toBe("CONTINUOUS");

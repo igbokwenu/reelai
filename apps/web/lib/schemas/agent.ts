@@ -81,6 +81,10 @@ const reliableCameraPatterns = [
   /\b(?:handheld follow|handheld camera[^,.]{0,24}follow(?:s|ing)?)\b/i,
 ] as const;
 
+function countReliableCameraBehaviors(value: string) {
+  return reliableCameraPatterns.filter((pattern) => pattern.test(value)).length;
+}
+
 export const shotPromptSchema = z
   .string()
   .trim()
@@ -97,9 +101,7 @@ export const shotPromptSchema = z
     { message: "Shot direction must contain 8 to 36 words." },
   )
   .refine(
-    (value) =>
-      reliableCameraPatterns.filter((pattern) => pattern.test(value)).length ===
-      1,
+    (value) => countReliableCameraBehaviors(value) === 1,
     {
       message: "Shot direction must contain exactly one reliable camera move.",
     },
@@ -202,6 +204,8 @@ export const storyboardJsonSchema = {
             minLength: 20,
             maxLength: 280,
             pattern: "^[^.!?\\n:]{2,40}: [^.!?\\n]+[.!?]?$",
+            description:
+              "Exactly one 8-36 word sentence in the form 'Mood anchor: one primary subject performs one action while one camera behavior is specified.' Use exactly one of: fixed camera, slow push-in, slow pull-back, gentle product orbit, or handheld follow.",
           },
           continuityNotes: {
             type: "string",
@@ -564,18 +568,13 @@ function normalizeStoryboardScene(value: unknown, index: number) {
         max: 600,
       },
     ),
-    shotPrompt: text(
+    shotPrompt: normalizeGeneratedShotPrompt(
       record.shotPrompt ??
         record.shot_prompt ??
         record.videoMotionPrompt ??
         record.video_motion_prompt ??
         record.motionPrompt ??
         record.motion,
-      {
-        fallback: "",
-        min: 20,
-        max: 280,
-      },
     ),
     continuityNotes: text(
       record.continuityNotes ??
@@ -649,6 +648,74 @@ function normalizeContinuityMode(value: unknown) {
   }
 
   return "CONTINUOUS" as const;
+}
+
+/**
+ * Structured-output providers can satisfy the JSON shape while narrowly
+ * missing a prose-level refinement. Preserve the first clear action and make
+ * only deterministic, low-risk repairs; genuinely missing directions still
+ * fail validation instead of becoming generic filler.
+ */
+function normalizeGeneratedShotPrompt(value: unknown) {
+  const raw = text(value, { fallback: "", min: 20, max: 280 });
+
+  if (shotPromptSchema.safeParse(raw).success || raw.length < 20) {
+    return raw;
+  }
+
+  const clean = raw.replace(/[“”"]/g, "").replace(/\s+/g, " ").trim();
+  const sentenceParts = clean
+    .split(/[.!?]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const colonMatch = clean.match(/^([^:]{2,40}):\s*(.+)$/);
+  let mood = "Focused momentum";
+  let action = sentenceParts[0] ?? clean;
+
+  if (colonMatch) {
+    mood = colonMatch[1]?.trim() || mood;
+    action = (colonMatch[2] ?? action).split(/[.!?]+/)[0]?.trim() || action;
+  } else if (
+    sentenceParts.length > 1 &&
+    (sentenceParts[0]?.split(/\s+/).length ?? 0) <= 6
+  ) {
+    mood = sentenceParts[0] ?? mood;
+    action = sentenceParts[1] ?? action;
+  }
+
+  mood = mood
+    .replace(/\band\b/gi, ",")
+    .replace(/[:.!?]+/g, "")
+    .replace(/\s*,\s*/g, ", ")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 6)
+    .join(" ");
+  action = action
+    .split(/\b(?:and then|then|before|after)\b/i)[0]
+    ?.split(/\s+and\s+(?=(?:the|a|an|he|she|they|it|camera|handheld)\b)/i)[0]
+    ?.replace(/[:.!?]+/g, "")
+    .trim() || action;
+
+  const candidate = `${mood}: ${action}.`;
+  if (shotPromptSchema.safeParse(candidate).success) {
+    return candidate;
+  }
+
+  // An absent, unsupported, or compound camera brief defaults to the most
+  // stable generation setup. Remove only an explicit trailing camera clause.
+  const primaryAction = action
+    .split(/\b(?:as|while|with)\s+(?:the\s+)?(?:camera|handheld)\b/i)[0]
+    ?.split(/[,;]+/)[0]
+    ?.trim();
+  const actionWords = (primaryAction || action).split(/\s+/).slice(0, 20);
+  const paddedAction =
+    actionWords.length >= 3
+      ? actionWords.join(" ")
+      : `${actionWords.join(" ")} remains clearly visible`.trim();
+  const repaired = `${mood}: ${paddedAction}, while a fixed camera holds the composition.`;
+
+  return shotPromptSchema.safeParse(repaired).success ? repaired : raw;
 }
 
 function normalizeBgm(value: unknown) {
