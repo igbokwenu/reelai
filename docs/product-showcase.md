@@ -37,7 +37,9 @@ The three-image total is deliberate. Current reference-aware image generation ca
 
 Uploaded product images are prioritized ahead of logos, reference ads, and general uploads when generating concept previews and scene anchors. Realistic mode uses commercial photography language; 3D mode uses physically based materials and studio lighting without changing product geometry.
 
-Structured storyboard output is repaired conservatively before it can enter Auto mode. Reel AI retains a supported camera move even when the model places it in a separate sentence, recognizes tactile product motion such as shimmer, sweep, settle, separate, fold, and pivot, and reconciles scene timing plus voiceover length to the project's exact target. Manual approval, anchor generation, clip generation, and Remotion export all use the same timing validator, so an invalid edit is explained in the storyboard rather than failing later in production.
+Structured storyboard output is repaired conservatively before it can enter Auto mode. Reel AI converts substantive multi-sentence prose into one safe shot direction, collapses conflicting camera language to one supported behavior, retains the focal product action, and reconciles scene timing plus voiceover length to the project's exact target. Creative-interest vocabulary and camera variety still guide generation, but they do not reject an otherwise safe product shot and trigger repeated paid rerolls. Manual approval, anchor generation, clip generation, and Remotion export all use the same timing validator, so an invalid edit is explained in the storyboard rather than failing later in production.
+
+During an active showcase run, the studio becomes a focused Auto production room. Manual generation/editing panels are hidden and the corresponding APIs reject stale manual requests. The complete editor returns if the run pauses for review or after the final reel is ready; no concept regeneration or replacement project is required to benefit from these safeguards.
 
 ## Data and API contract
 

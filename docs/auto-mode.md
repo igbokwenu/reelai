@@ -9,8 +9,8 @@ Auto mode is Reel AI's default concept-to-reel path. It removes the need to visi
 1. The user selects a creative concept.
 2. Before the first production spend, Reel AI shows a Brand Kit handoff with the project website, uploaded logos, product images, documents, and reference material. The handoff explains that these assets ground scene generation and the final brand lockup.
 3. The user can add brand material or proceed. Auto mode is on by default and can be turned off to continue with the existing step-by-step workflow.
-4. Auto mode displays one persistent production surface with the current phase, completed phases, overall progress, retry status, and a link into the relevant manual editor.
-5. When rendering completes, the surface links directly to the final reel. Storyboard, Production, Final, and Assets remain available for inspection or regeneration.
+4. Auto mode displays a focused production room with the current phase, completed phases, overall progress, and retry status. Manual tabs and generation controls are hidden while the coordinator owns an active run, preventing conflicting edits and duplicate provider spend.
+5. If Auto mode exhausts recovery and pauses, the relevant editor returns with **Review** and **Resume auto mode** actions. When rendering completes, the complete manual workflow returns and the surface links directly to the final reel.
 
 After the first Brand Kit confirmation, selecting a new concept uses a compact proceed panel instead of repeating the full asset handoff. The Auto mode preference is stored on the project.
 
@@ -26,14 +26,15 @@ Each poll advances at most one phase and first verifies persisted output. This m
 
 - Storyboards are auto-approved only after structured generation, exact timing, narration-fit, and policy checks. A policy blocker stops for human review.
 - Scene-count validation is output-mode aware: standard reels retain 2–4 scenes totaling 15–30 seconds, while Product Showcase uses a feasible 1–3 scenes totaling the project's exact 5, 10, or 15 second target. The same contract is enforced in the editor, production jobs, and final render.
-- Near-valid model output is normalized before persistence: supported camera direction is preserved when it arrives in a separate sentence, common product motion remains valid, voiceover is fitted after timing correction, and Product Showcase scene durations are reconciled to the exact target. A bounded schema-repair pass retains the original project requirements.
+- Near-valid model output is normalized before persistence: substantive multi-sentence prose becomes one safe shot sentence, conflicting camera clauses collapse to one supported behavior, voiceover is fitted after timing correction, and Product Showcase scene durations are reconciled to the exact target. Subjective creative-interest vocabulary and cross-scene camera variety remain prompt-level quality guidance rather than paid-retry blockers. A bounded schema-repair pass retains the original project requirements for genuinely incomplete output.
 - Anchor generation selects one current continuity-aware anchor per scene.
 - Video polling reuses the existing provider task IDs. If only some scenes fail, retry generation targets only missing scenes; completed siblings remain selected.
 - Narration is considered current only when every voiced scene links to a durable audio artifact.
 - A final render must have completed during the current auto run before it can finish the run.
 - Transient failures, including creative schema misses, receive up to three total phase attempts with bounded exponential backoff between attempts. Validation errors that require an actual user decision remain non-retryable. Provider-level HTTP/video polling has its own bounded retry behavior.
 - Exhausted or non-transient failures retain the failed phase and expose **Review** and **Resume auto mode** actions.
-- If a manual edit invalidates upstream output during an active run, the coordinator moves back to the earliest required phase instead of continuing with stale inputs. Navigating between tabs is safe; storyboard job claiming prevents a manual click and Auto mode from starting duplicate storyboard work.
+- While a run is active, project mutation APIs reject manual Brand Kit, concept, source, storyboard, take-selection, production, narration, and render actions with a conflict response. This also protects against stale browser tabs or direct requests after the focused UI has hidden its controls.
+- Existing upstream edits made before Auto mode starts are reconciled normally; if persisted output is no longer current, the coordinator moves back to the earliest required phase instead of continuing with stale inputs.
 
 The coordinator is app-driven for the current MVP: the studio polls `GET /api/projects/:projectId/auto`, which claims and advances the durable run. A future worker can call the same coordinator without changing the persisted state model or UI contract.
 

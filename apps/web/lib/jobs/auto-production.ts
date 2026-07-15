@@ -63,12 +63,6 @@ export async function startAutoGeneration({
       );
     }
 
-    await tx.project.update({
-      where: { id: projectId },
-      data: { autoMode: enabled, brandKitConfirmedAt: new Date() },
-    });
-    if (!enabled) return null;
-
     const active = await tx.autoGenerationRun.findFirst({
       where: {
         projectId,
@@ -76,6 +70,18 @@ export async function startAutoGeneration({
       },
       orderBy: { createdAt: "desc" },
     });
+    if (active && !enabled) {
+      throw new PublicError(
+        "Auto mode is already building this reel. Manual mode returns when the run completes or pauses for review.",
+        409,
+      );
+    }
+
+    await tx.project.update({
+      where: { id: projectId },
+      data: { autoMode: enabled, brandKitConfirmedAt: new Date() },
+    });
+    if (!enabled) return null;
     if (active) return active;
 
     return tx.autoGenerationRun.create({
@@ -96,6 +102,7 @@ export async function resumeAutoGeneration(projectId: string) {
     );
   }
   if (latest.status === "COMPLETE") return latest;
+  if (isAutoRunActive(latest.status)) return latest;
 
   return prisma.autoGenerationRun.update({
     where: { id: latest.id },

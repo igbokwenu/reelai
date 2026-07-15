@@ -240,14 +240,6 @@ export function AutoGenerationPanel({
                 <PlayReelIcon />
                 Watch final reel
               </Button>
-            ) : current ? (
-              <Button
-                onClick={() => onReviewStage(current.stage)}
-                size="sm"
-                variant="outline"
-              >
-                Review details
-              </Button>
             ) : null}
           </div>
         </div>

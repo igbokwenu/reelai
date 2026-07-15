@@ -1,5 +1,6 @@
 import { handleRoute, notFound, ok } from "@/lib/http/responses";
 import { createAndRunConceptJob } from "@/lib/jobs/creative";
+import { assertManualControlAvailable } from "@/lib/jobs/manual-control";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -17,6 +18,7 @@ export async function POST(_request: Request, context: RouteContext) {
     if (!project) {
       return notFound("Project not found");
     }
+    await assertManualControlAvailable(projectId);
 
     if (!project.brandKit) {
       return ok(

@@ -6,6 +6,7 @@ import {
 } from "@/lib/http/responses";
 import { storeObject } from "@/lib/oss";
 import { prisma } from "@/lib/prisma";
+import { assertManualControlAvailable } from "@/lib/jobs/manual-control";
 import { registerSourceSchema, sourceTypeSchema } from "@/lib/schemas/project";
 
 type RouteContext = {
@@ -53,6 +54,7 @@ export async function POST(request: Request, context: RouteContext) {
     if (!project) {
       return notFound("Project not found");
     }
+    await assertManualControlAvailable(projectId);
 
     const contentType = request.headers.get("content-type") ?? "";
 

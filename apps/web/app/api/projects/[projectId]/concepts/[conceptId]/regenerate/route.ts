@@ -1,5 +1,6 @@
 import { handleRoute, notFound, ok } from "@/lib/http/responses";
 import { createAndRunConceptRegenerationJob } from "@/lib/jobs/creative";
+import { assertManualControlAvailable } from "@/lib/jobs/manual-control";
 import { prisma } from "@/lib/prisma";
 import { creativeConceptRegenerationInputSchema } from "@/lib/schemas/agent";
 
@@ -24,6 +25,7 @@ export async function POST(request: Request, context: RouteContext) {
     if (!concept) {
       return notFound("Concept not found");
     }
+    await assertManualControlAvailable(projectId);
 
     if (!concept.project.brandKit) {
       return ok(

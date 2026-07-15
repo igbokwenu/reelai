@@ -1,5 +1,6 @@
 import { PublicError } from "@/lib/errors";
 import { handleRoute, notFound, ok } from "@/lib/http/responses";
+import { assertManualControlAvailable } from "@/lib/jobs/manual-control";
 import { prisma } from "@/lib/prisma";
 import { shotPromptSchema, storyboardPatchSchema } from "@/lib/schemas/agent";
 import { planContinuityInvalidation } from "@/lib/storyboards/continuity-invalidation";
@@ -24,6 +25,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (!storyboard) {
       return notFound("Storyboard not found");
     }
+    await assertManualControlAvailable(storyboard.projectId);
 
     if (body.scenes) {
       const knownSceneIds = new Set(storyboard.scenes.map((scene) => scene.id));

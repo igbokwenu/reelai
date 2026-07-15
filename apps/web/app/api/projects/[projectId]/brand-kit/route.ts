@@ -4,6 +4,7 @@ import {
   createQueuedBrandKitJob,
   runBrandKitJob,
 } from "@/lib/jobs/brand-kit";
+import { assertManualControlAvailable } from "@/lib/jobs/manual-control";
 import { prisma } from "@/lib/prisma";
 import { after } from "next/server";
 
@@ -28,6 +29,7 @@ export async function POST(request: Request, context: RouteContext) {
     if (!project) {
       return notFound("Project not found");
     }
+    await assertManualControlAvailable(projectId);
 
     if (project.outputMode === "PRODUCT_SHOWCASE") {
       const coveredProducts = new Set(

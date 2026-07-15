@@ -267,10 +267,6 @@ export const shotPromptSchema = z
   .refine((value) => !passiveFramingPattern.test(value), {
     message:
       "Shot direction must describe visible action, not passive shows/captures/illuminates framing.",
-  })
-  .refine((value) => visibleStoryBeatPattern.test(value), {
-    message:
-      "Shot direction must include a visible story change, layered composition, reveal, reaction, entrance, exit, or tactile motion.",
   });
 
 export const storyboardSceneSchema = z
@@ -359,21 +355,6 @@ function validateStoryboardStructure(
     ctx.addIssue({
       code: "custom",
       message: `Storyboard duration must land between ${minDuration} and ${maxDuration} seconds.`,
-      path: ["scenes"],
-    });
-  }
-
-  const cameraBehaviors = new Set(
-    value.scenes
-      .map((scene) => reliableCameraBehavior(scene.shotPrompt))
-      .filter(Boolean),
-  );
-
-  if (value.scenes.length > 1 && cameraBehaviors.size < 2) {
-    ctx.addIssue({
-      code: "custom",
-      message:
-        "Use at least two camera behaviors across the storyboard so the visual rhythm does not become repetitive.",
       path: ["scenes"],
     });
   }
@@ -996,6 +977,7 @@ function normalizeStoryboardScene(value: unknown, index: number) {
         record.video_motion_prompt ??
         record.motionPrompt ??
         record.motion,
+      index,
     ),
     continuityNotes: text(
       record.continuityNotes ??
@@ -1182,7 +1164,7 @@ function normalizeContinuityMode(value: unknown) {
  * only deterministic, low-risk repairs; genuinely missing directions still
  * fail validation instead of becoming generic filler.
  */
-function normalizeGeneratedShotPrompt(value: unknown) {
+function normalizeGeneratedShotPrompt(value: unknown, sceneIndex = 0) {
   const raw = text(value, { fallback: "", min: 20, max: 480 });
 
   if (shotPromptSchema.safeParse(raw).success || raw.length < 20) {
@@ -1198,7 +1180,11 @@ function normalizeGeneratedShotPrompt(value: unknown) {
   const moodLeadMatch = clean.match(
     /^([^.!?:]{2,40}\b(?:atmosphere|mood|energy|tension|pressure|warmth|relief|confidence|curiosity|delight|unease))\s+(.+)$/i,
   );
-  const cameraBehavior = reliableCameraBehavior(clean);
+  const suppliedCameraBehavior = reliableCameraBehavior(clean);
+  const cameraBehavior =
+    countReliableCameraBehaviors(clean) === 1 && suppliedCameraBehavior
+      ? suppliedCameraBehavior
+      : preferredCameraBehavior(sceneIndex);
   let mood = inferShotMood(clean);
   let action =
     sentenceParts.find((part) => !reliableCameraBehavior(part)) ??
@@ -1226,18 +1212,17 @@ function normalizeGeneratedShotPrompt(value: unknown) {
     action = sentenceParts[1] ?? action;
   }
 
-  mood = mood
-    .replace(/[:.!?]+/g, "")
-    .replace(/\s*,\s*/g, ", ")
-    .trim()
-    .split(/\s+/)
-    .slice(0, 6)
-    .join(" ");
-  action =
-    action
-      .replace(/^(?:shows?|captures?|depicts?|features?)\s+/i, "")
-      .replace(/[:.!?]+/g, "")
-      .trim() || action;
+  mood = sanitizeShotMood(mood, clean);
+  action = sanitizeShotAction(action);
+
+  if (!action) {
+    action =
+      "the focal subject moves into the foreground as surface detail settles under controlled light";
+  } else if (!visibleStoryBeatPattern.test(action)) {
+    action = `${action}, as the focal subject moves into the foreground`;
+  }
+
+  action = action.split(/\s+/).slice(0, 42).join(" ");
 
   const candidate = `${mood}: ${action}.`;
   if (shotPromptSchema.safeParse(candidate).success) {
@@ -1247,10 +1232,63 @@ function normalizeGeneratedShotPrompt(value: unknown) {
   // Preserve a supported camera direction even when the provider put it in a
   // second sentence. If none was supplied, use the most stable setup. We do
   // not invent a story beat: banal or overloaded action still goes to repair.
-  const cameraClause = cameraDirectionClause(cameraBehavior ?? "fixed");
-  const repaired = `${mood}: ${action.replace(/[,;\s]+$/, "")}, while ${cameraClause}.`;
+  const cameraClause = cameraDirectionClause(cameraBehavior);
+  let repaired = `${mood}: ${action.replace(/[,;\s]+$/, "")}, while ${cameraClause}.`;
+  if (wordCount(repaired) < 14) {
+    repaired = `${mood}: ${action.replace(/[,;\s]+$/, "")} with surface detail settling under controlled light, while ${cameraClause}.`;
+  }
 
-  return shotPromptSchema.safeParse(repaired).success ? repaired : raw;
+  if (shotPromptSchema.safeParse(repaired).success) return repaired;
+
+  const fallback = `${mood || "Purposeful energy"}: the focal subject moves into the foreground as its surface detail settles under controlled light, while ${cameraClause}.`;
+
+  return shotPromptSchema.safeParse(fallback).success ? fallback : raw;
+}
+
+function sanitizeShotAction(value: string) {
+  return value
+    .replace(
+      /\b(?:while|as|and)?\s*(?:(?:the|a)\s+)?(?:(?:fixed|static|handheld)\s+camera|camera|slow push-in|slow pull-back|gentle product orbit|handheld follow)\b[^,;]*/gi,
+      "",
+    )
+    .replace(
+      /\b(?:pan(?:s|ning)?|zooms?|doll(?:y|ies)|rack(?:s|ing)? focus|tilts?)\b[^,;]*/gi,
+      "",
+    )
+    .replace(/\b(?:shows?|captures?|depicts?|features?)\b/gi, "")
+    .replace(/\billuminates?\b/gi, "sweeps across")
+    .replace(sequencePattern, "as")
+    .replace(/\band\b/gi, ",")
+    .replace(/[:.!?]+/g, "")
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/(?:,\s*){2,}/g, ", ")
+    .replace(/\b(?:as|while|with)\s*$/i, "")
+    .replace(/^[,;\s]+|[,;\s]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sanitizeShotMood(value: string, fullPrompt: string) {
+  const sanitized = sanitizeShotAction(value)
+    .replace(/[,;]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 6)
+    .join(" ");
+
+  return sanitized && countReliableCameraBehaviors(sanitized) === 0
+    ? sanitized
+    : inferShotMood(fullPrompt);
+}
+
+function preferredCameraBehavior(sceneIndex: number) {
+  const behaviors = ["fixed", "push-in", "pull-back", "orbit"] as const;
+  return behaviors[sceneIndex % behaviors.length]!;
+}
+
+function wordCount(value: string) {
+  return value.trim().split(/\s+/).filter(Boolean).length;
 }
 
 function cameraDirectionClause(

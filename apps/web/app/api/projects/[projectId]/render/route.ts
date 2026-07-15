@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { handleRoute, notFound, ok } from "@/lib/http/responses";
 import { createAndRunFinalRenderJob } from "@/lib/jobs/final-render";
+import { assertManualControlAvailable } from "@/lib/jobs/manual-control";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -27,6 +28,7 @@ export async function POST(request: Request, context: RouteContext) {
     if (!project) {
       return notFound("Project not found");
     }
+    await assertManualControlAvailable(projectId);
 
     const job = await createAndRunFinalRenderJob({
       projectId,

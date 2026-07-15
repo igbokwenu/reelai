@@ -329,6 +329,79 @@ describe("Phase 4 agent schemas", () => {
     expect(parsed.scenes[0]?.voiceoverText).not.toMatch(/\band\.$/i);
   });
 
+  it("deterministically repairs substantive storyboard prose without paid reroll luck", () => {
+    const parsed = parseStoryboardOutput(
+      {
+        title: "Controlled product appetite",
+        script:
+          "A premium food reveal that holds product identity steady and closes on a concise invitation.",
+        bgm: {
+          enabled: true,
+          preset: "restrained pulse",
+          prompt: "A polished low-tempo pulse with a warm tactile finish.",
+        },
+        continuityBible: {
+          product:
+            "Preserve the exact burger stack, toasted bun, fillings, proportions, and plate.",
+          characters:
+            "No people appear; keep the supplied food product as the only focal subject.",
+          cast: { mode: "NO_PEOPLE", members: [] },
+          visualWorld:
+            "Controlled warm studio highlights, deep shadows, and premium macro detail.",
+        },
+        scenes: [
+          {
+            index: 1,
+            durationSec: 5,
+            captionText: "Made with intention",
+            voiceoverText: "Every layer is made to invite a closer look.",
+            shotPrompt:
+              "Camera slowly pushes in. The burger remains centered beneath warm highlights. Steam hangs above the plate.",
+            continuityNotes:
+              "Keep the exact stack, plate, warm highlights, and centered placement.",
+            continuityMode: "CONTINUOUS",
+          },
+          {
+            index: 2,
+            durationSec: 5,
+            captionText: "Take the first bite",
+            voiceoverText: "Discover the Deluxe Burger today.",
+            shotPrompt:
+              "Confident finish: steam drifts above the burger as the camera slowly pushes in while a gentle product orbit circles the plate.",
+            continuityNotes:
+              "Preserve the same stack, plate, palette, highlights, and product scale.",
+            continuityMode: "MATCH_CUT",
+          },
+        ],
+      },
+      "PRODUCT_SHOWCASE",
+      10,
+    );
+
+    for (const scene of parsed.scenes) {
+      expect(storyboardSceneSchema.safeParse(scene).success).toBe(true);
+      expect(scene.shotPrompt.match(/[.!?]/g) ?? []).toHaveLength(1);
+    }
+    expect(parsed.scenes[1]?.shotPrompt).toContain("slow push-in");
+    expect(parsed.scenes[1]?.shotPrompt).not.toContain("product orbit");
+  });
+
+  it("keeps creative interest heuristics advisory instead of blocking a safe shot", () => {
+    expect(
+      storyboardSceneSchema.safeParse({
+        index: 1,
+        durationSec: 6,
+        captionText: "Premium detail",
+        voiceoverText: "A considered finish, made to be remembered.",
+        shotPrompt:
+          "Premium stillness: the burger rests beneath controlled studio highlights while a fixed camera holds the composition with rich material detail.",
+        continuityNotes:
+          "Preserve the supplied burger, plate, studio palette, and warm highlights.",
+        continuityMode: "CONTINUOUS",
+      }).success,
+    ).toBe(true);
+  });
+
   it("rejects an impossible showcase scene count for coherent model repair", () => {
     const invalid = {
       title: "Five second product reveal",

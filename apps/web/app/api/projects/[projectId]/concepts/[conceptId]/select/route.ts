@@ -1,5 +1,6 @@
 import { handleRoute, notFound, ok } from "@/lib/http/responses";
 import { selectConcept } from "@/lib/agents/creative";
+import { assertManualControlAvailable } from "@/lib/jobs/manual-control";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -17,6 +18,7 @@ export async function POST(_request: Request, context: RouteContext) {
     if (!project) {
       return notFound("Project not found");
     }
+    await assertManualControlAvailable(projectId);
 
     const candidate = await prisma.creativeConcept.findFirst({
       where: { id: conceptId, projectId },
@@ -32,7 +34,10 @@ export async function POST(_request: Request, context: RouteContext) {
     const metadata = preview?.metadata as { groundingMode?: unknown } | null;
     if (typeof metadata?.groundingMode !== "string") {
       return ok(
-        { error: "Regenerate this concept with the current visual grounding safeguards before selecting it." },
+        {
+          error:
+            "Regenerate this concept with the current visual grounding safeguards before selecting it.",
+        },
         { status: 409 },
       );
     }
