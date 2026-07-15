@@ -143,6 +143,7 @@ export default async function ProjectPage({ params }: PageProps) {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Metric label="Style" value={formatEnum(project.style)} />
+                <Metric label="Mode" value={formatEnum(project.outputMode)} />
                 <Metric label="Length" value={`${project.videoLengthSec}s`} />
                 <Metric
                   label="Sources"
@@ -154,6 +155,49 @@ export default async function ProjectPage({ params }: PageProps) {
                 />
               </div>
             </header>
+
+            {project.outputMode === "PRODUCT_SHOWCASE" ? (
+              <section className="mt-4 overflow-hidden rounded-2xl border border-primary/20 bg-[radial-gradient(circle_at_top_right,rgba(183,255,60,0.09),transparent_35%),rgba(18,21,18,0.72)] p-4 sm:p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+                      Product showcase
+                    </p>
+                    <h2 className="mt-1 text-lg font-semibold">
+                      Identity-locked product direction
+                    </h2>
+                    <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
+                      Your uploaded product photography is the source of truth.
+                      Reel AI will pitch three restrained concepts, then build a{" "}
+                      {project.videoLengthSec}-second showcase with one hero
+                      action per shot.
+                    </p>
+                  </div>
+                  <span className="w-fit rounded-full border border-primary/20 bg-primary/[0.07] px-3 py-1.5 text-xs font-medium text-primary">
+                    {project.products.length} product
+                    {project.products.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {project.products.map((product, index) => (
+                    <div
+                      className="rounded-xl border border-border/80 bg-background/55 p-3"
+                      key={product.id}
+                    >
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        {index === 0 ? "Hero product" : `Product ${index + 1}`}
+                      </p>
+                      <p className="mt-1 text-sm font-medium">{product.name}</p>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                        {product.details ??
+                          product.websiteUrl ??
+                          "Grounded by uploaded product image"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             <details className="group mt-4 rounded-xl border border-border/70 bg-card/50 px-4 py-3 text-sm">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-medium [&::-webkit-details-marker]:hidden">
@@ -195,7 +239,13 @@ export default async function ProjectPage({ params }: PageProps) {
                       description="Add logos, product shots, screenshots, or supporting URLs. New material becomes available to future generations."
                       title="Source material"
                     />
-                    <SourceUploader projectId={project.id} />
+                    <SourceUploader
+                      products={project.products.map(({ id, name }) => ({
+                        id,
+                        name,
+                      }))}
+                      projectId={project.id}
+                    />
                     <div className="mt-5 grid gap-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                         Registered sources · {project.sources.length}
@@ -263,6 +313,7 @@ export default async function ProjectPage({ params }: PageProps) {
                   artifacts={project.artifacts}
                   latestNarrationJob={latestNarrationJob}
                   latestRenderJob={latestRenderJob}
+                  outputMode={project.outputMode}
                   projectId={project.id}
                   renders={project.renders}
                   storyboard={project.storyboard}

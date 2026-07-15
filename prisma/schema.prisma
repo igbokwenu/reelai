@@ -7,19 +7,20 @@ datasource db {
 }
 
 model Project {
-  id                  String        @id @default(cuid())
+  id                  String          @id @default(cuid())
   name                String
   businessName        String
   websiteUrl          String?
   targetAudience      String?
   offer               String?
-  videoLengthSec      Int           @default(30)
+  videoLengthSec      Int             @default(30)
   style               VideoStyle
-  status              ProjectStatus @default(DRAFT)
-  autoMode            Boolean       @default(true)
+  outputMode          VideoOutputMode @default(STANDARD)
+  status              ProjectStatus   @default(DRAFT)
+  autoMode            Boolean         @default(true)
   brandKitConfirmedAt DateTime?
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
   brandKit   BrandKit?
   sources    BrandSource[]
@@ -29,23 +30,40 @@ model Project {
   artifacts  Artifact[]
   renders    Render[]
   autoRuns   AutoGenerationRun[]
+  products   ProjectProduct[]
+}
+
+model ProjectProduct {
+  id         String   @id @default(cuid())
+  projectId  String
+  name       String
+  details    String?
+  websiteUrl String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sources BrandSource[]
+
+  @@index([projectId, sortOrder])
 }
 
 model AutoGenerationRun {
-  id             String   @id @default(cuid())
-  projectId      String
-  status         String   @default("RUNNING")
-  phase          String   @default("STORYBOARD")
-  currentJobId   String?
-  attempt        Int      @default(0)
-  maxAttempts    Int      @default(3)
-  nextAttemptAt  DateTime?
-  leaseUntil     DateTime?
-  error          String?
-  startedAt      DateTime @default(now())
-  completedAt    DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String    @id @default(cuid())
+  projectId     String
+  status        String    @default("RUNNING")
+  phase         String    @default("STORYBOARD")
+  currentJobId  String?
+  attempt       Int       @default(0)
+  maxAttempts   Int       @default(3)
+  nextAttemptAt DateTime?
+  leaseUntil    DateTime?
+  error         String?
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -78,11 +96,15 @@ model BrandSource {
   type          SourceType
   url           String?
   artifactId    String?
+  productId     String?
   extractedText String?
   metadata      Json?
   createdAt     DateTime   @default(now())
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  product ProjectProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
 }
 
 model CreativeConcept {
@@ -211,6 +233,11 @@ model Render {
 enum VideoStyle {
   REALISTIC
   THREE_D_ANIMATION
+}
+
+enum VideoOutputMode {
+  STANDARD
+  PRODUCT_SHOWCASE
 }
 
 enum ProjectStatus {

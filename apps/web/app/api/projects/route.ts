@@ -2,7 +2,10 @@ import { created, handleRoute, ok } from "@/lib/http/responses";
 import { runBrandKitJob } from "@/lib/jobs/brand-kit";
 import { prisma } from "@/lib/prisma";
 import { QWEN_STRUCTURED_MODEL } from "@/lib/qwen/client";
-import { createProjectSchema, inferProjectIdentity } from "@/lib/schemas/project";
+import {
+  createProjectSchema,
+  inferProjectIdentity,
+} from "@/lib/schemas/project";
 import { after } from "next/server";
 
 export async function GET() {
@@ -33,24 +36,60 @@ export async function POST(request: Request) {
           offer: input.offer,
           videoLengthSec: input.videoLengthSec,
           style: input.style,
-          sources: input.websiteUrl || input.brief
-            ? {
-                create: {
-                  type: input.websiteUrl ? "WEBSITE" : "DOCUMENT",
-                  url: input.websiteUrl,
+          outputMode: input.outputMode,
+          products:
+            input.outputMode === "PRODUCT_SHOWCASE"
+              ? {
+                  create: input.products.map((product, sortOrder) => ({
+                    name: product.name,
+                    details: product.details,
+                    websiteUrl: product.websiteUrl,
+                    sortOrder,
+                  })),
+                }
+              : undefined,
+          sources:
+            input.websiteUrl || input.brief
+              ? {
+                  create: {
+                    type: input.websiteUrl ? "WEBSITE" : "DOCUMENT",
+                    url: input.websiteUrl,
+                    metadata: {
+                      label: input.websiteUrl
+                        ? "Project website"
+                        : "Creative direction",
+                      source: "project-intake",
+                      creativeDirection: input.brief,
+                      businessNameInferred: !input.businessName,
+                      projectNameInferred: !input.name,
+                    },
+                  },
+                }
+              : undefined,
+        },
+        include: { sources: true, products: { orderBy: { sortOrder: "asc" } } },
+      });
+      if (input.outputMode === "PRODUCT_SHOWCASE") {
+        const productSources = project.products.flatMap((product) =>
+          product.websiteUrl && product.websiteUrl !== input.websiteUrl
+            ? [
+                {
+                  projectId: project.id,
+                  productId: product.id,
+                  type: "WEBSITE" as const,
+                  url: product.websiteUrl,
                   metadata: {
-                    label: input.websiteUrl ? "Project website" : "Creative direction",
-                    source: "project-intake",
-                    creativeDirection: input.brief,
-                    businessNameInferred: !input.businessName,
-                    projectNameInferred: !input.name,
+                    label: `${product.name} product page`,
+                    source: "product-showcase-intake",
                   },
                 },
-              }
-            : undefined,
-        },
-        include: { sources: true },
-      });
+              ]
+            : [],
+        );
+        if (productSources.length > 0) {
+          await tx.brandSource.createMany({ data: productSources });
+        }
+      }
       const brandKitJob = input.generateBrandKit
         ? await tx.generationJob.create({
             data: {

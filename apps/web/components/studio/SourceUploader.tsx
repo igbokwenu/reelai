@@ -6,13 +6,20 @@ import { useState, useSyncExternalStore, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 
-export function SourceUploader({ projectId }: { projectId: string }) {
+export function SourceUploader({
+  projectId,
+  products = [],
+}: {
+  projectId: string;
+  products?: Array<{ id: string; name: string }>;
+}) {
   const router = useRouter();
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [urlError, setUrlError] = useState<string | null>(null);
   const isHydrated = useHydrationStatus();
   const [isUploading, setIsUploading] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [uploadType, setUploadType] = useState("LOGO");
 
   async function uploadFile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -78,6 +85,7 @@ export function SourceUploader({ projectId }: { projectId: string }) {
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
             name="type"
             defaultValue="LOGO"
+            onChange={(event) => setUploadType(event.target.value)}
           >
             <option value="LOGO">Logo</option>
             <option value="PRODUCT_IMAGE">Product image</option>
@@ -85,6 +93,20 @@ export function SourceUploader({ projectId }: { projectId: string }) {
             <option value="REFERENCE_AD">Reference ad</option>
             <option value="UPLOAD">Other upload</option>
           </select>
+          {uploadType === "PRODUCT_IMAGE" && products.length > 0 ? (
+            <select
+              aria-label="Product for this image"
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              name="productId"
+              required
+            >
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name}
+                </option>
+              ))}
+            </select>
+          ) : null}
           <input
             className="rounded-md border border-input bg-background px-3 py-2 text-sm"
             name="file"

@@ -17,6 +17,7 @@ Build only this before stretch work:
 - No committed secrets. `.env` must stay ignored.
 - QwenCloud client code visibly includes `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`.
 - User can create a project from a website URL plus optional uploads.
+- User can choose Product Showcase, which requires product photography and creates a 5–15 second realistic or 3D showcase from three proposed creative directions. It supports up to three products and three product images total, with at least one image linked to each product.
 - App generates a Brand Kit.
 - App generates exactly three creative concepts with one preview frame each.
 - User selects one concept.

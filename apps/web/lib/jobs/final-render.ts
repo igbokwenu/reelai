@@ -425,6 +425,7 @@ async function getRenderableStoryboard(
   const storyboard = await prisma.storyboard.findUnique({
     where: { projectId },
     include: {
+      project: { select: { outputMode: true } },
       scenes: {
         include: { takes: { orderBy: { createdAt: "desc" } } },
         orderBy: { index: "asc" },
@@ -440,8 +441,16 @@ async function getRenderableStoryboard(
     throw new Error("Storyboard must be approved before final export.");
   }
 
-  if (storyboard.scenes.length < 2 || storyboard.scenes.length > 4) {
-    throw new Error("Final export needs a storyboard with 2 to 4 scenes.");
+  const validSceneCount =
+    storyboard.project.outputMode === "PRODUCT_SHOWCASE"
+      ? storyboard.scenes.length >= 1 && storyboard.scenes.length <= 3
+      : storyboard.scenes.length >= 2 && storyboard.scenes.length <= 4;
+  if (!validSceneCount) {
+    throw new Error(
+      storyboard.project.outputMode === "PRODUCT_SHOWCASE"
+        ? "Final export needs a Product Showcase storyboard with 1 to 3 scenes."
+        : "Final export needs a storyboard with 2 to 4 scenes.",
+    );
   }
   if (
     requireVideos &&

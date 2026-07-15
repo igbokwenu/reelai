@@ -96,3 +96,60 @@ test("requires confirmation before deleting a project", async ({
     .click();
   await expect(page.getByText(name, { exact: true })).toHaveCount(0);
 });
+
+test("creates a product showcase with a required product image", async ({
+  page,
+}) => {
+  const projectName = `${E2E_PROJECT_PREFIX} Product showcase ${Date.now()}`;
+  await page.route("**/api/projects/*/brand-kit", async (route) => {
+    if (route.request().method() === "POST") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          job: { id: "e2e-brand-kit-job" },
+          brandKit: null,
+        }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /Product showcase/ }).click();
+  await page.getByLabel("Product 1 name").fill("Midnight Burger");
+  await page
+    .getByLabel("Product 1 details")
+    .fill("Double patty, cheddar, pickles, and a toasted brioche bun.");
+  await page
+    .locator('input[type="file"]')
+    .first()
+    .setInputFiles({
+      name: "burger.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    });
+  await page.getByText("Customize project settings").click();
+  await page.getByLabel("Project name").fill(projectName);
+  await page.getByLabel("Business name").fill("E2E Foods");
+  await page
+    .getByRole("button", { name: "Create project & Brand Kit" })
+    .click();
+
+  await expect(page).toHaveURL(/\/projects\/.+/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: projectName }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Identity-locked product direction"),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Midnight Burger", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Product Showcase", { exact: true }),
+  ).toBeVisible();
+});

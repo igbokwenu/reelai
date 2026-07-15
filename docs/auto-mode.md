@@ -25,6 +25,7 @@ Storyboard → Scene anchors → Video clips → Narration → Remotion render
 Each poll advances at most one phase and first verifies persisted output. This makes the coordinator idempotent and avoids repeating successful, expensive work after a browser refresh or application restart. A database lease prevents overlapping browser polls from running the same phase concurrently.
 
 - Storyboards are auto-approved only after structured generation and policy checks. A policy blocker stops for human review.
+- Scene-count validation is output-mode aware: standard reels retain 2–4 scenes, while Product Showcase accepts 1–3 scenes totaling the requested 5–15 seconds.
 - Anchor generation selects one current continuity-aware anchor per scene.
 - Video polling reuses the existing provider task IDs. If only some scenes fail, retry generation targets only missing scenes; completed siblings remain selected.
 - Narration is considered current only when every voiced scene links to a durable audio artifact.

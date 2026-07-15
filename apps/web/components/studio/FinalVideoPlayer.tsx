@@ -72,6 +72,7 @@ export function FinalVideoPlayer({
   renders,
   latestNarrationJob,
   latestRenderJob,
+  outputMode = "STANDARD",
 }: {
   projectId: string;
   storyboard: Storyboard | null;
@@ -79,6 +80,7 @@ export function FinalVideoPlayer({
   renders: Render[];
   latestNarrationJob: Job | null;
   latestRenderJob: Job | null;
+  outputMode?: "STANDARD" | "PRODUCT_SHOWCASE";
 }) {
   const router = useRouter();
   const [narrationJob, setNarrationJob] = useState<Job | null>(
@@ -117,8 +119,9 @@ export function FinalVideoPlayer({
     storyboard?.scenes.filter((scene) => scene.status === "COMPLETE") ?? [];
   const canRender = Boolean(
     storyboard &&
-    storyboard.scenes.length >= 2 &&
-    storyboard.scenes.length <= 4 &&
+    (outputMode === "PRODUCT_SHOWCASE"
+      ? storyboard.scenes.length >= 1 && storyboard.scenes.length <= 3
+      : storyboard.scenes.length >= 2 && storyboard.scenes.length <= 4) &&
     storyboard.scenes.every(
       (scene) =>
         scene.status === "COMPLETE" &&

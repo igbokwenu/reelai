@@ -1,6 +1,11 @@
 import "server-only";
 
-import type { Artifact, BrandSource, Project } from "@prisma/client";
+import type {
+  Artifact,
+  BrandSource,
+  Project,
+  ProjectProduct,
+} from "@prisma/client";
 import { ZodError } from "zod";
 
 import { prisma } from "@/lib/prisma";
@@ -17,6 +22,7 @@ import {
 type ProjectWithContext = Project & {
   sources: BrandSource[];
   artifacts: Artifact[];
+  products: ProjectProduct[];
 };
 
 type SourceContext = {
@@ -32,6 +38,7 @@ export async function generateBrandKitForProject(projectId: string) {
     include: {
       sources: { orderBy: { createdAt: "asc" } },
       artifacts: { orderBy: { createdAt: "asc" } },
+      products: { orderBy: { sortOrder: "asc" } },
     },
   });
 
@@ -67,17 +74,23 @@ async function applyResearchedIdentity(
   project: ProjectWithContext,
   contexts: SourceContext[],
 ) {
-  const websiteSource = project.sources.find((source) => source.type === "WEBSITE");
+  const websiteSource = project.sources.find(
+    (source) => source.type === "WEBSITE",
+  );
   const metadata = websiteSource?.metadata as {
     businessNameInferred?: unknown;
     projectNameInferred?: unknown;
   } | null;
   const domainLabel = project.websiteUrl
-    ? new URL(project.websiteUrl).hostname.replace(/^www\./, "").split(".")[0] ?? ""
+    ? (new URL(project.websiteUrl).hostname
+        .replace(/^www\./, "")
+        .split(".")[0] ?? "")
     : "";
-  const normalized = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const normalized = (value: string) =>
+    value.toLowerCase().replace(/[^a-z0-9]/g, "");
   const legacyInferredBusiness =
-    Boolean(domainLabel) && normalized(project.businessName) === normalized(domainLabel);
+    Boolean(domainLabel) &&
+    normalized(project.businessName) === normalized(domainLabel);
   const businessWasInferred =
     metadata?.businessNameInferred === true || legacyInferredBusiness;
   const projectWasInferred =
@@ -85,7 +98,8 @@ async function applyResearchedIdentity(
     normalized(project.name) === `${normalized(project.businessName)}reel`;
   if (!businessWasInferred && !projectWasInferred) return;
 
-  const websiteText = contexts.find((context) => context.kind === "WEBSITE")?.text ?? "";
+  const websiteText =
+    contexts.find((context) => context.kind === "WEBSITE")?.text ?? "";
   const siteName = websiteText.match(/^Site name:\s*(.+)$/m)?.[1]?.trim();
   const title = websiteText.match(/^Title:\s*(.+)$/m)?.[1]?.trim();
   const candidate = (siteName ?? title?.split(/\s+[|–—-]\s+/)[0] ?? "")
@@ -95,7 +109,10 @@ async function applyResearchedIdentity(
 
   const businessName = businessWasInferred ? candidate : project.businessName;
   const name = projectWasInferred ? `${businessName} reel` : project.name;
-  await prisma.project.update({ where: { id: project.id }, data: { businessName, name } });
+  await prisma.project.update({
+    where: { id: project.id },
+    data: { businessName, name },
+  });
   project.businessName = businessName;
   project.name = name;
   const intake = contexts.find((context) => context.kind === "INTAKE");
@@ -137,13 +154,24 @@ async function collectBrandContexts(project: ProjectWithContext) {
         `Business: ${project.businessName}`,
         `Project: ${project.name}`,
         project.websiteUrl ? `Website: ${project.websiteUrl}` : null,
-        project.targetAudience ? `Target audience: ${project.targetAudience}` : null,
+        project.targetAudience
+          ? `Target audience: ${project.targetAudience}`
+          : null,
         project.offer ? `Offer: ${project.offer}` : null,
         getCreativeDirection(project.sources)
           ? `User direction: ${getCreativeDirection(project.sources)}`
           : null,
         `Requested style: ${project.style}`,
         `Requested length: ${project.videoLengthSec}s`,
+        `Output mode: ${project.outputMode}`,
+        project.products.length > 0
+          ? `Products: ${project.products
+              .map(
+                (product, index) =>
+                  `${index + 1}. ${product.name}${product.details ? ` — ${product.details}` : ""}${product.websiteUrl ? ` (${product.websiteUrl})` : ""}`,
+              )
+              .join(" | ")}`
+          : null,
       ]
         .filter(Boolean)
         .join("\n"),
@@ -160,7 +188,11 @@ async function collectBrandContexts(project: ProjectWithContext) {
       });
       if (source.url && source.type === "WEBSITE") {
         const research = await researchWebsite(source.url);
-        await appendWebsiteVisualContexts(contexts, source.id, research?.visualUrls ?? []);
+        await appendWebsiteVisualContexts(
+          contexts,
+          source.id,
+          research?.visualUrls ?? [],
+        );
       }
       continue;
     }
@@ -180,7 +212,11 @@ async function collectBrandContexts(project: ProjectWithContext) {
           kind: source.type,
           text: extractedText,
         });
-        await appendWebsiteVisualContexts(contexts, source.id, research?.visualUrls ?? []);
+        await appendWebsiteVisualContexts(
+          contexts,
+          source.id,
+          research?.visualUrls ?? [],
+        );
       } else {
         contexts.push({
           id: source.id,
@@ -248,7 +284,10 @@ async function collectBrandContexts(project: ProjectWithContext) {
     }
   }
 
-  if (project.websiteUrl && !contexts.some((context) => context.label === project.websiteUrl)) {
+  if (
+    project.websiteUrl &&
+    !contexts.some((context) => context.label === project.websiteUrl)
+  ) {
     const research = await researchWebsite(project.websiteUrl);
     const extractedText = research?.text ?? null;
 
@@ -259,7 +298,11 @@ async function collectBrandContexts(project: ProjectWithContext) {
         kind: "WEBSITE",
         text: extractedText,
       });
-      await appendWebsiteVisualContexts(contexts, "project-website", research?.visualUrls ?? []);
+      await appendWebsiteVisualContexts(
+        contexts,
+        "project-website",
+        research?.visualUrls ?? [],
+      );
     }
   }
 
@@ -273,8 +316,16 @@ async function appendWebsiteVisualContexts(
 ) {
   for (const [index, visual] of visuals.slice(0, 3).entries()) {
     try {
-      const analysis = await analyzeVisualAssetWithQwen({ imageUrl: visual.url, label: visual.label });
-      contexts.push({ id: `${sourceId}-visual-${index + 1}`, label: visual.url, kind: "WEBSITE_VISION", text: analysis.summary });
+      const analysis = await analyzeVisualAssetWithQwen({
+        imageUrl: visual.url,
+        label: visual.label,
+      });
+      contexts.push({
+        id: `${sourceId}-visual-${index + 1}`,
+        label: visual.url,
+        kind: "WEBSITE_VISION",
+        text: analysis.summary,
+      });
     } catch {
       // Text/CSS evidence remains usable when a remote image blocks model access.
     }
@@ -365,7 +416,10 @@ const brandKitSystemPrompt =
 function getCreativeDirection(sources: BrandSource[]) {
   for (const source of sources) {
     const metadata = source.metadata as { creativeDirection?: unknown } | null;
-    if (typeof metadata?.creativeDirection === "string" && metadata.creativeDirection.trim()) {
+    if (
+      typeof metadata?.creativeDirection === "string" &&
+      metadata.creativeDirection.trim()
+    ) {
       return metadata.creativeDirection.trim();
     }
   }
@@ -373,7 +427,9 @@ function getCreativeDirection(sources: BrandSource[]) {
 }
 
 function getCreativeDirectionFromContexts(contexts: SourceContext[]) {
-  const match = contexts.find((context) => context.kind === "INTAKE")?.text.match(/User direction: (.+)/);
+  const match = contexts
+    .find((context) => context.kind === "INTAKE")
+    ?.text.match(/User direction: (.+)/);
   return match?.[1]?.trim() || null;
 }
 
@@ -437,18 +493,31 @@ function enrichBrandKitFromProject(
       hasUploadedVisualEvidence,
     ),
     lockedStyle:
-      brandKit.lockedStyle === "Clean vertical ad style with restrained captions."
+      brandKit.lockedStyle ===
+      "Clean vertical ad style with restrained captions."
         ? "Realistic documentary-style vertical imagery with natural light, authentic home environments, unbranded wardrobe, human connection, and restrained captions added in post."
         : brandKit.lockedStyle,
   });
 }
 
-function sanitizeVisualMotifs(motifs: string[], hasUploadedVisualEvidence: boolean) {
+function sanitizeVisualMotifs(
+  motifs: string[],
+  hasUploadedVisualEvidence: boolean,
+) {
   if (hasUploadedVisualEvidence) return motifs;
   const safe = motifs.filter(
-    (motif) => !/\b(product|app|interface|screen|logo|packag|uniform|badge)\b/i.test(motif),
+    (motif) =>
+      !/\b(product|app|interface|screen|logo|packag|uniform|badge)\b/i.test(
+        motif,
+      ),
   );
-  return [...new Set([...safe, "authentic human connection", "natural home environment"])].slice(0, 8);
+  return [
+    ...new Set([
+      ...safe,
+      "authentic human connection",
+      "natural home environment",
+    ]),
+  ].slice(0, 8);
 }
 
 function replaceFallbackValueProps(
@@ -502,7 +571,9 @@ function replaceFallbackCitations(
   primarySourceId: string,
   contexts: SourceContext[],
 ) {
-  if (citations[0]?.note !== "Fallback citation for normalized Brand Kit fields.") {
+  if (
+    citations[0]?.note !== "Fallback citation for normalized Brand Kit fields."
+  ) {
     return citations;
   }
 
@@ -529,7 +600,9 @@ function getProjectPositioning(project: Project, contexts: SourceContext[]) {
     return ensureSentence(truncateText(description, 260));
   }
 
-  const visibleContent = contextText.match(/^Visible content:\s*(.+)$/m)?.[1]?.trim();
+  const visibleContent = contextText
+    .match(/^Visible content:\s*(.+)$/m)?.[1]
+    ?.trim();
   if (visibleContent && visibleContent.length > 40) {
     return ensureSentence(truncateText(visibleContent, 260));
   }

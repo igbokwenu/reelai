@@ -6,6 +6,7 @@ import type {
   BrandSource,
   CreativeConcept,
   Project,
+  ProjectProduct,
 } from "@prisma/client";
 import { ZodError } from "zod";
 
@@ -34,6 +35,12 @@ import {
   parseCreativeConceptRegenerationOutput,
   parseCreativeConceptsOutput,
   parseStoryboardOutput,
+  productShowcaseCreativeConceptRegenerationJsonSchema,
+  productShowcaseCreativeConceptRegenerationSchema,
+  productShowcaseCreativeConceptsJsonSchema,
+  productShowcaseCreativeConceptsSchema,
+  productShowcaseStoryboardJsonSchema,
+  productShowcaseStoryboardSchema,
   storyboardJsonSchema,
   storyboardSchema,
   type PolicyWarning,
@@ -48,12 +55,19 @@ type BrandProject = Project & {
   concepts: CreativeConcept[];
   artifacts: Artifact[];
   sources: BrandSource[];
+  products: ProjectProduct[];
 };
 
 export async function generateConceptsForProject(projectId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    include: { brandKit: true, concepts: true, artifacts: true, sources: true },
+    include: {
+      brandKit: true,
+      concepts: true,
+      artifacts: true,
+      sources: true,
+      products: { orderBy: { sortOrder: "asc" } },
+    },
   });
 
   if (!project) {
@@ -66,14 +80,21 @@ export async function generateConceptsForProject(projectId: string) {
 
   const result = await generateStructuredWithQwen({
     operation: "creative_director_concepts",
-    schema: creativeConceptsSchema,
+    schema:
+      project.outputMode === "PRODUCT_SHOWCASE"
+        ? productShowcaseCreativeConceptsSchema
+        : creativeConceptsSchema,
     schemaName: "reel_ai_creative_concepts",
-    jsonSchema: creativeConceptsJsonSchema,
+    jsonSchema:
+      project.outputMode === "PRODUCT_SHOWCASE"
+        ? productShowcaseCreativeConceptsJsonSchema
+        : creativeConceptsJsonSchema,
     model: QWEN_STRUCTURED_MODEL,
-    parse: parseCreativeConceptsOutput,
+    parse: (value) => parseCreativeConceptsOutput(value, project.outputMode),
     system: conceptSystemPrompt,
     user: buildConceptPrompt(project),
   });
+  validateConceptTiming(project, result.data.concepts);
   const grounding = getGroundingCapabilities(project.sources, project.brandKit);
   const violations = findConceptGroundingViolations(
     result.data.concepts,
@@ -160,6 +181,7 @@ export async function regenerateConceptForProject({
     include: {
       brandKit: true,
       concepts: { orderBy: { createdAt: "asc" } },
+      products: { orderBy: { sortOrder: "asc" } },
       artifacts: true,
       sources: true,
     },
@@ -184,11 +206,18 @@ export async function regenerateConceptForProject({
 
   const result = await generateStructuredWithQwen({
     operation: "creative_director_concept_regeneration",
-    schema: creativeConceptRegenerationSchema,
+    schema:
+      project.outputMode === "PRODUCT_SHOWCASE"
+        ? productShowcaseCreativeConceptRegenerationSchema
+        : creativeConceptRegenerationSchema,
     schemaName: "reel_ai_creative_concept_regeneration",
-    jsonSchema: creativeConceptRegenerationJsonSchema,
+    jsonSchema:
+      project.outputMode === "PRODUCT_SHOWCASE"
+        ? productShowcaseCreativeConceptRegenerationJsonSchema
+        : creativeConceptRegenerationJsonSchema,
     model: QWEN_STRUCTURED_MODEL,
-    parse: parseCreativeConceptRegenerationOutput,
+    parse: (value) =>
+      parseCreativeConceptRegenerationOutput(value, project.outputMode),
     system: conceptSystemPrompt,
     user: buildConceptRegenerationPrompt({
       project,
@@ -196,6 +225,7 @@ export async function regenerateConceptForProject({
       adjustmentNote,
     }),
   });
+  validateConceptTiming(project, [result.data.concept]);
   const grounding = getGroundingCapabilities(project.sources, project.brandKit);
   const violations = findConceptGroundingViolations(
     [result.data.concept],
@@ -340,6 +370,7 @@ export async function generateStoryboardForProject(projectId: string) {
       brandKit: true,
       concepts: { orderBy: { createdAt: "asc" } },
       sources: true,
+      products: { orderBy: { sortOrder: "asc" } },
     },
   });
 
@@ -372,15 +403,22 @@ export async function generateStoryboardForProject(projectId: string) {
       preflightViolations.length > 0
         ? "storyboard_generation_with_preflight_adaptation"
         : "storyboard_generation",
-    schema: storyboardSchema,
+    schema:
+      project.outputMode === "PRODUCT_SHOWCASE"
+        ? productShowcaseStoryboardSchema
+        : storyboardSchema,
     schemaName: "reel_ai_storyboard",
-    jsonSchema: storyboardJsonSchema,
+    jsonSchema:
+      project.outputMode === "PRODUCT_SHOWCASE"
+        ? productShowcaseStoryboardJsonSchema
+        : storyboardJsonSchema,
     model: QWEN_STRUCTURED_MODEL,
-    parse: parseStoryboardOutput,
+    parse: (value) => parseStoryboardOutput(value, project.outputMode),
     system: storyboardSystemPrompt,
     user: buildStoryboardPrompt(project, selectedConcept, preflightViolations),
   });
   let output = firstResult.data;
+  validateStoryboardTiming(project, output);
   let activeResult = firstResult;
   let recoveryResult: typeof firstResult | null = null;
   let storyboardViolations = findConceptGroundingViolations(
@@ -396,11 +434,17 @@ export async function generateStoryboardForProject(projectId: string) {
   if (storyboardViolations.length > 0) {
     recoveryResult = await generateStructuredWithQwen({
       operation: "storyboard_grounding_recovery",
-      schema: storyboardSchema,
+      schema:
+        project.outputMode === "PRODUCT_SHOWCASE"
+          ? productShowcaseStoryboardSchema
+          : storyboardSchema,
       schemaName: "reel_ai_storyboard_grounding_recovery",
-      jsonSchema: storyboardJsonSchema,
+      jsonSchema:
+        project.outputMode === "PRODUCT_SHOWCASE"
+          ? productShowcaseStoryboardJsonSchema
+          : storyboardJsonSchema,
       model: QWEN_STRUCTURED_MODEL,
-      parse: parseStoryboardOutput,
+      parse: (value) => parseStoryboardOutput(value, project.outputMode),
       system: storyboardSystemPrompt,
       user: buildStoryboardRecoveryPrompt({
         project,
@@ -411,6 +455,7 @@ export async function generateStoryboardForProject(projectId: string) {
       }),
     });
     output = recoveryResult.data;
+    validateStoryboardTiming(project, output);
     activeResult = recoveryResult;
     recoveryMethod = "REGENERATED";
     storyboardViolations = findConceptGroundingViolations(
@@ -624,8 +669,12 @@ async function createPreviewFrameArtifact({
   index: number;
   grounding: GroundingCapabilities;
 }) {
-  const groundedPrompt = hardenImagePrompt(prompt, grounding);
-  const generated = await tryGenerateProviderPreview(groundedPrompt, grounding);
+  const groundedPrompt = hardenImagePrompt(prompt, grounding, project.style);
+  const generated = await tryGenerateProviderPreview(
+    groundedPrompt,
+    grounding,
+    getPreviewReferenceUrls(project),
+  );
   const stored = generated
     ? await storeObject({
         projectId: project.id,
@@ -680,12 +729,14 @@ async function createPreviewFrameArtifact({
 async function tryGenerateProviderPreview(
   prompt: string,
   grounding: GroundingCapabilities,
+  imageUrls: string[],
 ) {
   try {
     const generated = await generateImageWithQwen({
       operation: "concept_preview_frame",
       model: QWEN_PREVIEW_IMAGE_MODEL,
       prompt,
+      imageUrls,
     });
     const review = await reviewGeneratedPreviewGrounding({
       imageUrl: generated.imageUrl,
@@ -712,6 +763,36 @@ async function tryGenerateProviderPreview(
   } catch {
     return null;
   }
+}
+
+function getPreviewReferenceUrls(project: BrandProject) {
+  const artifactById = new Map(
+    project.artifacts.map((artifact) => [artifact.id, artifact]),
+  );
+  const typeOrder = new Map([
+    ["PRODUCT_IMAGE", 0],
+    ["LOGO", 1],
+    ["REFERENCE_AD", 2],
+    ["UPLOAD", 3],
+  ]);
+  return [...project.sources]
+    .filter((source) => source.artifactId && typeOrder.has(source.type))
+    .sort(
+      (left, right) =>
+        (typeOrder.get(left.type) ?? 9) - (typeOrder.get(right.type) ?? 9),
+    )
+    .flatMap((source) => {
+      const artifact = source.artifactId
+        ? artifactById.get(source.artifactId)
+        : null;
+      if (!artifact?.publicUrl) return [];
+      if (/^https?:\/\//i.test(artifact.publicUrl)) return [artifact.publicUrl];
+      const publicAppUrl = process.env.PUBLIC_APP_URL?.replace(/\/$/, "");
+      return publicAppUrl && !publicAppUrl.toLowerCase().includes("placeholder")
+        ? [`${publicAppUrl}/api/artifacts/${artifact.id}/file`]
+        : [];
+    })
+    .slice(0, 3);
 }
 
 function reviewStoryboardClaims(
@@ -804,6 +885,8 @@ Project: ${project.name}
 Audience: ${project.targetAudience?.trim() || brandKit?.audience || "Not specified"}
 Offer: ${project.offer?.trim() || "Not specified"}
 Video target: ${project.videoLengthSec}s, ${project.style}
+Output mode: ${project.outputMode}
+${buildProductContext(project)}
 
 Brand Kit:
 Summary: ${brandKit?.summary}
@@ -826,7 +909,11 @@ Requirements:
 - narrativeArc must describe the beginning, middle, and ending beat.
 - rationale must explain why this direction can work for this brand and audience.
 - Do not leave strategy, narrativeArc, previewPrompt, or rationale blank or generic.
-- Keep estimated scenes between 2 and 4 and duration between 15 and 30 seconds.
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Keep estimated scenes between 1 and 3 and duration between 5 and 15 seconds." : "Keep estimated scenes between 2 and 4 and duration between 15 and 30 seconds."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Every direction must be a premium product-first showcase grounded in the uploaded product images. Make the three routes meaningfully different: for example tactile/material reveal, cinematic hero motion, or an elegant use-context/model presentation when appropriate." : "Keep the product or service strategy grounded in verified evidence."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Choose exactly one hero product and one hero action per shot. If multiple products are supplied, treat them as a restrained collection: reveal them sequentially or keep secondary products static; never merge products or choreograph several transformations at once." : "Use a clear brand-relevant visual hook."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Favor identity-safe motion: slow orbit, controlled separation/reassembly of large rigid components, ingredient layering, fabric movement, package reveal, light sweep, turntable, or a single model/use-context action. Avoid melting, spawning, tiny-part explosions, hands manipulating fine details, and simultaneous camera plus object choreography." : "Avoid overloaded scene choreography."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "End with a concise, source-safe caption and spoken call to action that fits naturally inside the requested duration." : "Resolve with a clear, source-safe audience action."}
 - Preview prompts must be 9:16 frame prompts suitable for ${QWEN_PREVIEW_IMAGE_MODEL}.
 - Use the brand palette colors and visual motifs in your visual direction.
 - Avoid unsupported claims and regulated-category promises.
@@ -866,6 +953,8 @@ Project: ${project.name}
 Audience: ${project.targetAudience?.trim() || brandKit?.audience || "Not specified"}
 Offer: ${project.offer?.trim() || "Not specified"}
 Video target: ${project.videoLengthSec}s, ${project.style}
+Output mode: ${project.outputMode}
+${buildProductContext(project)}
 
 Brand Kit:
 Summary: ${brandKit?.summary}
@@ -905,7 +994,8 @@ Requirements:
 - strategy must describe the ad strategy in one or two substantive sentences.
 - narrativeArc must describe the beginning, middle, and ending beat.
 - rationale must explain why this direction can work for this brand and audience.
-- Keep estimated scenes between 2 and 4 and duration between 15 and 30 seconds.
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Keep estimated scenes between 1 and 3 and duration between 5 and 15 seconds." : "Keep estimated scenes between 2 and 4 and duration between 15 and 30 seconds."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Keep the uploaded product as the unmistakable hero. Use one hero product and one hero action per shot; secondary products stay static or appear sequentially. Reject morphing, melting, crowded transformations, and ungrounded product variants." : "Keep the execution grounded and visually legible."}
 - The preview prompt must be a 9:16 frame prompt suitable for ${QWEN_PREVIEW_IMAGE_MODEL}.
 - Use the brand palette colors and supported visual motifs.
 - Avoid unsupported claims and regulated-category promises.
@@ -926,8 +1016,70 @@ function summarizeWebsiteEvidence(text: string) {
     .join("\n");
 }
 
+function buildProductContext(project: { products: ProjectProduct[] }) {
+  if (project.products.length === 0) return "Products: none supplied.";
+  return `Verified product intake:\n${project.products
+    .map(
+      (product, index) =>
+        `${index + 1}. ${product.name}${product.details ? ` — ${product.details}` : ""}${product.websiteUrl ? ` — context URL: ${product.websiteUrl}` : ""}`,
+    )
+    .join("\n")}`;
+}
+
+function validateConceptTiming(
+  project: Project,
+  concepts: Array<{ estimatedScenes: number; estimatedDurationSec: number }>,
+) {
+  const showcase = project.outputMode === "PRODUCT_SHOWCASE";
+  const invalid = concepts.some((concept) =>
+    showcase
+      ? concept.estimatedScenes < 1 ||
+        concept.estimatedScenes > 3 ||
+        concept.estimatedDurationSec < 5 ||
+        concept.estimatedDurationSec > 15
+      : concept.estimatedScenes < 2 ||
+        concept.estimatedScenes > 4 ||
+        concept.estimatedDurationSec < 15 ||
+        concept.estimatedDurationSec > 30,
+  );
+  if (invalid) {
+    throw new Error(
+      showcase
+        ? "Creative output schema mismatch: Product Showcase concepts must use 1 to 3 scenes and 5 to 15 seconds. Try regenerating."
+        : "Creative output schema mismatch: Reel concepts must use 2 to 4 scenes and 15 to 30 seconds. Try regenerating.",
+    );
+  }
+}
+
+function validateStoryboardTiming(project: Project, output: StoryboardOutput) {
+  const total = output.scenes.reduce(
+    (sum, scene) => sum + scene.durationSec,
+    0,
+  );
+  const showcase = project.outputMode === "PRODUCT_SHOWCASE";
+  const invalid = showcase
+    ? output.scenes.length < 1 ||
+      output.scenes.length > 3 ||
+      total !== project.videoLengthSec
+    : output.scenes.length < 2 ||
+      output.scenes.length > 4 ||
+      total < 15 ||
+      total > 30;
+  if (invalid) {
+    throw new Error(
+      showcase
+        ? `Storyboard schema mismatch: Product Showcase must use 1 to 3 scenes totaling exactly ${project.videoLengthSec} seconds. Try regenerating.`
+        : "Storyboard schema mismatch: Reel storyboards must use 2 to 4 scenes totaling 15 to 30 seconds. Try regenerating.",
+    );
+  }
+}
+
 function buildStoryboardPrompt(
-  project: Project & { brandKit: BrandKit | null; sources: BrandSource[] },
+  project: Project & {
+    brandKit: BrandKit | null;
+    sources: BrandSource[];
+    products: ProjectProduct[];
+  },
   concept: CreativeConcept,
   preflightViolations: string[] = [],
 ) {
@@ -941,6 +1093,8 @@ Audience: ${project.targetAudience?.trim() || brandKit?.audience || "Not specifi
 Offer: ${project.offer?.trim() || "Not specified"}
 Target length: ${project.videoLengthSec}s
 Style: ${project.style}
+Output mode: ${project.outputMode}
+${buildProductContext(project)}
 
 Selected concept:
 Title: ${concept.title}
@@ -969,8 +1123,13 @@ ${buildGroundingRecoveryInstructions(preflightViolations, grounding)}
 }
 
 Requirements:
-- Use 2 to 4 scenes total.
-- Total duration must be 15 to 30 seconds, with every scene lasting 5 to 10 seconds. Prefer 5 to 8 seconds; use 9 to 10 only for exceptionally simple motion.
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Use 1 to 3 scenes total. A 5-second showcase should use one shot; 10 seconds should normally use one or two shots; 15 seconds may use two or three." : "Use 2 to 4 scenes total."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Total duration must exactly match the requested 5 to 15 seconds, with every scene lasting 5 to 10 seconds." : "Total duration must be 15 to 30 seconds, with every scene lasting 5 to 10 seconds. Prefer 5 to 8 seconds; use 9 to 10 only for exceptionally simple motion."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Treat the actual uploaded product photography as the source of truth for silhouette, materials, colors, proportions, surface details, packaging, and visible ingredients. The generated scene may stylize the world but must not redesign the product." : "Preserve recurring product identity whenever a product is present."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Assign exactly one hero product and one primary action to each shot. For multiple products, use sequential hero shots or a static collection composition; never ask multiple products to assemble, transform, collide, or cross paths together." : "Keep the motion hierarchy deliberately simple."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "A separation/reassembly concept may move only a few large, visually grounded layers or components on one axis, then settle cleanly. Never explode dozens of small pieces, invent internal components, melt materials, or morph one product into another." : "Avoid physically ambiguous transformations."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "For clothing or wearable products, a model may wear the exact referenced item, but use one simple pose, step, turn, or fabric movement and no outfit transformation. For apps/websites, only depict supplied interface references; otherwise showcase a physical device silhouette with the screen reserved for compositing or show the real-world outcome." : "Match the execution lane to available references."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "The final scene's caption and voiceover must include one concise, brand-appropriate call to action. Keep it source-safe and inside the scene's spoken-word budget; do not add pricing, availability, or guarantees without evidence." : "Keep the final audience action clear and source-safe."}
 - The storyboard must clearly execute the selected concept's strategy, narrative arc, and visual style.
 - Do not drift into a different concept, a generic ad, or a list of disconnected scenes.
 - Write voiceover for natural spoken timing, not just the 600-character API ceiling: target at most 2.5 words per second of scene duration (about 12 words for 5 seconds, 15 for 6, 20 for 8, or 25 for 10). Keep each line self-contained inside its scene; never let a sentence depend on audio continuing into the next scene.
@@ -1026,7 +1185,11 @@ function buildStoryboardRecoveryPrompt({
   violations,
   grounding,
 }: {
-  project: Project & { brandKit: BrandKit | null; sources: BrandSource[] };
+  project: Project & {
+    brandKit: BrandKit | null;
+    sources: BrandSource[];
+    products: ProjectProduct[];
+  };
   concept: CreativeConcept;
   rejected: StoryboardOutput;
   violations: string[];

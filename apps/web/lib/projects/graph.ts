@@ -6,6 +6,7 @@ export function getProjectGraph(projectId: string) {
     include: {
       brandKit: true,
       sources: { orderBy: { createdAt: "desc" } },
+      products: { orderBy: { sortOrder: "asc" } },
       concepts: { orderBy: { createdAt: "asc" } },
       storyboard: {
         include: {

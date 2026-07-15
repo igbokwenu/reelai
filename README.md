@@ -10,6 +10,7 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Prisma/PostgreSQL project graph with projects, sources, artifacts, jobs, concepts, storyboards, takes, narration, and renders.
 - Server-side QwenCloud clients for structured text, vision, image generation, video generation, and TTS.
 - URL-first project creation that automatically queues Brand Kit research; project and business names can be inferred from the website.
+- Product Showcase output mode for premium 5–15 second realistic or 3D product films. Intake requires a real product image, supports up to three products and three product images total, collects per-product details/product-page context, pitches exactly three directions, and constrains every shot to one hero product action to reduce morphing.
 - Focused two-column landing workspace with optional pipeline guidance and confirmed project deletion, including local/OSS artifact cleanup.
 - Focused horizontal project workflow with six navigable stages: Brand, Concepts, Storyboard, Production, Final, and Assets. Stage readiness and completion are visible at a glance, and switching stages preserves in-progress client state.
 - Default-on Auto mode turns a selected concept into a finished reel without tab-by-tab approval: a one-time Brand Kit asset handoff precedes spend, a durable phase tracker shows live progress, and resilient retries resume from the last valid storyboard, anchor, clip, narration, or render output. Step-by-step mode and every manual editor remain available.
@@ -75,6 +76,8 @@ Existing storyboards remain generatable after migration. Their former motion bri
 Scene-timed narration adds the nullable `Scene.narrationArtifactId` link. Existing audio and renders are preserved, but a local checkout must stop `pnpm dev`, run `pnpm db:migrate` once, and restart `pnpm dev`. Then click **Generate Scene Narration** before the next render to replace any legacy project-wide track with measured scene clips. No seed is required.
 
 Auto mode adds persisted project preferences, the first-production Brand Kit confirmation, and resumable `AutoGenerationRun` coordination. Existing projects default to Auto mode and will see the Brand Kit handoff the next time they proceed from a selected concept. Stop `pnpm dev`, run `pnpm db:migrate`, then restart `pnpm dev`. No `pnpm install` or seed is required. See [docs/auto-mode.md](docs/auto-mode.md) for recovery behavior and the API contract.
+
+Product Showcase adds `Project.outputMode`, `ProjectProduct`, and the optional product link on uploaded sources. Existing projects remain `STANDARD`. Stop `pnpm dev`, run `pnpm db:migrate`, and restart `pnpm dev`; Prisma Client is regenerated automatically. No `pnpm install` or seed is required. See [docs/product-showcase.md](docs/product-showcase.md) for limits, grounding rules, and the end-to-end flow.
 
 The domain-neutral creative grammar, structured cast planning, richer motion-hierarchy guardrails, recent-anchor identity recovery, and last-scene logo lockup are application-only changes. Existing databases and artifacts remain compatible; restart `pnpm dev` after pulling them, with no additional migration or seed command.
 

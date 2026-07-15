@@ -36,7 +36,7 @@ type ProductionScene = Scene & {
     | "productContinuity"
     | "characterContinuity"
     | "visualContinuity"
-  >;
+  > & { outputMode: "STANDARD" | "PRODUCT_SHOWCASE" };
 };
 const ACTIVE_PRODUCTION_JOB_STATUSES = [
   "QUEUED",
@@ -801,6 +801,7 @@ async function getProductionScenes(projectId: string) {
   const storyboard = await prisma.storyboard.findUnique({
     where: { projectId },
     include: {
+      project: { select: { outputMode: true } },
       scenes: {
         include: { takes: { orderBy: { createdAt: "desc" } } },
         orderBy: { index: "asc" },
@@ -816,9 +817,15 @@ async function getProductionScenes(projectId: string) {
     throw new PublicError("Save and approve the storyboard before generation.");
   }
 
-  if (storyboard.scenes.length < 2 || storyboard.scenes.length > 4) {
+  const validSceneCount =
+    storyboard.project.outputMode === "PRODUCT_SHOWCASE"
+      ? storyboard.scenes.length >= 1 && storyboard.scenes.length <= 3
+      : storyboard.scenes.length >= 2 && storyboard.scenes.length <= 4;
+  if (!validSceneCount) {
     throw new PublicError(
-      "Production requires a storyboard with 2 to 4 scenes.",
+      storyboard.project.outputMode === "PRODUCT_SHOWCASE"
+        ? "Product Showcase production requires a storyboard with 1 to 3 scenes."
+        : "Production requires a storyboard with 2 to 4 scenes.",
     );
   }
   if (storyboard.scenes.some((scene) => scene.status === "DRAFT")) {
@@ -832,11 +839,16 @@ async function getProductionScenes(projectId: string) {
       productContinuity: storyboard.productContinuity,
       characterContinuity: storyboard.characterContinuity,
       visualContinuity: storyboard.visualContinuity,
+      outputMode: storyboard.project.outputMode,
     },
   }));
 }
 
 async function getGroundingReferenceUrls(projectId: string) {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { outputMode: true },
+  });
   const sources = await prisma.brandSource.findMany({
     where: {
       projectId,
@@ -844,6 +856,11 @@ async function getGroundingReferenceUrls(projectId: string) {
       type: { in: ["PRODUCT_IMAGE", "LOGO", "REFERENCE_AD", "UPLOAD"] },
     },
     orderBy: { createdAt: "asc" },
+  });
+  sources.sort((left, right) => {
+    const priority = (type: string) =>
+      type === "PRODUCT_IMAGE" ? 0 : type === "LOGO" ? 1 : 2;
+    return priority(left.type) - priority(right.type);
   });
   const artifactIds = sources
     .map((source) => source.artifactId)
@@ -867,7 +884,12 @@ async function getGroundingReferenceUrls(projectId: string) {
       source.artifactId ? artifactById.get(source.artifactId) : null,
     )
     .filter((artifact): artifact is Artifact => Boolean(artifact))
-    .map((artifact) => artifact.publicUrl)
+    .map((artifact) => {
+      if (artifact.publicUrl?.startsWith("http")) return artifact.publicUrl;
+      if (project?.outputMode === "PRODUCT_SHOWCASE")
+        return artifactUrl(artifact);
+      return null;
+    })
     .filter((url): url is string =>
       Boolean(url?.startsWith("https://") || url?.startsWith("http://")),
     )
@@ -924,6 +946,7 @@ Scene continuity: ${scene.continuityNotes}
 Cast identity rule: treat every role in the cast ledger as a separate person. Preserve recurring face geometry, visible complexion, hair, build, age band, wardrobe, and distinguishing feature exactly. In multi-person frames, enforce different silhouettes and facial structures; never clone one face onto another body or merge identities. Respect an explicit fictional complexion/heritage anchor, but never infer ethnicity for a reference-backed person or use physical traits as personality shorthand.
 ${previousScene ? `Prior shot context for the handoff: ${previousScene.shotPrompt}` : "This is the story's establishing anchor and immediate hook."}
 ${scene.continuityMode === "INTENTIONAL_CHANGE" ? "Honor only the explicitly planned change; preserve every other locked identity and style attribute." : "Use supplied prior-scene imagery only to preserve identity, lighting, spatial logic, and screen direction; compose a distinct next shot rather than copying it."}
+${scene.storyboard.outputMode === "PRODUCT_SHOWCASE" ? "PRODUCT SHOWCASE LOCK: the uploaded product references outrank all inferred styling. Preserve exact product silhouette, proportions, materials, colors, packaging, surface details, and visible ingredients. Compose one hero product and one clearly readable action only; secondary products remain static or absent. No melting, morphing, spawning, invented parts, crowded assembly, or simultaneous transformations." : ""}
 Vertical 9:16, clean silhouette, stable anatomy and product geometry, commercial polish, no readable text or logos.`;
 }
 
@@ -1019,18 +1042,20 @@ async function hasCompleteStoryVideos(projectId: string) {
   const storyboard = await prisma.storyboard.findUnique({
     where: { projectId },
     include: {
+      project: { select: { outputMode: true } },
       scenes: {
         include: { takes: { where: { kind: "VIDEO" } } },
       },
     },
   });
-  if (
-    !storyboard ||
-    storyboard.scenes.length < 2 ||
-    storyboard.scenes.length > 4
-  ) {
+  if (!storyboard) {
     return false;
   }
+  const validSceneCount =
+    storyboard.project.outputMode === "PRODUCT_SHOWCASE"
+      ? storyboard.scenes.length >= 1 && storyboard.scenes.length <= 3
+      : storyboard.scenes.length >= 2 && storyboard.scenes.length <= 4;
+  if (!validSceneCount) return false;
 
   return storyboard.scenes.every((scene) => {
     const selected = scene.takes.find(

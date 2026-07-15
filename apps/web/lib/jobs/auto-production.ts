@@ -89,7 +89,10 @@ export async function resumeAutoGeneration(projectId: string) {
     orderBy: { createdAt: "desc" },
   });
   if (!latest) {
-    throw new PublicError("No auto generation run is available to resume.", 404);
+    throw new PublicError(
+      "No auto generation run is available to resume.",
+      404,
+    );
   }
   if (latest.status === "COMPLETE") return latest;
 
@@ -153,7 +156,9 @@ export async function advanceAutoGeneration({
 
 async function executePhase(run: AutoGenerationRun, artifactBaseUrl: string) {
   if (run.phase !== "STORYBOARD" && run.phase !== "COMPLETE") {
-    const storyboardIsCurrent = await hasCurrentApprovedStoryboard(run.projectId);
+    const storyboardIsCurrent = await hasCurrentApprovedStoryboard(
+      run.projectId,
+    );
     if (!storyboardIsCurrent) return resetToPhase(run, "STORYBOARD");
   }
 
@@ -171,7 +176,10 @@ async function executePhase(run: AutoGenerationRun, artifactBaseUrl: string) {
     case "COMPLETE":
       return markRunComplete(run.id);
     default:
-      throw new AutoPipelineError("Auto generation reached an unknown phase.", false);
+      throw new AutoPipelineError(
+        "Auto generation reached an unknown phase.",
+        false,
+      );
   }
 }
 
@@ -181,12 +189,18 @@ async function runStoryboardPhase(run: AutoGenerationRun) {
     select: { id: true },
   });
   if (!selectedConcept) {
-    throw new AutoPipelineError("Select a concept before resuming Auto mode.", false);
+    throw new AutoPipelineError(
+      "Select a concept before resuming Auto mode.",
+      false,
+    );
   }
 
   let storyboard = await prisma.storyboard.findUnique({
     where: { projectId: run.projectId },
-    include: { scenes: true },
+    include: {
+      scenes: true,
+      project: { select: { outputMode: true } },
+    },
   });
   if (!storyboard || storyboard.conceptId !== selectedConcept.id) {
     const job = await createAndRunStoryboardJob(run.projectId);
@@ -194,12 +208,20 @@ async function runStoryboardPhase(run: AutoGenerationRun) {
     rejectPolicyBlockers(job);
     storyboard = await prisma.storyboard.findUnique({
       where: { projectId: run.projectId },
-      include: { scenes: true },
+      include: {
+        scenes: true,
+        project: { select: { outputMode: true } },
+      },
     });
   }
-  if (!storyboard || storyboard.scenes.length < 2 || storyboard.scenes.length > 4) {
+  const validSceneCount = storyboard
+    ? storyboard.project.outputMode === "PRODUCT_SHOWCASE"
+      ? storyboard.scenes.length >= 1 && storyboard.scenes.length <= 3
+      : storyboard.scenes.length >= 2 && storyboard.scenes.length <= 4
+    : false;
+  if (!storyboard || !validSceneCount) {
     throw new AutoPipelineError(
-      "Storyboard generation did not produce the required 2 to 4 scenes.",
+      "Storyboard generation did not produce the required scene count.",
       false,
     );
   }
@@ -224,7 +246,9 @@ async function runKeyframePhase(run: AutoGenerationRun) {
     assertCompleteJob(job, "Scene anchor generation");
   }
   if (!(await hasCompleteAnchors(run.projectId))) {
-    throw new AutoPipelineError("Scene anchors are incomplete after generation.");
+    throw new AutoPipelineError(
+      "Scene anchors are incomplete after generation.",
+    );
   }
   return moveToNextPhase(run, "KEYFRAMES");
 }
@@ -244,7 +268,8 @@ async function runClipPhase(run: AutoGenerationRun) {
     });
   }
   if (!job || ["FAILED", "CANCELLED", "COMPLETE"].includes(job.status)) {
-    if (job?.status === "FAILED") assertCompleteJob(job, "Scene clip generation");
+    if (job?.status === "FAILED")
+      assertCompleteJob(job, "Scene clip generation");
     job = await createAndRunVideoJob(run.projectId);
     await setCurrentJob(run.id, job.id);
   }
@@ -277,7 +302,9 @@ async function runNarrationPhase(run: AutoGenerationRun) {
     assertCompleteJob(job, "Scene narration generation");
   }
   if (!(await hasCurrentNarration(run.projectId))) {
-    throw new AutoPipelineError("Scene narration is incomplete after generation.");
+    throw new AutoPipelineError(
+      "Scene narration is incomplete after generation.",
+    );
   }
   return moveToNextPhase(run, "NARRATION");
 }
@@ -304,7 +331,9 @@ async function runRenderPhase(run: AutoGenerationRun, artifactBaseUrl: string) {
     assertCompleteJob(job, "Final reel rendering");
   }
   if (!(await hasCompleteRender(run.projectId, run.startedAt))) {
-    throw new AutoPipelineError("The final reel artifact is not available after rendering.");
+    throw new AutoPipelineError(
+      "The final reel artifact is not available after rendering.",
+    );
   }
   return markRunComplete(run.id);
 }
@@ -372,8 +401,7 @@ async function markRunComplete(runId: string) {
 async function handlePhaseFailure(run: AutoGenerationRun, error: unknown) {
   const message = autoErrorMessage(error, run.phase);
   const nextAttempt = run.attempt + 1;
-  const retryable =
-    !(error instanceof AutoPipelineError) || error.retryable;
+  const retryable = !(error instanceof AutoPipelineError) || error.retryable;
   const exhausted = !retryable || nextAttempt >= run.maxAttempts;
 
   await prisma.autoGenerationRun.update({
@@ -401,10 +429,11 @@ async function handlePhaseFailure(run: AutoGenerationRun, error: unknown) {
 
 function assertCompleteJob(job: GenerationJob, label: string) {
   if (job.status === "COMPLETE") return;
-  const message = job.error ? `${label}: ${job.error}` : `${label} did not complete.`;
-  const retryable = !/shorten|must be approved|not found|exactly one|policy/i.test(
-    message,
-  );
+  const message = job.error
+    ? `${label}: ${job.error}`
+    : `${label} did not complete.`;
+  const retryable =
+    !/shorten|must be approved|not found|exactly one|policy/i.test(message);
   throw new AutoPipelineError(message, retryable);
 }
 
@@ -426,12 +455,16 @@ async function hasCompleteAnchors(projectId: string) {
   const storyboard = await productionStoryboard(projectId);
   return Boolean(
     storyboard?.scenes.length &&
-      storyboard.scenes.every((scene) => {
-        const take = scene.takes.find(
-          (candidate) => candidate.id === scene.selectedKeyframeTakeId,
-        );
-        return take?.kind === "KEYFRAME_START" && take.status === "COMPLETE" && Boolean(take.artifactId);
-      }),
+    storyboard.scenes.every((scene) => {
+      const take = scene.takes.find(
+        (candidate) => candidate.id === scene.selectedKeyframeTakeId,
+      );
+      return (
+        take?.kind === "KEYFRAME_START" &&
+        take.status === "COMPLETE" &&
+        Boolean(take.artifactId)
+      );
+    }),
   );
 }
 
@@ -443,29 +476,42 @@ async function hasCurrentApprovedStoryboard(projectId: string) {
     }),
     prisma.storyboard.findUnique({
       where: { projectId },
-      select: { conceptId: true, status: true, scenes: { select: { id: true } } },
+      select: {
+        conceptId: true,
+        status: true,
+        scenes: { select: { id: true } },
+        project: { select: { outputMode: true } },
+      },
     }),
   ]);
-  return Boolean(
-    selectedConcept &&
-      storyboard &&
-      storyboard.conceptId === selectedConcept.id &&
-      ["APPROVED", "COMPLETE"].includes(storyboard.status) &&
-      storyboard.scenes.length >= 2 &&
-      storyboard.scenes.length <= 4,
-  );
+  if (
+    !selectedConcept ||
+    !storyboard ||
+    storyboard.conceptId !== selectedConcept.id ||
+    !["APPROVED", "COMPLETE"].includes(storyboard.status)
+  ) {
+    return false;
+  }
+  return storyboard.project.outputMode === "PRODUCT_SHOWCASE"
+    ? storyboard.scenes.length >= 1 && storyboard.scenes.length <= 3
+    : storyboard.scenes.length >= 2 && storyboard.scenes.length <= 4;
 }
 
 async function hasCompleteClips(projectId: string) {
   const storyboard = await productionStoryboard(projectId);
   return Boolean(
     storyboard?.scenes.length &&
-      storyboard.scenes.every((scene) => {
-        const take = scene.takes.find(
-          (candidate) => candidate.id === scene.selectedVideoTakeId,
-        );
-        return scene.status === "COMPLETE" && take?.kind === "VIDEO" && take.status === "COMPLETE" && Boolean(take.artifactId);
-      }),
+    storyboard.scenes.every((scene) => {
+      const take = scene.takes.find(
+        (candidate) => candidate.id === scene.selectedVideoTakeId,
+      );
+      return (
+        scene.status === "COMPLETE" &&
+        take?.kind === "VIDEO" &&
+        take.status === "COMPLETE" &&
+        Boolean(take.artifactId)
+      );
+    }),
   );
 }
 
@@ -491,7 +537,9 @@ async function hasCurrentNarration(projectId: string) {
     .filter((scene) => scene.voiceoverText.trim())
     .map((scene) => scene.narrationArtifactId)
     .filter((id): id is string => Boolean(id));
-  const voicedScenes = storyboard.scenes.filter((scene) => scene.voiceoverText.trim());
+  const voicedScenes = storyboard.scenes.filter((scene) =>
+    scene.voiceoverText.trim(),
+  );
   if (voicedScenes.length === 0) return true;
   if (requiredIds.length !== voicedScenes.length) return false;
   const artifactCount = await prisma.artifact.count({
@@ -538,7 +586,9 @@ function releaseLease(
 
 function autoErrorMessage(error: unknown, phase: string) {
   const detail =
-    error instanceof Error ? error.message : "The generation service did not respond.";
+    error instanceof Error
+      ? error.message
+      : "The generation service did not respond.";
   return `${formatPhase(phase)} paused: ${detail}`.slice(0, 900);
 }
 

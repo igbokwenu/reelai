@@ -206,8 +206,13 @@ export function safeVisualMotifs(
 export function hardenImagePrompt(
   prompt: string,
   capabilities: GroundingCapabilities,
+  visualStyle: "REALISTIC" | "THREE_D_ANIMATION" = "REALISTIC",
 ) {
-  return `${prompt}\n\nGROUNDING CONSTRAINTS (mandatory):\n- ${buildGroundingInstructions(capabilities)}\n- Photorealistic 9:16 editorial frame. No split labels or typographic layout. Show only visually plausible, non-branded details supported by the concept.`;
+  const style =
+    visualStyle === "THREE_D_ANIMATION"
+      ? "Premium physically based 3D product visualization with believable materials and studio lighting"
+      : "Photorealistic premium commercial product/editorial photography";
+  return `${prompt}\n\nGROUNDING CONSTRAINTS (mandatory):\n- ${buildGroundingInstructions(capabilities)}\n- ${style}, vertical 9:16. No split labels or typographic layout. Show only visually plausible details supported by the references and concept.`;
 }
 
 function hasAffirmativeVisualRequest(text: string, pattern: RegExp) {

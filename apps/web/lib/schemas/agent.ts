@@ -12,12 +12,26 @@ export const creativeConceptSchema = z.object({
   rationale: z.string().min(20).max(520),
 });
 
+export const productShowcaseCreativeConceptSchema =
+  creativeConceptSchema.extend({
+    estimatedScenes: z.number().int().min(1).max(3),
+    estimatedDurationSec: z.number().int().min(5).max(15),
+  });
+
 export const creativeConceptsSchema = z.object({
   concepts: z.array(creativeConceptSchema).length(3),
 });
 
 export const creativeConceptRegenerationSchema = z.object({
   concept: creativeConceptSchema,
+});
+
+export const productShowcaseCreativeConceptsSchema = z.object({
+  concepts: z.array(productShowcaseCreativeConceptSchema).length(3),
+});
+
+export const productShowcaseCreativeConceptRegenerationSchema = z.object({
+  concept: productShowcaseCreativeConceptSchema,
 });
 
 export const creativeConceptRegenerationInputSchema = z.object({
@@ -63,12 +77,39 @@ export const creativeConceptsJsonSchema = {
   },
 } satisfies Record<string, unknown>;
 
+export const productShowcaseCreativeConceptsJsonSchema = {
+  ...creativeConceptsJsonSchema,
+  properties: {
+    concepts: {
+      ...creativeConceptsJsonSchema.properties.concepts,
+      items: {
+        ...creativeConceptsJsonSchema.properties.concepts.items,
+        properties: {
+          ...creativeConceptsJsonSchema.properties.concepts.items.properties,
+          estimatedScenes: { type: "integer", minimum: 1, maximum: 3 },
+          estimatedDurationSec: { type: "integer", minimum: 5, maximum: 15 },
+        },
+      },
+    },
+  },
+} satisfies Record<string, unknown>;
+
 export const creativeConceptRegenerationJsonSchema = {
   type: "object",
   additionalProperties: false,
   required: ["concept"],
   properties: {
     concept: creativeConceptsJsonSchema.properties.concepts.items,
+  },
+} satisfies Record<string, unknown>;
+
+export const productShowcaseCreativeConceptRegenerationJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["concept"],
+  properties: {
+    concept:
+      productShowcaseCreativeConceptsJsonSchema.properties.concepts.items,
   },
 } satisfies Record<string, unknown>;
 
@@ -265,52 +306,92 @@ export const storyboardSceneSchema = z
     }
   });
 
-export const storyboardSchema = z
-  .object({
-    title: z.string().min(3).max(100),
-    script: z.string().min(20).max(2400),
-    bgm: z.object({
-      enabled: z.boolean(),
-      preset: z.string().min(2).max(80),
-      prompt: z.string().min(4).max(400),
+const storyboardBaseSchema = z.object({
+  title: z.string().min(3).max(100),
+  script: z.string().min(20).max(2400),
+  bgm: z.object({
+    enabled: z.boolean(),
+    preset: z.string().min(2).max(80),
+    prompt: z.string().min(4).max(400),
+  }),
+  continuityBible: z.object({
+    product: z.string().min(6).max(700),
+    characters: z.string().min(20).max(500),
+    cast: castPlanSchema,
+    visualWorld: z.string().min(6).max(700),
+  }),
+  scenes: z.array(storyboardSceneSchema).min(1).max(4),
+});
+
+function validateStoryboardStructure(
+  value: z.infer<typeof storyboardBaseSchema>,
+  ctx: z.RefinementCtx,
+  {
+    minScenes,
+    maxScenes,
+    minDuration,
+    maxDuration,
+  }: {
+    minScenes: number;
+    maxScenes: number;
+    minDuration: number;
+    maxDuration: number;
+  },
+) {
+  if (value.scenes.length < minScenes || value.scenes.length > maxScenes) {
+    ctx.addIssue({
+      code: "custom",
+      message: `Storyboard must contain ${minScenes} to ${maxScenes} scenes.`,
+      path: ["scenes"],
+    });
+  }
+  const totalDuration = value.scenes.reduce(
+    (sum, scene) => sum + scene.durationSec,
+    0,
+  );
+
+  if (totalDuration < minDuration || totalDuration > maxDuration) {
+    ctx.addIssue({
+      code: "custom",
+      message: `Storyboard duration must land between ${minDuration} and ${maxDuration} seconds.`,
+      path: ["scenes"],
+    });
+  }
+
+  const cameraBehaviors = new Set(
+    value.scenes
+      .map((scene) => reliableCameraBehavior(scene.shotPrompt))
+      .filter(Boolean),
+  );
+
+  if (value.scenes.length > 1 && cameraBehaviors.size < 2) {
+    ctx.addIssue({
+      code: "custom",
+      message:
+        "Use at least two camera behaviors across the storyboard so the visual rhythm does not become repetitive.",
+      path: ["scenes"],
+    });
+  }
+}
+
+export const storyboardSchema = storyboardBaseSchema.superRefine((value, ctx) =>
+  validateStoryboardStructure(value, ctx, {
+    minScenes: 2,
+    maxScenes: 4,
+    minDuration: 15,
+    maxDuration: 30,
+  }),
+);
+
+export const productShowcaseStoryboardSchema = storyboardBaseSchema.superRefine(
+  (value, ctx) =>
+    validateStoryboardStructure(value, ctx, {
+      minScenes: 1,
+      maxScenes: 3,
+      minDuration: 5,
+      maxDuration: 15,
     }),
-    continuityBible: z.object({
-      product: z.string().min(6).max(700),
-      characters: z.string().min(20).max(500),
-      cast: castPlanSchema,
-      visualWorld: z.string().min(6).max(700),
-    }),
-    scenes: z.array(storyboardSceneSchema).min(2).max(4),
-  })
-  .superRefine((value, ctx) => {
-    const totalDuration = value.scenes.reduce(
-      (sum, scene) => sum + scene.durationSec,
-      0,
-    );
-
-    if (totalDuration < 15 || totalDuration > 30) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Storyboard duration must land between 15 and 30 seconds.",
-        path: ["scenes"],
-      });
-    }
-
-    const cameraBehaviors = new Set(
-      value.scenes
-        .map((scene) => reliableCameraBehavior(scene.shotPrompt))
-        .filter(Boolean),
-    );
-
-    if (value.scenes.length > 1 && cameraBehaviors.size < 2) {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          "Use at least two camera behaviors across the storyboard so the visual rhythm does not become repetitive.",
-        path: ["scenes"],
-      });
-    }
-  });
+);
 
 export const storyboardJsonSchema = {
   type: "object",
@@ -459,6 +540,18 @@ export const storyboardJsonSchema = {
   },
 } satisfies Record<string, unknown>;
 
+export const productShowcaseStoryboardJsonSchema = {
+  ...storyboardJsonSchema,
+  properties: {
+    ...storyboardJsonSchema.properties,
+    scenes: {
+      ...storyboardJsonSchema.properties.scenes,
+      minItems: 1,
+      maxItems: 3,
+    },
+  },
+} satisfies Record<string, unknown>;
+
 export const storyboardPatchSchema = z.object({
   title: z.string().min(3).max(100).optional(),
   script: z.string().min(20).max(2400).optional(),
@@ -544,29 +637,50 @@ const flexibleConceptSchema = z
 
 export function parseCreativeConceptsOutput(
   value: unknown,
+  outputMode: "STANDARD" | "PRODUCT_SHOWCASE" = "STANDARD",
 ): CreativeConceptsOutput {
   const extracted = extractConceptArray(value);
 
   const concepts = extracted
     .slice(0, 3)
-    .map((item: unknown) => normalizeConcept(item));
+    .map((item: unknown) =>
+      normalizeConcept(item, outputMode === "PRODUCT_SHOWCASE"),
+    );
 
-  return creativeConceptsSchema.parse({ concepts });
+  return (
+    outputMode === "PRODUCT_SHOWCASE"
+      ? productShowcaseCreativeConceptsSchema
+      : creativeConceptsSchema
+  ).parse({ concepts });
 }
 
-export function parseCreativeConceptRegenerationOutput(value: unknown) {
+export function parseCreativeConceptRegenerationOutput(
+  value: unknown,
+  outputMode: "STANDARD" | "PRODUCT_SHOWCASE" = "STANDARD",
+) {
   const record = asRecord(value);
   const directConcept = record ? asRecord(record.concept) : null;
   const extracted = directConcept ?? extractConceptArray(value)[0];
 
-  return creativeConceptRegenerationSchema.parse({
-    concept: normalizeConcept(extracted),
+  return (
+    outputMode === "PRODUCT_SHOWCASE"
+      ? productShowcaseCreativeConceptRegenerationSchema
+      : creativeConceptRegenerationSchema
+  ).parse({
+    concept: normalizeConcept(extracted, outputMode === "PRODUCT_SHOWCASE"),
   });
 }
 
-export function parseStoryboardOutput(value: unknown): StoryboardOutput {
+export function parseStoryboardOutput(
+  value: unknown,
+  outputMode: "STANDARD" | "PRODUCT_SHOWCASE" = "STANDARD",
+): StoryboardOutput {
   const canonical = canonicalizeStoryboardValue(value);
-  const strict = storyboardSchema.safeParse(canonical);
+  const activeSchema =
+    outputMode === "PRODUCT_SHOWCASE"
+      ? productShowcaseStoryboardSchema
+      : storyboardSchema;
+  const strict = activeSchema.safeParse(canonical);
 
   if (strict.success) {
     return strict.data;
@@ -582,7 +696,7 @@ export function parseStoryboardOutput(value: unknown): StoryboardOutput {
     .slice(0, 4)
     .map((scene, index) => normalizeStoryboardScene(scene, index));
 
-  return storyboardSchema.parse({
+  return activeSchema.parse({
     title: text(record.title ?? record.name ?? "Generated storyboard", {
       fallback: "",
       min: 3,
@@ -637,7 +751,7 @@ function extractConceptArray(value: unknown): unknown[] {
   return inner ? extractConceptArray(inner) : [];
 }
 
-function normalizeConcept(value: unknown) {
+function normalizeConcept(value: unknown, productShowcase = false) {
   const parsed = flexibleConceptSchema.parse(asRecord(value) ?? {});
   const scenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
   const firstScene = scenes[0] ? asRecord(scenes[0]) : null;
@@ -721,7 +835,9 @@ function normalizeConcept(value: unknown) {
         parsed.sceneCount ??
         parsed.scene_count ??
         (Array.isArray(parsed.scenes) ? parsed.scenes.length : undefined),
-      { fallback: 3, min: 2, max: 4 },
+      productShowcase
+        ? { fallback: 2, min: 1, max: 3 }
+        : { fallback: 3, min: 2, max: 4 },
     ),
     estimatedDurationSec: integerInRange(
       parsed.estimatedDurationSec ??
@@ -731,7 +847,9 @@ function normalizeConcept(value: unknown) {
         parsed.durationSec ??
         parsed.duration ??
         parsed.target_duration_seconds,
-      { fallback: 24, min: 15, max: 30 },
+      productShowcase
+        ? { fallback: 10, min: 5, max: 15 }
+        : { fallback: 24, min: 15, max: 30 },
     ),
     previewPrompt,
     rationale: text(
