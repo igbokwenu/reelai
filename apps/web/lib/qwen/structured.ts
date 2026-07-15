@@ -43,32 +43,36 @@ export async function generateStructuredWithQwen<T>({
       strict: true,
     },
   };
-  let result;
+  const requestStructuredCompletion = async (
+    requestOperation: string,
+    requestMessages: typeof messages,
+  ) => {
+    try {
+      return await qwenChatCompletion({
+        operation: requestOperation,
+        model,
+        messages: requestMessages,
+        enableThinking: false,
+        responseFormat: schemaResponseFormat,
+      });
+    } catch (error) {
+      if (!(error instanceof QwenClientError) || error.status !== 400) {
+        throw error;
+      }
 
-  try {
-    result = await qwenChatCompletion({
-      operation,
-      model,
-      messages,
-      enableThinking: false,
-      responseFormat: schemaResponseFormat,
-    });
-  } catch (error) {
-    if (!(error instanceof QwenClientError) || error.status !== 400) {
-      throw error;
+      console.warn(
+        `[${requestOperation}] Strict JSON schema failed, falling back to json_object mode`,
+      );
+      return qwenChatCompletion({
+        operation: `${requestOperation}_json_object_fallback`,
+        model,
+        messages: requestMessages,
+        enableThinking: false,
+        responseFormat: { type: "json_object" },
+      });
     }
-
-    console.warn(
-      `[${operation}] Strict JSON schema failed, falling back to json_object mode`,
-    );
-    result = await qwenChatCompletion({
-      operation: `${operation}_json_object_fallback`,
-      model,
-      messages,
-      enableThinking: false,
-      responseFormat: { type: "json_object" },
-    });
-  }
+  };
+  let result = await requestStructuredCompletion(operation, messages);
 
   const parsed = parseQwenJson(result.content);
   let data: T;
@@ -80,10 +84,9 @@ export async function generateStructuredWithQwen<T>({
       throw error;
     }
 
-    const repaired = await qwenChatCompletion({
-      operation: `${operation}_schema_repair`,
-      model,
-      messages: [
+    const repaired = await requestStructuredCompletion(
+      `${operation}_schema_repair`,
+      [
         {
           role: "system" as const,
           content:
@@ -102,9 +105,7 @@ export async function generateStructuredWithQwen<T>({
           ].join("\n\n"),
         },
       ],
-      enableThinking: false,
-      responseFormat: schemaResponseFormat,
-    });
+    );
 
     data = parse(parseQwenJson(repaired.content));
     result = repaired;

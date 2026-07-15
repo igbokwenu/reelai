@@ -6,6 +6,7 @@ import { PublicError } from "@/lib/errors";
 import { createAndRunStoryboardJob } from "@/lib/jobs/creative";
 import {
   isAutoRunActive,
+  isRetryableAutoFailure,
   nextAutoPhase,
   retryDelayMs,
   type AutoPhase,
@@ -448,10 +449,7 @@ function assertCompleteJob(job: GenerationJob, label: string) {
   const message = job.error
     ? `${label}: ${job.error}`
     : `${label} did not complete.`;
-  const retryable =
-    !/shorten|must be approved|not found|select (?:exactly )?one|before (?:proceeding|resuming)|policy|requires human review|upload the/i.test(
-      message,
-    );
+  const retryable = isRetryableAutoFailure(message);
   throw new AutoPipelineError(message, retryable);
 }
 

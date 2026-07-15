@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import {
   AUTO_PHASES,
   autoProgress,
+  presentAutoFailure,
   type AutoPhase,
   type AutoRunStatus,
 } from "@/lib/jobs/auto-production-state";
@@ -155,6 +156,7 @@ export function AutoGenerationPanel({
     !retryAt || retryAt <= new Date()
       ? "Retrying now"
       : `Retrying shortly · attempt ${(run?.attempt ?? 0) + 1} of ${run?.maxAttempts ?? 3}`;
+  const displayError = run?.error ? presentAutoFailure(run.error) : null;
 
   if (!run) return null;
 
@@ -207,7 +209,7 @@ export function AutoGenerationPanel({
               {status === "COMPLETE"
                 ? "The complete reel is ready to watch. Every storyboard scene, anchor, clip, and narration track remains editable below."
                 : status === "FAILED"
-                  ? "Nothing completed has been lost. Review the detail below, make an edit if needed, then resume from this phase."
+                  ? "Auto Director paused before this step could affect downstream production. Your approved work is preserved; review the guidance, then retry only this phase."
                   : current?.description}
             </p>
           </div>
@@ -232,7 +234,7 @@ export function AutoGenerationPanel({
                   ) : (
                     <RefreshCw className="size-4" aria-hidden="true" />
                   )}
-                  Resume auto mode
+                  Retry {current?.label ?? "this phase"}
                 </Button>
               </>
             ) : status === "COMPLETE" ? (
@@ -308,13 +310,16 @@ export function AutoGenerationPanel({
             <span>{retryLabel}. Completed work is preserved.</span>
           </div>
         ) : null}
-        {run.error && status === "FAILED" ? (
+        {displayError && status === "FAILED" ? (
           <div className="mt-4 flex gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-3 text-sm text-destructive">
             <AlertTriangle
               className="mt-0.5 size-4 shrink-0"
               aria-hidden="true"
             />
-            <span>{run.error}</span>
+            <div>
+              <p className="font-medium text-foreground">What needs attention</p>
+              <p className="mt-1 leading-5">{displayError}</p>
+            </div>
           </div>
         ) : null}
         {requestError ? (

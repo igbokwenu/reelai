@@ -327,6 +327,97 @@ describe("Phase 4 agent schemas", () => {
       parsed.scenes[0]?.voiceoverText.split(/\s+/).filter(Boolean).length,
     ).toBeLessThanOrEqual(12);
     expect(parsed.scenes[0]?.voiceoverText).not.toMatch(/\band\.$/i);
+    expect(parsed.bgm).toEqual({
+      enabled: false,
+      preset: "none",
+      prompt: "Voiceover only; no background music.",
+    });
+  });
+
+  it("derives missing storyboard script and narration-only BGM metadata without a paid reroll", () => {
+    const parsed = parseStoryboardOutput(
+      {
+        title: "Sarah's signature finish",
+        script: "",
+        bgm: { enabled: false, preset: "", prompt: "" },
+        continuityBible: {
+          product:
+            "Preserve the exact frozen dessert, serving cup, colors, texture, and verified toppings.",
+          characters:
+            "No people appear; keep the supplied dessert as the only focal subject.",
+          cast: { mode: "NO_PEOPLE", members: [] },
+          visualWorld:
+            "Rich studio shadows, cool highlights, and premium macro food texture.",
+        },
+        scenes: [
+          {
+            index: 1,
+            durationSec: 5,
+            captionText: "Taste the signature finish",
+            voiceoverText:
+              "A joyful scoop, finished with Sarah's signature flourish.",
+            shotPrompt:
+              "Elegant anticipation: Sarah's frozen dessert turns briefly as verified toppings fall while a fixed camera holds the composition.",
+            continuityNotes:
+              "Keep the exact dessert, cup, toppings, cool highlights, and centered scale.",
+            continuityMode: "CONTINUOUS",
+            transitionStyle: "CUT",
+          },
+        ],
+      },
+      "PRODUCT_SHOWCASE",
+      5,
+    );
+
+    expect(parsed.script).toBe(
+      "A joyful scoop, finished with Sarah's signature flourish.",
+    );
+    expect(parsed.bgm).toEqual({
+      enabled: false,
+      preset: "none",
+      prompt: "Voiceover only; no background music.",
+    });
+  });
+
+  it("uses a safe disabled-music fallback for standard storyboards too", () => {
+    const scene = (index: number) => ({
+      index,
+      durationSec: 8,
+      captionText: index === 1 ? "A calmer start" : "Move with confidence",
+      voiceoverText:
+        index === 1
+          ? "A thoughtful start makes every next step feel clearer."
+          : "Move forward with support designed around what matters.",
+      shotPrompt:
+        index === 1
+          ? "Quiet assurance: the founder opens the studio door while a fixed camera holds the welcoming layered composition."
+          : "Earned confidence: the founder steps into warm daylight as the camera slowly pushes in toward her relaxed expression.",
+      continuityNotes:
+        "Preserve the founder's face, wardrobe, warm palette, screen direction, and morning light.",
+      continuityMode: "CONTINUOUS",
+      transitionStyle: "CUT",
+    });
+    const parsed = parseStoryboardOutput({
+      title: "A confident next step",
+      script: "",
+      continuityBible: {
+        product:
+          "No recurring product appears; keep the service story visually grounded.",
+        characters:
+          "Keep the fictional founder's face, age, hair, and wardrobe stable.",
+        cast: { mode: "NO_PEOPLE", members: [] },
+        visualWorld:
+          "Warm morning light, grounded studio textures, and a calm neutral palette.",
+      },
+      scenes: [scene(1), scene(2)],
+    });
+
+    expect(parsed.script).toContain("A thoughtful start");
+    expect(parsed.bgm).toEqual({
+      enabled: false,
+      preset: "none",
+      prompt: "Voiceover only; no background music.",
+    });
   });
 
   it("deterministically repairs substantive storyboard prose without paid reroll luck", () => {

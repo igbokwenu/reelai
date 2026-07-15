@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   autoProgress,
   isAutoRunActive,
+  isRetryableAutoFailure,
   nextAutoPhase,
+  presentAutoFailure,
   retryDelayMs,
 } from "@/lib/jobs/auto-production-state";
 
@@ -29,5 +31,34 @@ describe("auto production state", () => {
     expect(autoProgress("COMPLETE", "COMPLETE")).toBe(100);
     expect(isAutoRunActive("WAITING_RETRY")).toBe(true);
     expect(isAutoRunActive("FAILED")).toBe(false);
+  });
+
+  it("retries transient failures but does not repeat deterministic creative validation", () => {
+    expect(
+      isRetryableAutoFailure("Video provider returned a temporary 503."),
+    ).toBe(true);
+    expect(
+      isRetryableAutoFailure(
+        "Creative output schema mismatch: script is too short.",
+      ),
+    ).toBe(false);
+    expect(
+      isRetryableAutoFailure(
+        "Reel AI could not complete the plan after automatic repair.",
+      ),
+    ).toBe(false);
+  });
+
+  it("hides legacy schema internals from persisted failed Auto runs", () => {
+    expect(
+      presentAutoFailure(
+        "Storyboard paused: Creative output schema mismatch: bgm.preset Too small: expected string to have >=2 characters.",
+      ),
+    ).toBe(
+      "Reel AI couldn't complete the creative plan after automatic repair. Your concept and brand assets are safe; retry this phase to continue.",
+    );
+    expect(presentAutoFailure("Video provider returned a temporary 503.")).toBe(
+      "Video provider returned a temporary 503.",
+    );
   });
 });

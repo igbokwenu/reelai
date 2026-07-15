@@ -38,3 +38,24 @@ export function retryDelayMs(
 export function isAutoRunActive(status: string) {
   return status === "RUNNING" || status === "WAITING_RETRY";
 }
+
+const NON_RETRYABLE_AUTO_FAILURE =
+  /shorten|must be approved|not found|select (?:exactly )?one|before (?:proceeding|resuming)|policy|requires human review|upload the|schema mismatch|after automatic repair/i;
+
+/**
+ * Provider outages and polling failures can improve on retry. Validation and
+ * user-input failures cannot, and structured creative jobs have already used
+ * their own bounded repair pass before reaching the Auto coordinator.
+ */
+export function isRetryableAutoFailure(message: string) {
+  return !NON_RETRYABLE_AUTO_FAILURE.test(message);
+}
+
+const TECHNICAL_CREATIVE_VALIDATION =
+  /schema mismatch|too small: expected|too big: expected|invalid_type|expected string to have/i;
+
+export function presentAutoFailure(message: string) {
+  if (!TECHNICAL_CREATIVE_VALIDATION.test(message)) return message;
+
+  return "Reel AI couldn't complete the creative plan after automatic repair. Your concept and brand assets are safe; retry this phase to continue.";
+}

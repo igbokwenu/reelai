@@ -436,6 +436,8 @@ Rules:
 - Log model, operation, elapsed time, provider task id, and sanitized errors.
 - Do not log prompts containing uploaded private content unless `NODE_ENV !== "production"` and the log is explicitly redacted.
 - For structured JSON, always use Zod schemas and validate the model output before saving.
+- Normalize only policy-derived or safely reconstructable structured fields before requesting a paid repair. Storyboard script may be derived from validated scene narration; disabled BGM must use explicit non-empty sentinel metadata. Never invent a missing shot direction, product fact, claim, or cast identity.
+- A structured creative call gets one bounded schema-repair pass. If validation still fails, preserve the technical issue in sanitized server logs but show plain-language recovery copy. Auto mode must not automatically repeat the whole creative phase for that deterministic failure; an explicit user retry is allowed.
 - For async video tasks, save the provider `task_id` to `GenerationJob.providerTaskId`.
 
 ## Agent Output Schemas
@@ -621,7 +623,7 @@ UI rules:
 - Do not use generic placeholder thumbnails after real artifacts exist.
 - Buttons that trigger spend-heavy generation must show confirmation text and estimated scene count.
 - Show model IDs and provider task IDs in a collapsible “Run details” panel.
-- All failed jobs must show a retry button and sanitized error.
+- All failed jobs must show a phase-scoped retry button and a sanitized, plain-language error. Completed upstream work must remain preserved.
 - Use icons from `lucide-react`.
 
 ## Styling Contract

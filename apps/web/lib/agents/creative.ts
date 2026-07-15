@@ -548,7 +548,10 @@ export async function generateStoryboardForProject(projectId: string) {
 
 export function getCreativeGenerationError(error: unknown) {
   if (error instanceof ZodError) {
-    return `Creative output schema mismatch: ${formatZodIssues(error)}. Try regenerating.`;
+    console.warn(
+      `[creative_output_validation] Automatic repair did not satisfy validation: ${formatZodIssues(error)}`,
+    );
+    return "Reel AI couldn't assemble a complete creative plan after automatic repair. Your concept and brand assets are safe; regenerate this stage to try again.";
   }
 
   if (
@@ -1089,8 +1092,8 @@ function validateConceptTiming(
   if (invalid) {
     throw new Error(
       showcase
-        ? `Creative output schema mismatch: Product Showcase concepts must use a feasible 1 to 3 scenes totaling exactly ${project.videoLengthSec} seconds. Try regenerating.`
-        : "Creative output schema mismatch: Reel concepts must use 2 to 4 scenes and 15 to 30 seconds. Try regenerating.",
+        ? `Reel AI couldn't align the Product Showcase concepts to the ${project.videoLengthSec}-second format after automatic repair. Your inputs are safe; regenerate the concepts to try again.`
+        : "Reel AI couldn't align the concepts to the reel format after automatic repair. Your inputs are safe; regenerate the concepts to try again.",
     );
   }
 }
@@ -1101,8 +1104,11 @@ function validateStoryboardTiming(project: Project, output: StoryboardOutput) {
     targetDurationSec: project.videoLengthSec,
     durations: output.scenes.map((scene) => scene.durationSec),
   });
-  if (issue)
-    throw new Error(`Storyboard schema mismatch: ${issue} Try regenerating.`);
+  if (issue) {
+    throw new Error(
+      `Reel AI couldn't align the storyboard timing after automatic repair: ${issue} Regenerate the storyboard to try again.`,
+    );
+  }
 }
 
 function buildStoryboardPrompt(
@@ -1166,6 +1172,7 @@ Requirements:
 - The storyboard must clearly execute the selected concept's strategy, narrative arc, and visual style.
 - Do not drift into a different concept, a generic ad, or a list of disconnected scenes.
 - Write voiceover for natural spoken timing, not just the 600-character API ceiling: target at most 2.5 words per second of scene duration (about 12 words for 5 seconds, 15 for 6, 20 for 8, or 25 for 10). Keep each line self-contained inside its scene; never let a sentence depend on audio continuing into the next scene.
+- script is the unified narration plan and must never be empty. If the concept does not need separate copy, join the scene voiceoverText lines in scene order.
 - Each scene needs a caption, a concise voiceover, one shotPrompt, and engine-only continuity metadata.
 - Build a continuityBible before the scenes. Separately lock recurring product attributes, a structured cast plan, and the shared visual world. If a category is absent, explicitly say so rather than inventing a product or token people.
 - Select the execution lane that fits the verified offer; do not default every business to a stressed-person / relieved-person service story:
@@ -1208,7 +1215,7 @@ Requirements:
 - The final scene must resolve with a clear brand-value payoff and preserve calm negative space in the upper-left safe area for Reel AI's composited brand lockup. When an uploaded logo is available, the renderer places that exact asset over the final scene; never ask the image or video model to redraw it.
 - Only the final scene caption is composited into the rendered reel as the closer or call to action; earlier captionText values are editorial labels and must not duplicate narration or be designed as on-screen typography.
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Generated source clips must be silent: do not describe dialogue, music, sound effects, ambience, or auto-dubbing. Narration is created separately and is the only Product Showcase audio layer." : "Do not ask source-video generation for dialogue or lip-sync; narration and optional music are composed separately."}
-- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Set bgm.enabled to false. Product Showcase uses scene narration as its only final audio layer." : "Choose bgm only when it adds real pacing value; narration remains primary."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? 'Set bgm.enabled to false, bgm.preset to "none", and bgm.prompt to "Voiceover only; no background music." Product Showcase uses scene narration as its only final audio layer.' : 'Choose bgm only when it adds real pacing value; narration remains primary. When disabled, still return bgm.preset as "none" and bgm.prompt as "Voiceover only; no background music."'}
 - ${buildCinematicBoostInstruction(project.cinematicBoost)}
 - Match the ${project.style === "THREE_D_ANIMATION" ? "3D animation" : "realistic"} visual style.
 - Do not create unsupported performance, medical, financial, or legal claims.

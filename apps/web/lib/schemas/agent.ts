@@ -409,15 +409,33 @@ export const storyboardJsonSchema = {
   required: ["title", "script", "bgm", "continuityBible", "scenes"],
   properties: {
     title: { type: "string", minLength: 3, maxLength: 100 },
-    script: { type: "string", minLength: 20, maxLength: 2400 },
+    script: {
+      type: "string",
+      minLength: 20,
+      maxLength: 2400,
+      description:
+        "A unified narration script. Never leave this empty; when no separate script is needed, join the scene voiceover lines in scene order.",
+    },
     bgm: {
       type: "object",
       additionalProperties: false,
       required: ["enabled", "preset", "prompt"],
       properties: {
         enabled: { type: "boolean" },
-        preset: { type: "string", minLength: 2, maxLength: 80 },
-        prompt: { type: "string", minLength: 4, maxLength: 400 },
+        preset: {
+          type: "string",
+          minLength: 2,
+          maxLength: 80,
+          description:
+            'Never empty. Use "none" when background music is disabled.',
+        },
+        prompt: {
+          type: "string",
+          minLength: 4,
+          maxLength: 400,
+          description:
+            'Never empty. Use "Voiceover only; no background music." when disabled.',
+        },
       },
     },
     continuityBible: {
@@ -561,6 +579,18 @@ export const productShowcaseStoryboardJsonSchema = {
   ...storyboardJsonSchema,
   properties: {
     ...storyboardJsonSchema.properties,
+    bgm: {
+      ...storyboardJsonSchema.properties.bgm,
+      properties: {
+        ...storyboardJsonSchema.properties.bgm.properties,
+        enabled: {
+          type: "boolean",
+          const: false,
+          description:
+            "Product Showcase is narration-only and must not use background music.",
+        },
+      },
+    },
     scenes: {
       ...storyboardJsonSchema.properties.scenes,
       minItems: 1,
@@ -730,7 +760,9 @@ export function parseStoryboardOutput(
   const strict = validationSchema.safeParse(canonical);
 
   if (strict.success) {
-    return strict.data;
+    return outputMode === "PRODUCT_SHOWCASE"
+      ? { ...strict.data, bgm: narrationOnlyBgm() }
+      : strict.data;
   }
 
   const record = asRecord(canonical) ?? {};
@@ -764,18 +796,19 @@ export function parseStoryboardOutput(
     }));
   }
 
+  const title = text(record.title ?? record.name, {
+    fallback: "Generated storyboard",
+    min: 3,
+    max: 100,
+  });
+
   return validationSchema.parse({
-    title: text(record.title ?? record.name ?? "Generated storyboard", {
-      fallback: "",
-      min: 3,
-      max: 100,
-    }),
-    script: text(record.script ?? record.voiceoverScript ?? record.copy, {
-      fallback: "",
-      min: 20,
-      max: 2400,
-    }),
-    bgm: normalizeBgm(record.bgm ?? record.music ?? record.backgroundMusic),
+    title,
+    script: normalizeStoryboardScript(record, scenes, title),
+    bgm: normalizeBgm(
+      record.bgm ?? record.music ?? record.backgroundMusic,
+      outputMode,
+    ),
     continuityBible: normalizeContinuityBible(
       record.continuityBible ??
         record.continuity_bible ??
@@ -1411,34 +1444,71 @@ function inferShotMood(value: string) {
   return "Purposeful energy";
 }
 
-function normalizeBgm(value: unknown) {
-  const record = asRecord(value);
+function normalizeStoryboardScript(
+  record: Record<string, unknown>,
+  scenes: ReturnType<typeof normalizeStoryboardScene>[],
+  title: string,
+) {
+  const narratedStory = scenes
+    .map((scene) => scene.voiceoverText.trim())
+    .filter(Boolean)
+    .join(" ");
+  const editorialOutline = [
+    title,
+    ...scenes.map((scene) => scene.captionText.trim()).filter(Boolean),
+  ]
+    .map((part) => part.replace(/[.!?]+$/, ""))
+    .filter(Boolean)
+    .join(". ");
+  const derivedScript =
+    narratedStory.length >= 20 ? narratedStory : editorialOutline;
 
-  if (!record) {
-    return {
-      enabled: true,
-      preset: "",
-      prompt: "",
-    };
-  }
+  return text(record.script ?? record.voiceoverScript ?? record.copy, {
+    fallback: derivedScript,
+    min: 20,
+    max: 2400,
+  });
+}
+
+function normalizeBgm(
+  value: unknown,
+  outputMode: "STANDARD" | "PRODUCT_SHOWCASE",
+) {
+  if (outputMode === "PRODUCT_SHOWCASE") return narrationOnlyBgm();
+
+  const record = asRecord(value);
+  const requestedEnabled =
+    typeof record?.enabled === "boolean"
+      ? record.enabled
+      : typeof record?.bgmEnabled === "boolean"
+        ? record.bgmEnabled
+        : false;
+  const enabled = requestedEnabled;
+  const presetFallback = enabled ? "subtle" : "none";
+  const promptFallback = enabled
+    ? "Subtle background music that stays beneath the narration."
+    : "Voiceover only; no background music.";
 
   return {
-    enabled:
-      typeof record.enabled === "boolean"
-        ? record.enabled
-        : typeof record.bgmEnabled === "boolean"
-          ? record.bgmEnabled
-          : true,
-    preset: text(record.preset ?? record.mood ?? record.style, {
-      fallback: "",
+    enabled,
+    preset: text(record?.preset ?? record?.mood ?? record?.style, {
+      fallback: presetFallback,
       min: 2,
       max: 80,
     }),
-    prompt: text(record.prompt ?? record.description, {
-      fallback: "",
+    prompt: text(record?.prompt ?? record?.description, {
+      fallback: promptFallback,
       min: 4,
       max: 400,
     }),
+  };
+}
+
+function narrationOnlyBgm() {
+  return {
+    enabled: false,
+    preset: "none",
+    prompt: "Voiceover only; no background music.",
   };
 }
 
