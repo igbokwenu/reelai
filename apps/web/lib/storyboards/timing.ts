@@ -6,6 +6,14 @@ export function storyboardSceneRange(outputMode: StoryboardOutputMode) {
     : { min: 2, max: 4 };
 }
 
+export function productShowcaseSceneRange(targetDurationSec: number) {
+  const target = clamp(Math.round(targetDurationSec), 5, 15);
+  return {
+    min: Math.max(1, Math.ceil(target / 10)),
+    max: Math.min(3, Math.floor(target / 5)),
+  };
+}
+
 export function storyboardTimingIssue({
   outputMode,
   targetDurationSec,
@@ -15,11 +23,17 @@ export function storyboardTimingIssue({
   targetDurationSec: number;
   durations: number[];
 }) {
-  const range = storyboardSceneRange(outputMode);
+  const range =
+    outputMode === "PRODUCT_SHOWCASE"
+      ? productShowcaseSceneRange(targetDurationSec)
+      : storyboardSceneRange(outputMode);
   if (durations.length < range.min || durations.length > range.max) {
-    return outputMode === "PRODUCT_SHOWCASE"
-      ? "Product Showcase needs 1 to 3 scenes."
-      : "A standard reel needs 2 to 4 scenes.";
+    if (outputMode === "PRODUCT_SHOWCASE") {
+      return targetDurationSec === 5
+        ? "A 5-second Product Showcase must use exactly one scene and one video clip."
+        : `A ${targetDurationSec}-second Product Showcase needs ${range.min} to ${range.max} scenes.`;
+    }
+    return "A standard reel needs 2 to 4 scenes.";
   }
 
   if (durations.some((duration) => duration < 5 || duration > 10)) {
@@ -51,8 +65,7 @@ export function normalizeShowcaseSceneCount(
   targetDurationSec: number,
 ) {
   const target = clamp(Math.round(targetDurationSec), 5, 15);
-  const min = Math.max(1, Math.ceil(target / 10));
-  const max = Math.min(3, Math.floor(target / 5));
+  const { min, max } = productShowcaseSceneRange(target);
   return clamp(Math.round(requestedCount), min, max);
 }
 

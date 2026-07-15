@@ -538,7 +538,7 @@ describe("Phase 4 agent schemas", () => {
     };
 
     expect(() => parseStoryboardOutput(invalid, "PRODUCT_SHOWCASE", 5)).toThrow(
-      /exactly 5 seconds/,
+      /exactly one scene and one video clip/,
     );
   });
 

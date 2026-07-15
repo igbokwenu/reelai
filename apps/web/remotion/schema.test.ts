@@ -5,6 +5,7 @@ import {
   BGM_DUCKED_VOLUME,
   getBgmVolume,
   getBrandWatermarkWindow,
+  getReelDurationFrames,
   getSceneNarrationWindow,
   getTransitionDurationFrames,
   type ReelCompositionInput,
@@ -51,6 +52,27 @@ describe("brand watermark timing", () => {
         30,
       ),
     ).toEqual({ from: 0, durationInFrames: 420 });
+  });
+
+  it("treats a five-second Product Showcase as one clip with the logo throughout", () => {
+    const fiveSecondInput: ReelCompositionInput = {
+      ...baseInput,
+      scenes: [
+        {
+          captionText: "Taste the signature finish",
+          durationSec: 5,
+          startTimeSec: 0,
+          transitionStyle: "CUT",
+          videoUrl: "https://assets.example/hero.mp4",
+        },
+      ],
+    };
+
+    expect(getReelDurationFrames(fiveSecondInput)).toBe(150);
+    expect(getBrandWatermarkWindow(fiveSecondInput, 30)).toEqual({
+      from: 0,
+      durationInFrames: 150,
+    });
   });
 });
 

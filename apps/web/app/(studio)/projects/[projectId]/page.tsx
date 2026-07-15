@@ -174,9 +174,20 @@ export default async function ProjectPage({ params }: PageProps) {
                     </h2>
                     <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
                       Your uploaded product photography is the source of truth.
-                      Reel AI will pitch three restrained concepts, then build a{" "}
-                      {project.videoLengthSec}-second showcase with one hero
-                      action per shot.
+                      {project.videoLengthSec === 5 ? (
+                        <>
+                          {" "}This five-second format is one continuous hero
+                          clip: an immediate product hook, one signature action,
+                          a concise narrated CTA, and the verified logo composed
+                          over the shot.
+                        </>
+                      ) : (
+                        <>
+                          {" "}Reel AI will pitch three restrained concepts,
+                          then build a {project.videoLengthSec}-second showcase
+                          with one hero action per shot.
+                        </>
+                      )}
                     </p>
                   </div>
                   <span className="w-fit rounded-full border border-primary/20 bg-primary/[0.07] px-3 py-1.5 text-xs font-medium text-primary">

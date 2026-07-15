@@ -14,6 +14,7 @@ import { wipe } from "@remotion/transitions/wipe";
 import {
   AbsoluteFill,
   Audio,
+  Img,
   interpolate,
   Sequence,
   spring,
@@ -235,9 +236,11 @@ function BrandWatermark({
       }}
     >
       {watermark.logoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Img
           alt=""
+          delayRenderTimeoutInMilliseconds={120_000}
+          maxRetries={4}
+          pauseWhenLoading
           src={watermark.logoUrl}
           style={{
             borderRadius: 8,

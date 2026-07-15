@@ -939,7 +939,7 @@ Requirements:
 - narrativeArc must describe the beginning, middle, and ending beat.
 - rationale must explain why this direction can work for this brand and audience.
 - Do not leave strategy, narrativeArc, previewPrompt, or rationale blank or generic.
-- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Keep estimated scenes between 1 and 3 and duration between 5 and 15 seconds." : "Keep estimated scenes between 2 and 4 and duration between 15 and 30 seconds."}
+- ${buildSceneCountInstruction(project, "CONCEPT")}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Every direction must be a premium product-first showcase grounded in the uploaded product images. Make the three routes meaningfully different: for example tactile/material reveal, cinematic hero motion, or an elegant use-context/model presentation when appropriate." : "Keep the product or service strategy grounded in verified evidence."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "First classify the hero product by its real visual behavior, then design for that behavior: food and drink may use verified garnish, condensation, steam, pours, crumbs, or temperature contrast; beauty may use a controlled droplet, texture ribbon, cap reveal, or light sweep; fashion may use fabric response, a silhouette turn, or a clean step; rigid packaged goods and electronics favor precision rotation, parallax, surface light, or a functional reveal; home and craft objects favor material detail and a simple use-result. Do not apply the same spin or floating-parts idea to every category." : "Choose a domain-specific premium visual system: service reels need visible cause-and-effect behavior; places need spatial reveals and atmosphere; software needs verified interface action or a real-world outcome; expertise needs concrete artifacts and decisions. Avoid generic montage logic."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Choose exactly one hero product and one hero action per shot. If multiple products are supplied, treat them as a restrained collection: reveal them sequentially or keep secondary products static; never merge products or choreograph several transformations at once." : "Use a clear brand-relevant visual hook."}
@@ -1028,7 +1028,7 @@ Requirements:
 - strategy must describe the ad strategy in one or two substantive sentences.
 - narrativeArc must describe the beginning, middle, and ending beat.
 - rationale must explain why this direction can work for this brand and audience.
-- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Keep estimated scenes between 1 and 3 and duration between 5 and 15 seconds." : "Keep estimated scenes between 2 and 4 and duration between 15 and 30 seconds."}
+- ${buildSceneCountInstruction(project, "CONCEPT")}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Keep the uploaded product as the unmistakable hero. Use one hero product and one hero action per shot; secondary products stay static or appear sequentially. Reject morphing, melting, crowded transformations, and ungrounded product variants." : "Keep the execution grounded and visually legible."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Choose motion from the product's real material and use cues rather than defaulting to a generic spin: use verified garnish/temperature behavior for food, fluid or texture control for beauty, fabric response for fashion, precision parallax/light for rigid goods, and simple use-result motion for home or craft products. One restrained supporting material behavior may accompany the hero action." : "Use domain-specific action, physical metaphor, and lighting rather than a generic montage."}
 - Plan only purposeful scene transitions: clean cut for match cuts; short fade for gentle continuity; slide or wipe for directional movement; iris or clock wipe only when circular geometry or a centered hero reveal motivates it.
@@ -1067,6 +1067,27 @@ function buildCinematicBoostInstruction(enabled: boolean) {
   return enabled
     ? "CINEMATIC BOOST IS ON: make the creative leap unmistakable. Heighten scale, contrast, lighting changes, foreground depth, reveal timing, and physically credible motion; favor an audacious first-frame pattern interrupt and one signature visual device the viewer could describe afterward. Stay brand-accurate, source-grounded, single-shot, and feasible for image-to-video—intensity must come from art direction, not extra simultaneous actions."
     : "Use premium, confident art direction with restrained motion and transitions; clarity and brand fit outrank spectacle.";
+}
+
+function buildSceneCountInstruction(
+  project: Pick<Project, "outputMode" | "videoLengthSec">,
+  stage: "CONCEPT" | "STORYBOARD",
+) {
+  if (project.outputMode !== "PRODUCT_SHOWCASE") {
+    return stage === "CONCEPT"
+      ? "Keep estimated scenes between 2 and 4 and duration between 15 and 30 seconds."
+      : "Use 2 to 4 scenes total.";
+  }
+
+  if (project.videoLengthSec === 5) {
+    return stage === "CONCEPT"
+      ? "This is a 5-second Product Showcase: every concept must use exactly one continuous hero shot and estimate exactly one scene. The single clip needs an immediate first-frame product hook, one signature category-native action, and a concise spoken/caption CTA; do not plan a separate intro, transition, or end card. Reel AI composites the verified logo over this clip."
+      : "This 5-second showcase must contain exactly one 5-second scene, producing exactly one video clip. It must open on the hero product in action from frame one, deliver one bold category-native visual idea, and carry the concise final CTA plus verified logo overlay in that same shot. Use CUT for transitionStyle; do not create a separate intro, outro, end card, or transition.";
+  }
+
+  return stage === "CONCEPT"
+    ? "Keep estimated scenes between 1 and 3 and duration between 5 and 15 seconds."
+    : "Use 1 to 3 scenes total. Ten seconds should normally use one or two shots; 15 seconds may use two or three.";
 }
 
 function validateConceptTiming(
@@ -1161,7 +1182,7 @@ ${buildGroundingRecoveryInstructions(preflightViolations, grounding)}
 }
 
 Requirements:
-- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Use 1 to 3 scenes total. A 5-second showcase should use one shot; 10 seconds should normally use one or two shots; 15 seconds may use two or three." : "Use 2 to 4 scenes total."}
+- ${buildSceneCountInstruction(project, "STORYBOARD")}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Total duration must exactly match the requested 5 to 15 seconds, with every scene lasting 5 to 10 seconds." : "Total duration must be 15 to 30 seconds, with every scene lasting 5 to 10 seconds. Prefer 5 to 8 seconds; use 9 to 10 only for exceptionally simple motion."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Treat the actual uploaded product photography as the source of truth for silhouette, materials, colors, proportions, surface details, packaging, and visible ingredients. The generated scene may stylize the world but must not redesign the product." : "Preserve recurring product identity whenever a product is present."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Assign exactly one hero product and one primary action to each shot. For multiple products, use sequential hero shots or a static collection composition; never ask multiple products to assemble, transform, collide, or cross paths together." : "Keep the motion hierarchy deliberately simple."}

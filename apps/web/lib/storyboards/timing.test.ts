@@ -4,6 +4,7 @@ import {
   isStoryboardTimingValid,
   normalizeShowcaseDurations,
   normalizeShowcaseSceneCount,
+  productShowcaseSceneRange,
   storyboardTimingIssue,
 } from "@/lib/storyboards/timing";
 
@@ -29,13 +30,28 @@ describe("storyboard timing", () => {
         targetDurationSec: 5,
         durations: [5, 5],
       }),
-    ).toContain("exactly 5 seconds");
+    ).toContain("exactly one scene and one video clip");
   });
 
   it("chooses only scene counts that can satisfy 5-10 seconds per scene", () => {
+    expect(productShowcaseSceneRange(5)).toEqual({ min: 1, max: 1 });
+    expect(productShowcaseSceneRange(10)).toEqual({ min: 1, max: 2 });
+    expect(productShowcaseSceneRange(15)).toEqual({ min: 2, max: 3 });
     expect(normalizeShowcaseSceneCount(3, 5)).toBe(1);
     expect(normalizeShowcaseSceneCount(3, 10)).toBe(2);
     expect(normalizeShowcaseSceneCount(1, 15)).toBe(2);
+  });
+
+  it("explains that a five-second showcase is exactly one video clip", () => {
+    expect(
+      storyboardTimingIssue({
+        outputMode: "PRODUCT_SHOWCASE",
+        targetDurationSec: 5,
+        durations: [5, 5],
+      }),
+    ).toBe(
+      "A 5-second Product Showcase must use exactly one scene and one video clip.",
+    );
   });
 
   it("normalizes provider timing to the exact showcase target", () => {

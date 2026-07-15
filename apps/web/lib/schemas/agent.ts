@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   normalizeShowcaseDurations,
   normalizeShowcaseSceneCount,
+  productShowcaseSceneRange,
 } from "@/lib/storyboards/timing";
 
 export const creativeConceptSchema = z.object({
@@ -744,6 +745,20 @@ export function parseStoryboardOutput(
   const validationSchema =
     outputMode === "PRODUCT_SHOWCASE" && targetDurationSec !== undefined
       ? activeSchema.superRefine((storyboard, ctx) => {
+          const sceneRange = productShowcaseSceneRange(targetDurationSec);
+          if (
+            storyboard.scenes.length < sceneRange.min ||
+            storyboard.scenes.length > sceneRange.max
+          ) {
+            ctx.addIssue({
+              code: "custom",
+              message:
+                targetDurationSec === 5
+                  ? "A 5-second Product Showcase must use exactly one scene and one video clip."
+                  : `A ${targetDurationSec}-second Product Showcase needs ${sceneRange.min} to ${sceneRange.max} scenes.`,
+              path: ["scenes"],
+            });
+          }
           const total = storyboard.scenes.reduce(
             (sum, scene) => sum + scene.durationSec,
             0,

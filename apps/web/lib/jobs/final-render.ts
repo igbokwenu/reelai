@@ -85,7 +85,7 @@ export async function createAndRunFinalRenderJob({
 }) {
   const projectAudioPolicy = await prisma.project.findUniqueOrThrow({
     where: { id: projectId },
-    select: { outputMode: true },
+    select: { outputMode: true, videoLengthSec: true },
   });
   const effectiveBgmEnabled =
     projectAudioPolicy.outputMode === "PRODUCT_SHOWCASE" ? false : bgmEnabled;
@@ -115,9 +115,17 @@ export async function createAndRunFinalRenderJob({
             ? "VOICEOVER_ONLY"
             : "NARRATION_WITH_OPTIONAL_BGM",
         logoIncluded: Boolean(input.brandWatermark?.logoUrl),
+        logoLoadPolicy: input.brandWatermark?.logoUrl
+          ? "WAIT_FOR_DOWNLOAD_AND_DECODE"
+          : "TEXT_ONLY",
         brandLockupMode: input.brandWatermark?.logoUrl
           ? "LOGO_ONLY"
           : "TEXT_ONLY",
+        showcaseFormat:
+          projectAudioPolicy.outputMode === "PRODUCT_SHOWCASE" &&
+          projectAudioPolicy.videoLengthSec === 5
+            ? "SINGLE_CLIP_HERO_WITH_BRAND_CLOSER"
+            : null,
         captionOverlaySceneCount: input.scenes.length > 0 ? 1 : 0,
         transitionStyles: input.scenes.map(
           (scene) => scene.transitionStyle ?? "CUT",

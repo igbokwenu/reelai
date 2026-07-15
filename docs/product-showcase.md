@@ -11,7 +11,7 @@ Product Showcase is a first-class output mode for short, product-led films. It r
 3. Choose realistic or premium 3D and a 5, 10, or 15 second target.
 4. Reel AI stores and links the images before Brand Kit research begins. Product-page URLs are researched as evidence when available.
 5. The Creative Director pitches exactly three product-first concepts. The user selects one, then continues in Auto mode or the unchanged step-by-step workflow.
-6. The storyboard uses a feasible one to three scenes totaling the exact requested duration. Five seconds resolves to one scene, 15 seconds requires at least two, and 10 seconds can use one or two. Final output remains vertical 9:16 with scene-timed voiceover, one final closer/CTA overlay, purposeful Remotion transitions, and the verified brand lockup. Product Showcase does not add source-clip audio or BGM.
+6. The storyboard uses a feasible one to three scenes totaling the exact requested duration. Five seconds is a strict single-clip format: one continuous hero shot begins with an immediate product hook, performs one bold category-native action, and carries the concise narrated CTA, final caption, and verified logo in that same shot—there is no separate intro, transition, or end card. Fifteen seconds requires at least two scenes, and 10 seconds can use one or two. Final output remains vertical 9:16 with scene-timed voiceover, one final closer/CTA overlay, purposeful Remotion transitions where multiple scenes exist, and the verified brand lockup. Product Showcase does not add source-clip audio or BGM.
 
 ## Input policy
 
@@ -39,6 +39,7 @@ The three-image total is deliberate. Current reference-aware image generation ca
 - **Cinematic Boost** is a persisted concept-stage preference. When enabled, both concept and storyboard agents materially heighten scale, lighting contrast, foreground depth, reveal timing, and physically credible motion without relaxing product-reference or single-shot constraints.
 - Source video requests omit driving audio (and force `audio: false` on compatible legacy Wan models). Remotion also mutes every source clip. Product Showcase disables BGM at storyboard save and final-render boundaries, leaving scene narration as the only audio layer.
 - Earlier scene captions are editorial labels only. Remotion composites only the final scene's concise closer or CTA.
+- Uploaded logos use Remotion's render-blocking image component. Each render frame waits for the complete image download and browser decode, with bounded retries and the same 120-second media timeout, before the logo can be composited. A slow or unavailable logo therefore delays or fails the render instead of producing partially decoded scanlines in the exported reel.
 
 Uploaded product images are prioritized ahead of logos, reference ads, and general uploads when generating concept previews and scene anchors. Realistic mode uses commercial photography language; 3D mode uses physically based materials and studio lighting without changing product geometry.
 
