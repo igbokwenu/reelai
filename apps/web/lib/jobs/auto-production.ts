@@ -20,6 +20,7 @@ import {
   createAndRunVideoJob,
 } from "@/lib/jobs/production";
 import { prisma } from "@/lib/prisma";
+import { storyboardTimingIssue } from "@/lib/storyboards/timing";
 
 const AUTO_LEASE_MS = 20 * 60 * 1000;
 
@@ -199,29 +200,37 @@ async function runStoryboardPhase(run: AutoGenerationRun) {
     where: { projectId: run.projectId },
     include: {
       scenes: true,
-      project: { select: { outputMode: true } },
+      project: { select: { outputMode: true, videoLengthSec: true } },
     },
   });
   if (!storyboard || storyboard.conceptId !== selectedConcept.id) {
     const job = await createAndRunStoryboardJob(run.projectId);
+    if (["QUEUED", "RUNNING", "WAITING_PROVIDER"].includes(job.status)) {
+      return releaseLease(run.id, { currentJobId: job.id });
+    }
     assertCompleteJob(job, "Storyboard generation");
     rejectPolicyBlockers(job);
     storyboard = await prisma.storyboard.findUnique({
       where: { projectId: run.projectId },
       include: {
         scenes: true,
-        project: { select: { outputMode: true } },
+        project: { select: { outputMode: true, videoLengthSec: true } },
       },
     });
   }
-  const validSceneCount = storyboard
-    ? storyboard.project.outputMode === "PRODUCT_SHOWCASE"
-      ? storyboard.scenes.length >= 1 && storyboard.scenes.length <= 3
-      : storyboard.scenes.length >= 2 && storyboard.scenes.length <= 4
-    : false;
-  if (!storyboard || !validSceneCount) {
+  if (!storyboard) {
     throw new AutoPipelineError(
-      "Storyboard generation did not produce the required scene count.",
+      "Storyboard generation did not produce a saved storyboard.",
+    );
+  }
+  const timingIssue = storyboardTimingIssue({
+    outputMode: storyboard.project.outputMode,
+    targetDurationSec: storyboard.project.videoLengthSec,
+    durations: storyboard.scenes.map((scene) => scene.durationSec),
+  });
+  if (timingIssue) {
+    throw new AutoPipelineError(
+      `Storyboard needs review before Auto mode can continue: ${timingIssue}`,
       false,
     );
   }
@@ -433,7 +442,9 @@ function assertCompleteJob(job: GenerationJob, label: string) {
     ? `${label}: ${job.error}`
     : `${label} did not complete.`;
   const retryable =
-    !/shorten|must be approved|not found|exactly one|policy/i.test(message);
+    !/shorten|must be approved|not found|select (?:exactly )?one|before (?:proceeding|resuming)|policy|requires human review|upload the/i.test(
+      message,
+    );
   throw new AutoPipelineError(message, retryable);
 }
 
@@ -479,8 +490,8 @@ async function hasCurrentApprovedStoryboard(projectId: string) {
       select: {
         conceptId: true,
         status: true,
-        scenes: { select: { id: true } },
-        project: { select: { outputMode: true } },
+        scenes: { select: { durationSec: true } },
+        project: { select: { outputMode: true, videoLengthSec: true } },
       },
     }),
   ]);
@@ -492,9 +503,11 @@ async function hasCurrentApprovedStoryboard(projectId: string) {
   ) {
     return false;
   }
-  return storyboard.project.outputMode === "PRODUCT_SHOWCASE"
-    ? storyboard.scenes.length >= 1 && storyboard.scenes.length <= 3
-    : storyboard.scenes.length >= 2 && storyboard.scenes.length <= 4;
+  return !storyboardTimingIssue({
+    outputMode: storyboard.project.outputMode,
+    targetDurationSec: storyboard.project.videoLengthSec,
+    durations: storyboard.scenes.map((scene) => scene.durationSec),
+  });
 }
 
 async function hasCompleteClips(projectId: string) {

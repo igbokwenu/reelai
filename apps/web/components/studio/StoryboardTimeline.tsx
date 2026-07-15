@@ -29,6 +29,7 @@ import {
 } from "@/components/studio/SceneInspector";
 import { Button } from "@/components/ui/button";
 import { GuideTooltip } from "@/components/ui/guide-tooltip";
+import { storyboardTimingIssue } from "@/lib/storyboards/timing";
 
 type Storyboard = {
   id: string;
@@ -95,6 +96,8 @@ export function StoryboardTimeline({
   groundingCapabilities,
   latestStoryboardJob,
   latestPolicyJob,
+  outputMode,
+  targetDurationSec,
 }: {
   projectId: string;
   selectedConcept: Concept | null;
@@ -103,6 +106,8 @@ export function StoryboardTimeline({
   groundingCapabilities: GroundingCapabilities | null;
   latestStoryboardJob: Job | null;
   latestPolicyJob: Job | null;
+  outputMode: "STANDARD" | "PRODUCT_SHOWCASE";
+  targetDurationSec: number;
 }) {
   const router = useRouter();
   const [job, setJob] = useState<Job | null>(latestStoryboardJob);
@@ -130,6 +135,28 @@ export function StoryboardTimeline({
   );
   const totalDuration =
     draft?.scenes.reduce((sum, scene) => sum + scene.durationSec, 0) ?? 0;
+  const timingIssue = draft
+    ? storyboardTimingIssue({
+        outputMode,
+        targetDurationSec,
+        durations: draft.scenes.map((scene) => scene.durationSec),
+      })
+    : null;
+  const narrationIssue = draft
+    ? (draft.scenes
+        .map((scene) => {
+          const words = scene.voiceoverText
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean).length;
+          const budget = Math.floor(scene.durationSec * 2.5);
+          return words > budget
+            ? `Scene ${scene.index} narration needs ${words - budget} fewer word${words - budget === 1 ? "" : "s"} for a natural read.`
+            : null;
+        })
+        .find(Boolean) ?? null)
+    : null;
+  const approvalIssue = timingIssue ?? narrationIssue;
   const artifactIds = useMemo(
     () => new Set(artifacts.map((artifact) => artifact.id)),
     [artifacts],
@@ -207,6 +234,10 @@ export function StoryboardTimeline({
 
   async function saveStoryboard() {
     if (!draft) return;
+    if (approvalIssue) {
+      setError(approvalIssue);
+      return;
+    }
 
     setIsSaving(true);
     setSaved(false);
@@ -303,10 +334,13 @@ export function StoryboardTimeline({
           </Button>
           {draft ? (
             <Button
-              disabled={isSaving}
+              disabled={isSaving || Boolean(approvalIssue)}
               onClick={saveStoryboard}
               size="sm"
-              tooltip="Saves every storyboard edit and approves the plan for production."
+              tooltip={
+                approvalIssue ??
+                "Saves every storyboard edit and approves the plan for production."
+              }
               tooltipSide="bottom"
             >
               {isSaving ? (
@@ -362,6 +396,24 @@ export function StoryboardTimeline({
             aria-hidden="true"
           />
           <span>{error}</span>
+        </div>
+      ) : null}
+
+      {approvalIssue && !error ? (
+        <div className="flex gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[0.07] p-4 text-sm">
+          <AlertTriangle
+            className="mt-0.5 size-4 shrink-0 text-amber-300"
+            aria-hidden="true"
+          />
+          <div>
+            <p className="font-medium text-amber-100">
+              One finishing adjustment
+            </p>
+            <p className="mt-1 leading-5 text-muted-foreground">
+              {approvalIssue} Adjust the highlighted scene timing or narration,
+              then approve the storyboard.
+            </p>
+          </div>
         </div>
       ) : null}
 
@@ -565,10 +617,13 @@ export function StoryboardTimeline({
               </div>
             </div>
             <Button
-              disabled={isSaving}
+              disabled={isSaving || Boolean(approvalIssue)}
               onClick={saveStoryboard}
               size="sm"
-              tooltip="Saves every scene and continuity edit, then keeps the plan approved for production."
+              tooltip={
+                approvalIssue ??
+                "Saves every scene and continuity edit, then keeps the plan approved for production."
+              }
               tooltipSide="bottom"
             >
               {isSaving ? (

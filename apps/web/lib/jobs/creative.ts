@@ -52,17 +52,35 @@ export async function createAndRunConceptRegenerationJob({
 }
 
 export async function createAndRunStoryboardJob(projectId: string) {
-  const job = await prisma.generationJob.create({
-    data: {
-      projectId,
-      type: "STORYBOARD",
-      status: "QUEUED",
-      model: QWEN_STRUCTURED_MODEL,
-      input: { operation: "storyboard_generation" },
-    },
+  const claimed = await prisma.$transaction(async (tx) => {
+    const project = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "Project" WHERE "id" = ${projectId} FOR UPDATE
+    `;
+    if (project.length === 0) throw new Error("Project not found");
+
+    const active = await tx.generationJob.findFirst({
+      where: {
+        projectId,
+        type: "STORYBOARD",
+        status: { in: ["QUEUED", "RUNNING"] },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (active) return { job: active, shouldRun: false };
+
+    const job = await tx.generationJob.create({
+      data: {
+        projectId,
+        type: "STORYBOARD",
+        status: "QUEUED",
+        model: QWEN_STRUCTURED_MODEL,
+        input: { operation: "storyboard_generation" },
+      },
+    });
+    return { job, shouldRun: true };
   });
 
-  return runStoryboardJob(job.id);
+  return claimed.shouldRun ? runStoryboardJob(claimed.job.id) : claimed.job;
 }
 
 async function runConceptJob(jobId: string) {

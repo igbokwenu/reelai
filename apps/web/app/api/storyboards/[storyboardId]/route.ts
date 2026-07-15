@@ -1,7 +1,9 @@
+import { PublicError } from "@/lib/errors";
 import { handleRoute, notFound, ok } from "@/lib/http/responses";
 import { prisma } from "@/lib/prisma";
 import { shotPromptSchema, storyboardPatchSchema } from "@/lib/schemas/agent";
 import { planContinuityInvalidation } from "@/lib/storyboards/continuity-invalidation";
+import { storyboardTimingIssue } from "@/lib/storyboards/timing";
 
 type RouteContext = {
   params: Promise<{ storyboardId: string }>;
@@ -13,7 +15,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     const body = storyboardPatchSchema.parse(await request.json());
     const storyboard = await prisma.storyboard.findUnique({
       where: { id: storyboardId },
-      include: { scenes: true },
+      include: {
+        scenes: true,
+        project: { select: { outputMode: true, videoLengthSec: true } },
+      },
     });
 
     if (!storyboard) {
@@ -40,10 +45,35 @@ export async function PATCH(request: Request, context: RouteContext) {
     const existingSceneById = new Map(
       storyboard.scenes.map((scene) => [scene.id, scene]),
     );
+    const proposedSceneById = new Map(
+      (body.scenes ?? []).map((scene) => [scene.id, scene]),
+    );
+    const timingIssue = storyboardTimingIssue({
+      outputMode: storyboard.project.outputMode,
+      targetDurationSec: storyboard.project.videoLengthSec,
+      durations: storyboard.scenes.map(
+        (scene) =>
+          proposedSceneById.get(scene.id)?.durationSec ?? scene.durationSec,
+      ),
+    });
+    if (timingIssue) {
+      throw new PublicError(timingIssue, 409);
+    }
     for (const scene of body.scenes ?? []) {
       const existing = existingSceneById.get(scene.id)!;
       if (scene.shotPrompt !== existing.shotPrompt) {
         shotPromptSchema.parse(scene.shotPrompt);
+      }
+      const wordCount = scene.voiceoverText
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean).length;
+      const wordBudget = Math.floor(scene.durationSec * 2.5);
+      if (wordCount > wordBudget) {
+        throw new PublicError(
+          `Scene ${existing.index} voiceover has ${wordCount} words. Shorten it to ${wordBudget} words for a natural ${scene.durationSec}-second read.`,
+          409,
+        );
       }
     }
     const invalidation = planContinuityInvalidation(

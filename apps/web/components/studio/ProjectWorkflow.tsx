@@ -166,6 +166,7 @@ export function ProjectWorkflow({
       {latestAutoRun ? (
         <AutoGenerationPanel
           initialRun={latestAutoRun}
+          key={latestAutoRun.id}
           onReviewStage={(stage) => selectStage(stage)}
           projectId={projectId}
         />

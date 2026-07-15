@@ -14,7 +14,7 @@ import {
   WandSparkles,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -41,35 +41,40 @@ const PHASE_DETAILS = {
   STORYBOARD: {
     label: "Storyboard",
     active: "Directing the story",
-    description: "Writing the scene plan, captions, voiceover, and continuity bible.",
+    description:
+      "Writing the scene plan, captions, voiceover, and continuity bible.",
     icon: Clapperboard,
     stage: "storyboard",
   },
   KEYFRAMES: {
     label: "Scene anchors",
     active: "Designing the visual world",
-    description: "Creating continuity-aware anchor frames from your approved brand material.",
+    description:
+      "Creating continuity-aware anchor frames from your approved brand material.",
     icon: ImagePlus,
     stage: "production",
   },
   CLIPS: {
     label: "Video clips",
     active: "Bringing every scene to life",
-    description: "Generating and checking each motion clip; completed scenes stay preserved.",
+    description:
+      "Generating and checking each motion clip; completed scenes stay preserved.",
     icon: Video,
     stage: "production",
   },
   NARRATION: {
     label: "Narration",
     active: "Fitting the voice track",
-    description: "Synthesizing scene-locked narration and fitting its timing naturally.",
+    description:
+      "Synthesizing scene-locked narration and fitting its timing naturally.",
     icon: Mic2,
     stage: "final",
   },
   RENDER: {
     label: "Final reel",
     active: "Finishing your reel",
-    description: "Composing clips, captions, audio, branding, and disclosure in Remotion.",
+    description:
+      "Composing clips, captions, audio, branding, and disclosure in Remotion.",
     icon: WandSparkles,
     stage: "final",
   },
@@ -86,6 +91,7 @@ export function AutoGenerationPanel({
 }) {
   const router = useRouter();
   const [run, setRun] = useState(initialRun);
+  const runRef = useRef(initialRun);
   const [isResuming, setIsResuming] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
 
@@ -104,25 +110,27 @@ export function AutoGenerationPanel({
           run?: AutoRunView | null;
           error?: string;
         };
-        if (!response.ok) throw new Error(data.error ?? "Auto mode could not report progress.");
+        if (!response.ok)
+          throw new Error(data.error ?? "Auto mode could not report progress.");
         if (cancelled) return;
 
         if (data.run) {
-          setRun((current) => {
-            if (
-              current &&
-              (current.phase !== data.run!.phase || current.status !== data.run!.status)
-            ) {
-              router.refresh();
-            }
-            return data.run!;
-          });
+          const previous = runRef.current;
+          const changed =
+            previous &&
+            (previous.phase !== data.run.phase ||
+              previous.status !== data.run.status);
+          runRef.current = data.run;
+          setRun(data.run);
+          if (changed) router.refresh();
         }
         setRequestError(null);
       } catch (error) {
         if (!cancelled) {
           setRequestError(
-            error instanceof Error ? error.message : "Progress is temporarily unavailable.",
+            error instanceof Error
+              ? error.message
+              : "Progress is temporarily unavailable.",
           );
         }
       } finally {
@@ -167,6 +175,7 @@ export function AutoGenerationPanel({
       setRequestError(data.error ?? "Auto mode could not resume.");
       return;
     }
+    runRef.current = data.run;
     setRun(data.run);
     router.refresh();
   }
@@ -192,7 +201,7 @@ export function AutoGenerationPanel({
                 ? "Your reel is ready"
                 : status === "FAILED"
                   ? `${current?.label ?? "Generation"} needs your attention`
-                  : current?.active ?? "Building your reel"}
+                  : (current?.active ?? "Building your reel")}
             </h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
               {status === "COMPLETE"
@@ -216,7 +225,10 @@ export function AutoGenerationPanel({
                 ) : null}
                 <Button disabled={isResuming} onClick={resume} size="sm">
                   {isResuming ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                    <Loader2
+                      className="size-4 animate-spin"
+                      aria-hidden="true"
+                    />
                   ) : (
                     <RefreshCw className="size-4" aria-hidden="true" />
                   )}
@@ -243,7 +255,9 @@ export function AutoGenerationPanel({
         <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-white/[0.07]">
           <div
             className="h-full rounded-full bg-primary shadow-[0_0_18px_rgba(183,255,60,0.5)] transition-[width] duration-700"
-            style={{ width: `${Math.max(status === "RUNNING" ? 4 : 0, progress)}%` }}
+            style={{
+              width: `${Math.max(status === "RUNNING" ? 4 : 0, progress)}%`,
+            }}
           />
         </div>
 
@@ -277,12 +291,17 @@ export function AutoGenerationPanel({
                     {complete ? (
                       <Check className="size-3.5" aria-hidden="true" />
                     ) : active && status !== "FAILED" ? (
-                      <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                      <Loader2
+                        className="size-3.5 animate-spin"
+                        aria-hidden="true"
+                      />
                     ) : (
                       <Icon className="size-3.5" aria-hidden="true" />
                     )}
                   </span>
-                  <span className={`text-xs font-medium ${active ? "text-foreground" : "text-muted-foreground"}`}>
+                  <span
+                    className={`text-xs font-medium ${active ? "text-foreground" : "text-muted-foreground"}`}
+                  >
                     {detail.label}
                   </span>
                 </div>
@@ -299,12 +318,17 @@ export function AutoGenerationPanel({
         ) : null}
         {run.error && status === "FAILED" ? (
           <div className="mt-4 flex gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-3 text-sm text-destructive">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <AlertTriangle
+              className="mt-0.5 size-4 shrink-0"
+              aria-hidden="true"
+            />
             <span>{run.error}</span>
           </div>
         ) : null}
         {requestError ? (
-          <p className="mt-3 text-xs text-amber-200">{requestError} Reel AI will keep checking.</p>
+          <p className="mt-3 text-xs text-amber-200">
+            {requestError} Reel AI will keep checking.
+          </p>
         ) : null}
       </div>
     </section>

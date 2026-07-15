@@ -11,7 +11,7 @@ Product Showcase is a first-class output mode for short, product-led films. It r
 3. Choose realistic or premium 3D and a 5, 10, or 15 second target.
 4. Reel AI stores and links the images before Brand Kit research begins. Product-page URLs are researched as evidence when available.
 5. The Creative Director pitches exactly three product-first concepts. The user selects one, then continues in Auto mode or the unchanged step-by-step workflow.
-6. The storyboard uses one to three scenes totaling the requested duration. Final output remains vertical 9:16 with captions, scene-timed voiceover, optional BGM, and the verified brand lockup.
+6. The storyboard uses a feasible one to three scenes totaling the exact requested duration. Five seconds resolves to one scene, 15 seconds requires at least two, and 10 seconds can use one or two. Final output remains vertical 9:16 with captions, scene-timed voiceover, optional BGM, and the verified brand lockup.
 
 ## Input policy
 
@@ -36,6 +36,8 @@ The three-image total is deliberate. Current reference-aware image generation ca
 - App/website products require supplied interface evidence for generated screens. Otherwise the concept shows the real-world outcome or reserves the screen for controlled compositing.
 
 Uploaded product images are prioritized ahead of logos, reference ads, and general uploads when generating concept previews and scene anchors. Realistic mode uses commercial photography language; 3D mode uses physically based materials and studio lighting without changing product geometry.
+
+Structured storyboard output is repaired conservatively before it can enter Auto mode. Reel AI retains a supported camera move even when the model places it in a separate sentence, recognizes tactile product motion such as shimmer, sweep, settle, separate, fold, and pivot, and reconciles scene timing plus voiceover length to the project's exact target. Manual approval, anchor generation, clip generation, and Remotion export all use the same timing validator, so an invalid edit is explained in the storyboard rather than failing later in production.
 
 ## Data and API contract
 

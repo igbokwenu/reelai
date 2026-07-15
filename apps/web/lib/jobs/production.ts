@@ -23,6 +23,7 @@ import {
   type VideoJobOutput,
   type VideoSceneTask,
 } from "@/lib/jobs/production-state";
+import { storyboardTimingIssue } from "@/lib/storyboards/timing";
 
 export const QWEN_KEYFRAME_IMAGE_MODEL = "wan2.7-image-pro";
 const VIDEO_NEGATIVE_PROMPT =
@@ -801,7 +802,7 @@ async function getProductionScenes(projectId: string) {
   const storyboard = await prisma.storyboard.findUnique({
     where: { projectId },
     include: {
-      project: { select: { outputMode: true } },
+      project: { select: { outputMode: true, videoLengthSec: true } },
       scenes: {
         include: { takes: { orderBy: { createdAt: "desc" } } },
         orderBy: { index: "asc" },
@@ -817,16 +818,13 @@ async function getProductionScenes(projectId: string) {
     throw new PublicError("Save and approve the storyboard before generation.");
   }
 
-  const validSceneCount =
-    storyboard.project.outputMode === "PRODUCT_SHOWCASE"
-      ? storyboard.scenes.length >= 1 && storyboard.scenes.length <= 3
-      : storyboard.scenes.length >= 2 && storyboard.scenes.length <= 4;
-  if (!validSceneCount) {
-    throw new PublicError(
-      storyboard.project.outputMode === "PRODUCT_SHOWCASE"
-        ? "Product Showcase production requires a storyboard with 1 to 3 scenes."
-        : "Production requires a storyboard with 2 to 4 scenes.",
-    );
+  const timingIssue = storyboardTimingIssue({
+    outputMode: storyboard.project.outputMode,
+    targetDurationSec: storyboard.project.videoLengthSec,
+    durations: storyboard.scenes.map((scene) => scene.durationSec),
+  });
+  if (timingIssue) {
+    throw new PublicError(timingIssue, 409);
   }
   if (storyboard.scenes.some((scene) => scene.status === "DRAFT")) {
     throw new PublicError("Approve every storyboard scene before generation.");
@@ -1042,7 +1040,7 @@ async function hasCompleteStoryVideos(projectId: string) {
   const storyboard = await prisma.storyboard.findUnique({
     where: { projectId },
     include: {
-      project: { select: { outputMode: true } },
+      project: { select: { outputMode: true, videoLengthSec: true } },
       scenes: {
         include: { takes: { where: { kind: "VIDEO" } } },
       },
@@ -1051,11 +1049,14 @@ async function hasCompleteStoryVideos(projectId: string) {
   if (!storyboard) {
     return false;
   }
-  const validSceneCount =
-    storyboard.project.outputMode === "PRODUCT_SHOWCASE"
-      ? storyboard.scenes.length >= 1 && storyboard.scenes.length <= 3
-      : storyboard.scenes.length >= 2 && storyboard.scenes.length <= 4;
-  if (!validSceneCount) return false;
+  if (
+    storyboardTimingIssue({
+      outputMode: storyboard.project.outputMode,
+      targetDurationSec: storyboard.project.videoLengthSec,
+      durations: storyboard.scenes.map((scene) => scene.durationSec),
+    })
+  )
+    return false;
 
   return storyboard.scenes.every((scene) => {
     const selected = scene.takes.find(

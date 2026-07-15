@@ -24,15 +24,16 @@ Storyboard → Scene anchors → Video clips → Narration → Remotion render
 
 Each poll advances at most one phase and first verifies persisted output. This makes the coordinator idempotent and avoids repeating successful, expensive work after a browser refresh or application restart. A database lease prevents overlapping browser polls from running the same phase concurrently.
 
-- Storyboards are auto-approved only after structured generation and policy checks. A policy blocker stops for human review.
-- Scene-count validation is output-mode aware: standard reels retain 2–4 scenes, while Product Showcase accepts 1–3 scenes totaling the requested 5–15 seconds.
+- Storyboards are auto-approved only after structured generation, exact timing, narration-fit, and policy checks. A policy blocker stops for human review.
+- Scene-count validation is output-mode aware: standard reels retain 2–4 scenes totaling 15–30 seconds, while Product Showcase uses a feasible 1–3 scenes totaling the project's exact 5, 10, or 15 second target. The same contract is enforced in the editor, production jobs, and final render.
+- Near-valid model output is normalized before persistence: supported camera direction is preserved when it arrives in a separate sentence, common product motion remains valid, voiceover is fitted after timing correction, and Product Showcase scene durations are reconciled to the exact target. A bounded schema-repair pass retains the original project requirements.
 - Anchor generation selects one current continuity-aware anchor per scene.
 - Video polling reuses the existing provider task IDs. If only some scenes fail, retry generation targets only missing scenes; completed siblings remain selected.
 - Narration is considered current only when every voiced scene links to a durable audio artifact.
 - A final render must have completed during the current auto run before it can finish the run.
-- Transient failures receive up to three total phase attempts with bounded exponential backoff between attempts. Provider-level HTTP/video polling has its own bounded retry behavior.
+- Transient failures, including creative schema misses, receive up to three total phase attempts with bounded exponential backoff between attempts. Validation errors that require an actual user decision remain non-retryable. Provider-level HTTP/video polling has its own bounded retry behavior.
 - Exhausted or non-transient failures retain the failed phase and expose **Review** and **Resume auto mode** actions.
-- If a manual edit invalidates upstream output during an active run, the coordinator moves back to the earliest required phase instead of continuing with stale inputs.
+- If a manual edit invalidates upstream output during an active run, the coordinator moves back to the earliest required phase instead of continuing with stale inputs. Navigating between tabs is safe; storyboard job claiming prevents a manual click and Auto mode from starting duplicate storyboard work.
 
 The coordinator is app-driven for the current MVP: the studio polls `GET /api/projects/:projectId/auto`, which claims and advances the durable run. A future worker can call the same coordinator without changing the persisted state model or UI contract.
 

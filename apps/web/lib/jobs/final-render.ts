@@ -19,6 +19,7 @@ import {
 } from "@/lib/qwen/tts";
 import { renderReel } from "@/remotion/render";
 import type { ReelCompositionInput } from "@/remotion/schema";
+import { storyboardTimingIssue } from "@/lib/storyboards/timing";
 
 type SceneWithTakes = Scene & { takes: Take[] };
 type StoryboardWithScenes = Storyboard & { scenes: SceneWithTakes[] };
@@ -425,7 +426,7 @@ async function getRenderableStoryboard(
   const storyboard = await prisma.storyboard.findUnique({
     where: { projectId },
     include: {
-      project: { select: { outputMode: true } },
+      project: { select: { outputMode: true, videoLengthSec: true } },
       scenes: {
         include: { takes: { orderBy: { createdAt: "desc" } } },
         orderBy: { index: "asc" },
@@ -441,16 +442,13 @@ async function getRenderableStoryboard(
     throw new Error("Storyboard must be approved before final export.");
   }
 
-  const validSceneCount =
-    storyboard.project.outputMode === "PRODUCT_SHOWCASE"
-      ? storyboard.scenes.length >= 1 && storyboard.scenes.length <= 3
-      : storyboard.scenes.length >= 2 && storyboard.scenes.length <= 4;
-  if (!validSceneCount) {
-    throw new Error(
-      storyboard.project.outputMode === "PRODUCT_SHOWCASE"
-        ? "Final export needs a Product Showcase storyboard with 1 to 3 scenes."
-        : "Final export needs a storyboard with 2 to 4 scenes.",
-    );
+  const timingIssue = storyboardTimingIssue({
+    outputMode: storyboard.project.outputMode,
+    targetDurationSec: storyboard.project.videoLengthSec,
+    durations: storyboard.scenes.map((scene) => scene.durationSec),
+  });
+  if (timingIssue) {
+    throw new Error(timingIssue);
   }
   if (
     requireVideos &&

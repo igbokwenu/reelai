@@ -15,6 +15,7 @@ import { StoryboardTimeline } from "@/components/studio/StoryboardTimeline";
 import { getGroundingCapabilities } from "@/lib/brand/grounding";
 import { prisma } from "@/lib/prisma";
 import { getProjectGraph } from "@/lib/projects/graph";
+import { isStoryboardTimingValid } from "@/lib/storyboards/timing";
 
 type PageProps = {
   params: Promise<{ projectId: string }>;
@@ -61,6 +62,11 @@ export default async function ProjectPage({ params }: PageProps) {
     project.concepts.find((concept) => concept.selected) ?? null;
   const productionComplete = Boolean(
     project.storyboard?.scenes.length &&
+    isStoryboardTimingValid({
+      outputMode: project.outputMode,
+      targetDurationSec: project.videoLengthSec,
+      durations: project.storyboard.scenes.map((scene) => scene.durationSec),
+    }) &&
     project.storyboard.scenes.every(
       (scene) => scene.status === "COMPLETE" && scene.selectedVideoTakeId,
     ),
@@ -317,6 +323,7 @@ export default async function ProjectPage({ params }: PageProps) {
                   projectId={project.id}
                   renders={project.renders}
                   storyboard={project.storyboard}
+                  targetDurationSec={project.videoLengthSec}
                 />
               }
               finalComplete={finalComplete}
@@ -329,8 +336,10 @@ export default async function ProjectPage({ params }: PageProps) {
                   conceptTitle={selectedConcept?.title ?? null}
                   latestKeyframeJob={latestKeyframeJob}
                   latestVideoJob={latestVideoJob}
+                  outputMode={project.outputMode}
                   projectId={project.id}
                   storyboard={project.storyboard}
+                  targetDurationSec={project.videoLengthSec}
                 />
               }
               productionComplete={productionComplete}
@@ -346,9 +355,11 @@ export default async function ProjectPage({ params }: PageProps) {
                   }
                   latestPolicyJob={latestPolicyJob}
                   latestStoryboardJob={latestStoryboardJob}
+                  outputMode={project.outputMode}
                   projectId={project.id}
                   selectedConcept={selectedConcept}
                   storyboard={project.storyboard}
+                  targetDurationSec={project.videoLengthSec}
                 />
               }
               storyboardStatus={project.storyboard?.status ?? null}

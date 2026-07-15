@@ -277,6 +277,107 @@ describe("Phase 4 agent schemas", () => {
     expect(parsed.scenes[0]?.continuityMode).toBe("CONTINUOUS");
   });
 
+  it("repairs Product Showcase prose and timing to the exact project target", () => {
+    const scene = (index: number) => ({
+      index,
+      durationSec: 8,
+      captionText: index === 1 ? "Meet the ritual" : "Made to glow",
+      voiceoverText:
+        "A considered product ritual designed to make every detail feel effortless and memorable.",
+      shotPrompt:
+        index === 1
+          ? "Confident reveal. The serum bottle shimmers as its cap lifts from the neck. The camera slowly pushes in toward the label."
+          : "Tactile delight. A ribbon separates from the package as the fixed camera holds the composition.",
+      continuityNotes:
+        "Keep the exact bottle silhouette, label, finish, and warm studio light.",
+      continuityMode: "CONTINUOUS",
+    });
+
+    const parsed = parseStoryboardOutput(
+      {
+        title: "Ten second product reveal",
+        script:
+          "A compact product reveal that moves from tactile anticipation to a crisp branded finish.",
+        bgm: {
+          enabled: true,
+          preset: "polished pulse",
+          prompt: "A restrained premium pulse with a tactile finish.",
+        },
+        continuityBible: {
+          product:
+            "Preserve the exact serum bottle, cap, label, colors, and material finish.",
+          characters:
+            "No people appear; keep the visual focus entirely on the supplied product.",
+          cast: { mode: "NO_PEOPLE", members: [] },
+          visualWorld:
+            "Warm controlled studio light, rich shadows, and premium macro texture.",
+        },
+        scenes: [scene(1), scene(2)],
+      },
+      "PRODUCT_SHOWCASE",
+      10,
+    );
+
+    expect(parsed.scenes).toHaveLength(2);
+    expect(parsed.scenes.map((item) => item.durationSec)).toEqual([5, 5]);
+    expect(parsed.scenes[0]?.shotPrompt).toMatch(
+      /^Confident reveal: .+slow push-in.+\.$/,
+    );
+    expect(
+      parsed.scenes[0]?.voiceoverText.split(/\s+/).filter(Boolean).length,
+    ).toBeLessThanOrEqual(12);
+    expect(parsed.scenes[0]?.voiceoverText).not.toMatch(/\band\.$/i);
+  });
+
+  it("rejects an impossible showcase scene count for coherent model repair", () => {
+    const invalid = {
+      title: "Five second product reveal",
+      script:
+        "A compact product reveal that moves from tactile anticipation to a crisp branded finish.",
+      bgm: {
+        enabled: true,
+        preset: "polished pulse",
+        prompt: "A restrained premium pulse with a tactile finish.",
+      },
+      continuityBible: {
+        product: "Preserve the exact package silhouette, colors, and finish.",
+        characters:
+          "No people appear; keep the visual focus entirely on the supplied product.",
+        cast: { mode: "NO_PEOPLE", members: [] },
+        visualWorld:
+          "Warm controlled studio light, rich shadows, and premium macro texture.",
+      },
+      scenes: [
+        {
+          index: 1,
+          durationSec: 5,
+          captionText: "Unwrap",
+          voiceoverText: "Meet the new ritual.",
+          shotPrompt:
+            "Tactile anticipation: the ribbon separates from the package while a fixed camera holds the layered composition behind it.",
+          continuityNotes:
+            "Keep the exact package silhouette, ribbon, finish, and lighting.",
+          continuityMode: "CONTINUOUS",
+        },
+        {
+          index: 2,
+          durationSec: 5,
+          captionText: "Reveal",
+          voiceoverText: "Made for the moment.",
+          shotPrompt:
+            "Confident reveal: the product rises into warm light as the camera slowly pushes in toward its tactile finish.",
+          continuityNotes:
+            "Keep the exact product silhouette, materials, finish, and lighting.",
+          continuityMode: "CONTINUOUS",
+        },
+      ],
+    };
+
+    expect(() => parseStoryboardOutput(invalid, "PRODUCT_SHOWCASE", 5)).toThrow(
+      /exactly 5 seconds/,
+    );
+  });
+
   it("rejects incomplete storyboards instead of filling generic scene prompts", () => {
     expect(() =>
       parseStoryboardOutput({
@@ -318,9 +419,9 @@ describe("Phase 4 agent schemas", () => {
     expect(scenes.items.required).toContain("continuityMode");
     expect(scenes.items.properties.continuityNotes.minLength).toBe(6);
     expect(storyboardJsonSchema.required).toContain("continuityBible");
-    expect(
-      storyboardJsonSchema.properties.continuityBible.required,
-    ).toContain("cast");
+    expect(storyboardJsonSchema.properties.continuityBible.required).toContain(
+      "cast",
+    );
   });
 
   it("requires unique cast identities without forcing people into every ad", () => {
@@ -332,11 +433,7 @@ describe("Phase 4 agent schemas", () => {
       recurrence: "RECURRING",
       ageBand: "adults in their 30s",
       referenceBasis: "FICTIONAL_CAST",
-      appearanceAnchors: [
-        "oval face",
-        "shoulder-length curls",
-        "medium build",
-      ],
+      appearanceAnchors: ["oval face", "shoulder-length curls", "medium build"],
       complexionOrHeritageAnchor: "warm brown skin",
       wardrobeAnchor: "navy work jacket",
       distinguishingFeature: "rectangular glasses and a dimpled chin",

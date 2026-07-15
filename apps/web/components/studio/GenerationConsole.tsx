@@ -24,6 +24,7 @@ import {
 } from "@/components/studio/KeyframeStoryFlow";
 import type { TakeArtifact } from "@/components/studio/TakeCompare";
 import { Button } from "@/components/ui/button";
+import { isStoryboardTimingValid } from "@/lib/storyboards/timing";
 
 type Storyboard = {
   id: string;
@@ -52,6 +53,8 @@ export function GenerationConsole({
   artifacts,
   latestKeyframeJob,
   latestVideoJob,
+  outputMode,
+  targetDurationSec,
 }: {
   projectId: string;
   conceptTitle: string | null;
@@ -59,6 +62,8 @@ export function GenerationConsole({
   artifacts: TakeArtifact[];
   latestKeyframeJob: Job | null;
   latestVideoJob: Job | null;
+  outputMode: "STANDARD" | "PRODUCT_SHOWCASE";
+  targetDurationSec: number;
 }) {
   const router = useRouter();
   const [keyframeJob, setKeyframeJob] = useState<Job | null>(latestKeyframeJob);
@@ -77,9 +82,11 @@ export function GenerationConsole({
   const scenes = storyboard?.scenes ?? [];
   const productionScenes = scenes;
   const hasApprovedStory =
-    productionScenes.length >= 2 &&
-    productionScenes.length <= 4 &&
-    productionScenes.every((scene) => scene.status !== "DRAFT");
+    isStoryboardTimingValid({
+      outputMode,
+      targetDurationSec,
+      durations: productionScenes.map((scene) => scene.durationSec),
+    }) && productionScenes.every((scene) => scene.status !== "DRAFT");
   const hasRecommendedAnchors =
     hasApprovedStory &&
     productionScenes.every((scene) => {

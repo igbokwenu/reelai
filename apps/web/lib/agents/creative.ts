@@ -47,6 +47,10 @@ import {
   type StoryboardOutput,
 } from "@/lib/schemas/agent";
 import { deleteStoredObject, storeObject } from "@/lib/oss";
+import {
+  normalizeShowcaseSceneCount,
+  storyboardTimingIssue,
+} from "@/lib/storyboards/timing";
 
 export const QWEN_PREVIEW_IMAGE_MODEL = "wan2.7-image-pro";
 
@@ -90,7 +94,12 @@ export async function generateConceptsForProject(projectId: string) {
         ? productShowcaseCreativeConceptsJsonSchema
         : creativeConceptsJsonSchema,
     model: QWEN_STRUCTURED_MODEL,
-    parse: (value) => parseCreativeConceptsOutput(value, project.outputMode),
+    parse: (value) =>
+      parseCreativeConceptsOutput(
+        value,
+        project.outputMode,
+        project.videoLengthSec,
+      ),
     system: conceptSystemPrompt,
     user: buildConceptPrompt(project),
   });
@@ -217,7 +226,11 @@ export async function regenerateConceptForProject({
         : creativeConceptRegenerationJsonSchema,
     model: QWEN_STRUCTURED_MODEL,
     parse: (value) =>
-      parseCreativeConceptRegenerationOutput(value, project.outputMode),
+      parseCreativeConceptRegenerationOutput(
+        value,
+        project.outputMode,
+        project.videoLengthSec,
+      ),
     system: conceptSystemPrompt,
     user: buildConceptRegenerationPrompt({
       project,
@@ -413,7 +426,8 @@ export async function generateStoryboardForProject(projectId: string) {
         ? productShowcaseStoryboardJsonSchema
         : storyboardJsonSchema,
     model: QWEN_STRUCTURED_MODEL,
-    parse: (value) => parseStoryboardOutput(value, project.outputMode),
+    parse: (value) =>
+      parseStoryboardOutput(value, project.outputMode, project.videoLengthSec),
     system: storyboardSystemPrompt,
     user: buildStoryboardPrompt(project, selectedConcept, preflightViolations),
   });
@@ -444,7 +458,12 @@ export async function generateStoryboardForProject(projectId: string) {
           ? productShowcaseStoryboardJsonSchema
           : storyboardJsonSchema,
       model: QWEN_STRUCTURED_MODEL,
-      parse: (value) => parseStoryboardOutput(value, project.outputMode),
+      parse: (value) =>
+        parseStoryboardOutput(
+          value,
+          project.outputMode,
+          project.videoLengthSec,
+        ),
       system: storyboardSystemPrompt,
       user: buildStoryboardRecoveryPrompt({
         project,
@@ -1035,8 +1054,12 @@ function validateConceptTiming(
     showcase
       ? concept.estimatedScenes < 1 ||
         concept.estimatedScenes > 3 ||
-        concept.estimatedDurationSec < 5 ||
-        concept.estimatedDurationSec > 15
+        concept.estimatedDurationSec !== project.videoLengthSec ||
+        concept.estimatedScenes !==
+          normalizeShowcaseSceneCount(
+            concept.estimatedScenes,
+            project.videoLengthSec,
+          )
       : concept.estimatedScenes < 2 ||
         concept.estimatedScenes > 4 ||
         concept.estimatedDurationSec < 15 ||
@@ -1045,33 +1068,20 @@ function validateConceptTiming(
   if (invalid) {
     throw new Error(
       showcase
-        ? "Creative output schema mismatch: Product Showcase concepts must use 1 to 3 scenes and 5 to 15 seconds. Try regenerating."
+        ? `Creative output schema mismatch: Product Showcase concepts must use a feasible 1 to 3 scenes totaling exactly ${project.videoLengthSec} seconds. Try regenerating.`
         : "Creative output schema mismatch: Reel concepts must use 2 to 4 scenes and 15 to 30 seconds. Try regenerating.",
     );
   }
 }
 
 function validateStoryboardTiming(project: Project, output: StoryboardOutput) {
-  const total = output.scenes.reduce(
-    (sum, scene) => sum + scene.durationSec,
-    0,
-  );
-  const showcase = project.outputMode === "PRODUCT_SHOWCASE";
-  const invalid = showcase
-    ? output.scenes.length < 1 ||
-      output.scenes.length > 3 ||
-      total !== project.videoLengthSec
-    : output.scenes.length < 2 ||
-      output.scenes.length > 4 ||
-      total < 15 ||
-      total > 30;
-  if (invalid) {
-    throw new Error(
-      showcase
-        ? `Storyboard schema mismatch: Product Showcase must use 1 to 3 scenes totaling exactly ${project.videoLengthSec} seconds. Try regenerating.`
-        : "Storyboard schema mismatch: Reel storyboards must use 2 to 4 scenes totaling 15 to 30 seconds. Try regenerating.",
-    );
-  }
+  const issue = storyboardTimingIssue({
+    outputMode: project.outputMode,
+    targetDurationSec: project.videoLengthSec,
+    durations: output.scenes.map((scene) => scene.durationSec),
+  });
+  if (issue)
+    throw new Error(`Storyboard schema mismatch: ${issue} Try regenerating.`);
 }
 
 function buildStoryboardPrompt(

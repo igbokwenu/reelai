@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { isStoryboardTimingValid } from "@/lib/storyboards/timing";
 
 type Artifact = {
   id: string;
@@ -73,6 +74,7 @@ export function FinalVideoPlayer({
   latestNarrationJob,
   latestRenderJob,
   outputMode = "STANDARD",
+  targetDurationSec,
 }: {
   projectId: string;
   storyboard: Storyboard | null;
@@ -81,6 +83,7 @@ export function FinalVideoPlayer({
   latestNarrationJob: Job | null;
   latestRenderJob: Job | null;
   outputMode?: "STANDARD" | "PRODUCT_SHOWCASE";
+  targetDurationSec: number;
 }) {
   const router = useRouter();
   const [narrationJob, setNarrationJob] = useState<Job | null>(
@@ -119,9 +122,11 @@ export function FinalVideoPlayer({
     storyboard?.scenes.filter((scene) => scene.status === "COMPLETE") ?? [];
   const canRender = Boolean(
     storyboard &&
-    (outputMode === "PRODUCT_SHOWCASE"
-      ? storyboard.scenes.length >= 1 && storyboard.scenes.length <= 3
-      : storyboard.scenes.length >= 2 && storyboard.scenes.length <= 4) &&
+    isStoryboardTimingValid({
+      outputMode,
+      targetDurationSec,
+      durations: storyboard.scenes.map((scene) => scene.durationSec),
+    }) &&
     storyboard.scenes.every(
       (scene) =>
         scene.status === "COMPLETE" &&

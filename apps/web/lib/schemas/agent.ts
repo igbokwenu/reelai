@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import {
+  normalizeShowcaseDurations,
+  normalizeShowcaseSceneCount,
+} from "@/lib/storyboards/timing";
+
 export const creativeConceptSchema = z.object({
   title: z.string().min(3).max(90),
   hook: z.string().min(8).max(220),
@@ -133,7 +138,7 @@ const reliableCameraPatterns = [
 const passiveFramingPattern =
   /\b(?:shows?|captures?|depicts?|features?|illuminates?|can be seen|is seen)\b/i;
 const visibleStoryBeatPattern =
-  /\b(?:foreground|background|behind (?:her|him|them|the)|enters? (?:the )?frame|exits? (?:the )?frame|walks? (?:away|out)|steps? (?:away|out)|rises?|stands? up|sits? down|reacts?|relaxes?|releases?|brightens?|recoils?|reveals?|unfolds?|opens?|closes?|topples?|spills?|drops?|lifts?|raises?|turns?|rotates?|slides?|crosses? (?:the )?frame|moves? into|moves? out of|pours?|streams?|bubbles?|steams?|sizzles?|sprays?|dispenses?|stacks?|assembles?|arranges?|packs?|unboxes?|peels?|snaps?|clicks?|locks?|glides?|rolls?|lands?|swirls?|curls?|tosses?|stirs?|writes?|draws?|types?|taps?|points?|guides?|demonstrates?|wipes?|polishes?|ripples?|blooms?)\b/i;
+  /\b(?:foreground|background|behind (?:her|him|them|the)|enters? (?:the )?frame|exits? (?:the )?frame|walks? (?:away|out)|steps? (?:away|out)|rises?|stands? up|sits? down|reacts?|relaxes?|releases?|brightens?|recoils?|reveals?|unfolds?|opens?|closes?|topples?|spills?|drops?|lifts?|raises?|turns?|rotates?|slides?|crosses? (?:the )?frame|moves? into|moves? out of|pours?|streams?|bubbles?|steams?|sizzles?|sprays?|dispenses?|stacks?|assembles?|arranges?|packs?|unboxes?|peels?|snaps?|clicks?|locks?|glides?|rolls?|lands?|swirls?|curls?|tosses?|stirs?|writes?|draws?|types?|taps?|points?|guides?|demonstrates?|wipes?|polishes?|ripples?|blooms?|separates?|settles?|sweeps?|shimmers?|reflects?|catches?|drifts?|tilts?|emerges?|extends?|retracts?|hovers?|floats?|folds?|wraps?|twists?|spins?|pivots?|flips?|fades?)\b/i;
 const sequencePattern =
   /\b(?:then|afterward|afterwards|next|finally|followed by)\b/gi;
 
@@ -638,13 +643,18 @@ const flexibleConceptSchema = z
 export function parseCreativeConceptsOutput(
   value: unknown,
   outputMode: "STANDARD" | "PRODUCT_SHOWCASE" = "STANDARD",
+  targetDurationSec?: number,
 ): CreativeConceptsOutput {
   const extracted = extractConceptArray(value);
 
   const concepts = extracted
     .slice(0, 3)
     .map((item: unknown) =>
-      normalizeConcept(item, outputMode === "PRODUCT_SHOWCASE"),
+      normalizeConcept(
+        item,
+        outputMode === "PRODUCT_SHOWCASE",
+        targetDurationSec,
+      ),
     );
 
   return (
@@ -657,6 +667,7 @@ export function parseCreativeConceptsOutput(
 export function parseCreativeConceptRegenerationOutput(
   value: unknown,
   outputMode: "STANDARD" | "PRODUCT_SHOWCASE" = "STANDARD",
+  targetDurationSec?: number,
 ) {
   const record = asRecord(value);
   const directConcept = record ? asRecord(record.concept) : null;
@@ -667,20 +678,41 @@ export function parseCreativeConceptRegenerationOutput(
       ? productShowcaseCreativeConceptRegenerationSchema
       : creativeConceptRegenerationSchema
   ).parse({
-    concept: normalizeConcept(extracted, outputMode === "PRODUCT_SHOWCASE"),
+    concept: normalizeConcept(
+      extracted,
+      outputMode === "PRODUCT_SHOWCASE",
+      targetDurationSec,
+    ),
   });
 }
 
 export function parseStoryboardOutput(
   value: unknown,
   outputMode: "STANDARD" | "PRODUCT_SHOWCASE" = "STANDARD",
+  targetDurationSec?: number,
 ): StoryboardOutput {
   const canonical = canonicalizeStoryboardValue(value);
   const activeSchema =
     outputMode === "PRODUCT_SHOWCASE"
       ? productShowcaseStoryboardSchema
       : storyboardSchema;
-  const strict = activeSchema.safeParse(canonical);
+  const validationSchema =
+    outputMode === "PRODUCT_SHOWCASE" && targetDurationSec !== undefined
+      ? activeSchema.superRefine((storyboard, ctx) => {
+          const total = storyboard.scenes.reduce(
+            (sum, scene) => sum + scene.durationSec,
+            0,
+          );
+          if (total !== targetDurationSec) {
+            ctx.addIssue({
+              code: "custom",
+              message: `Product Showcase must total exactly ${targetDurationSec} seconds.`,
+              path: ["scenes"],
+            });
+          }
+        })
+      : activeSchema;
+  const strict = validationSchema.safeParse(canonical);
 
   if (strict.success) {
     return strict.data;
@@ -692,11 +724,32 @@ export function parseStoryboardOutput(
     : Array.isArray(record.storyboard)
       ? record.storyboard
       : [];
-  const scenes = rawScenes
-    .slice(0, 4)
+  let scenes = rawScenes
+    .slice(0, outputMode === "PRODUCT_SHOWCASE" ? 3 : 4)
     .map((scene, index) => normalizeStoryboardScene(scene, index));
 
-  return activeSchema.parse({
+  if (
+    outputMode === "PRODUCT_SHOWCASE" &&
+    targetDurationSec !== undefined &&
+    scenes.length >= Math.ceil(targetDurationSec / 10) &&
+    scenes.length <= Math.floor(targetDurationSec / 5)
+  ) {
+    const durations = normalizeShowcaseDurations(
+      scenes.map((scene) => scene.durationSec),
+      targetDurationSec,
+    );
+    scenes = scenes.map((scene, index) => ({
+      ...scene,
+      index: index + 1,
+      durationSec: durations[index]!,
+      voiceoverText: fitVoiceoverToDuration(
+        scene.voiceoverText,
+        durations[index]!,
+      ),
+    }));
+  }
+
+  return validationSchema.parse({
     title: text(record.title ?? record.name ?? "Generated storyboard", {
       fallback: "",
       min: 3,
@@ -751,7 +804,11 @@ function extractConceptArray(value: unknown): unknown[] {
   return inner ? extractConceptArray(inner) : [];
 }
 
-function normalizeConcept(value: unknown, productShowcase = false) {
+function normalizeConcept(
+  value: unknown,
+  productShowcase = false,
+  targetDurationSec?: number,
+) {
   const parsed = flexibleConceptSchema.parse(asRecord(value) ?? {});
   const scenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
   const firstScene = scenes[0] ? asRecord(scenes[0]) : null;
@@ -823,34 +880,43 @@ function normalizeConcept(value: unknown, productShowcase = false) {
     },
   );
 
+  const estimatedScenes = integerInRange(
+    parsed.estimatedScenes ??
+      parsed.estimated_scenes ??
+      parsed.sceneCount ??
+      parsed.scene_count ??
+      (Array.isArray(parsed.scenes) ? parsed.scenes.length : undefined),
+    productShowcase
+      ? { fallback: 2, min: 1, max: 3 }
+      : { fallback: 3, min: 2, max: 4 },
+  );
+  const estimatedDurationSec = integerInRange(
+    parsed.estimatedDurationSec ??
+      parsed.estimated_duration_sec ??
+      parsed.estimatedDuration ??
+      parsed.estimated_duration ??
+      parsed.durationSec ??
+      parsed.duration ??
+      parsed.target_duration_seconds,
+    productShowcase
+      ? { fallback: 10, min: 5, max: 15 }
+      : { fallback: 24, min: 15, max: 30 },
+  );
+  const showcaseTarget =
+    productShowcase && targetDurationSec !== undefined
+      ? Math.min(15, Math.max(5, Math.round(targetDurationSec)))
+      : estimatedDurationSec;
+
   return {
     title,
     hook,
     strategy,
     narrativeArc,
     visualStyle,
-    estimatedScenes: integerInRange(
-      parsed.estimatedScenes ??
-        parsed.estimated_scenes ??
-        parsed.sceneCount ??
-        parsed.scene_count ??
-        (Array.isArray(parsed.scenes) ? parsed.scenes.length : undefined),
-      productShowcase
-        ? { fallback: 2, min: 1, max: 3 }
-        : { fallback: 3, min: 2, max: 4 },
-    ),
-    estimatedDurationSec: integerInRange(
-      parsed.estimatedDurationSec ??
-        parsed.estimated_duration_sec ??
-        parsed.estimatedDuration ??
-        parsed.estimated_duration ??
-        parsed.durationSec ??
-        parsed.duration ??
-        parsed.target_duration_seconds,
-      productShowcase
-        ? { fallback: 10, min: 5, max: 15 }
-        : { fallback: 24, min: 15, max: 30 },
-    ),
+    estimatedScenes: productShowcase
+      ? normalizeShowcaseSceneCount(estimatedScenes, showcaseTarget)
+      : estimatedScenes,
+    estimatedDurationSec: showcaseTarget,
     previewPrompt,
     rationale: text(
       parsed.rationale ??
@@ -1132,12 +1198,23 @@ function normalizeGeneratedShotPrompt(value: unknown) {
   const moodLeadMatch = clean.match(
     /^([^.!?:]{2,40}\b(?:atmosphere|mood|energy|tension|pressure|warmth|relief|confidence|curiosity|delight|unease))\s+(.+)$/i,
   );
+  const cameraBehavior = reliableCameraBehavior(clean);
   let mood = inferShotMood(clean);
-  let action = sentenceParts[0] ?? clean;
+  let action =
+    sentenceParts.find((part) => !reliableCameraBehavior(part)) ??
+    sentenceParts[0] ??
+    clean;
 
   if (colonMatch) {
     mood = colonMatch[1]?.trim() || mood;
-    action = (colonMatch[2] ?? action).split(/[.!?]+/)[0]?.trim() || action;
+    const bodyParts = (colonMatch[2] ?? action)
+      .split(/[.!?]+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    action =
+      bodyParts.find((part) => !reliableCameraBehavior(part)) ??
+      bodyParts[0] ??
+      action;
   } else if (moodLeadMatch) {
     mood = moodLeadMatch[1]?.trim() || mood;
     action = moodLeadMatch[2]?.trim() || action;
@@ -1167,15 +1244,48 @@ function normalizeGeneratedShotPrompt(value: unknown) {
     return candidate;
   }
 
-  // A missing camera brief defaults to the most stable generation setup. Do
-  // not invent a story beat here: if the supplied action is still banal or
-  // overloaded, final validation intentionally sends it to model repair.
-  const repaired =
-    countReliableCameraBehaviors(action) === 0
-      ? `${mood}: ${action.replace(/[,;\s]+$/, "")}, while a fixed camera holds the composition.`
-      : candidate;
+  // Preserve a supported camera direction even when the provider put it in a
+  // second sentence. If none was supplied, use the most stable setup. We do
+  // not invent a story beat: banal or overloaded action still goes to repair.
+  const cameraClause = cameraDirectionClause(cameraBehavior ?? "fixed");
+  const repaired = `${mood}: ${action.replace(/[,;\s]+$/, "")}, while ${cameraClause}.`;
 
   return shotPromptSchema.safeParse(repaired).success ? repaired : raw;
+}
+
+function cameraDirectionClause(
+  behavior: NonNullable<ReturnType<typeof reliableCameraBehavior>>,
+) {
+  switch (behavior) {
+    case "push-in":
+      return "a slow push-in tightens the layered composition";
+    case "pull-back":
+      return "a slow pull-back reveals the wider composition";
+    case "orbit":
+      return "a gentle product orbit traces the changing silhouette";
+    case "handheld-follow":
+      return "a handheld follow stays with the focal action";
+    default:
+      return "a fixed camera holds the composition";
+  }
+}
+
+function fitVoiceoverToDuration(value: string, durationSec: number) {
+  const words = value.trim().split(/\s+/).filter(Boolean);
+  const budget = Math.max(1, Math.floor(durationSec * 2.5));
+  if (words.length <= budget) return value;
+
+  const fitted = words.slice(0, budget);
+  while (
+    fitted.length > 1 &&
+    /^(?:and|or|but|as|with|to|the|a|an)$/i.test(
+      fitted[fitted.length - 1]!.replace(/[^a-z]/gi, ""),
+    )
+  ) {
+    fitted.pop();
+  }
+
+  return `${fitted.join(" ").replace(/[,:;.!?]+$/, "")}.`;
 }
 
 function inferShotMood(value: string) {

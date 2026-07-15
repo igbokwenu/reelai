@@ -58,7 +58,9 @@ export async function generateStructuredWithQwen<T>({
       throw error;
     }
 
-    console.warn(`[${operation}] Strict JSON schema failed, falling back to json_object mode`);
+    console.warn(
+      `[${operation}] Strict JSON schema failed, falling back to json_object mode`,
+    );
     result = await qwenChatCompletion({
       operation: `${operation}_json_object_fallback`,
       model,
@@ -92,6 +94,8 @@ export async function generateStructuredWithQwen<T>({
           content: [
             `The previous ${schemaName} JSON failed validation.`,
             `Validation issues: ${formatZodIssues(error)}`,
+            "Original requirements (these remain mandatory during repair):",
+            user,
             "Rewrite it to satisfy every required field with substantive, non-empty content.",
             "Invalid JSON:",
             JSON.stringify(parsed),
