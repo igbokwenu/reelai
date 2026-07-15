@@ -12,6 +12,7 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - URL-first project creation that automatically queues Brand Kit research; project and business names can be inferred from the website.
 - Focused two-column landing workspace with optional pipeline guidance and confirmed project deletion, including local/OSS artifact cleanup.
 - Focused horizontal project workflow with six navigable stages: Brand, Concepts, Storyboard, Production, Final, and Assets. Stage readiness and completion are visible at a glance, and switching stages preserves in-progress client state.
+- Default-on Auto mode turns a selected concept into a finished reel without tab-by-tab approval: a one-time Brand Kit asset handoff precedes spend, a durable phase tracker shows live progress, and resilient retries resume from the last valid storyboard, anchor, clip, narration, or render output. Step-by-step mode and every manual editor remain available.
 - Premium contextual action guidance across consequential controls. Mouse hover and keyboard focus explain outcomes in plain language, including replacement, deletion, generation, and downstream effects; disabled controls remain discoverable and the guidance is screen-reader and reduced-motion aware.
 - Reusable Brand Kit with value props, palette, claims, policy risks, locked style language, and citations.
 - Multi-page website evidence collection covering metadata, visible copy, CSS color candidates, logos/social images, and QwenCloud visual analysis.
@@ -72,6 +73,8 @@ Application-only updates that do not add a Prisma migration require only a resta
 Existing storyboards remain generatable after migration. Their former motion brief becomes the shot direction and durations are safely clamped to 5–10 seconds; unchanged legacy wording is accepted until it is edited. For the best quality, regenerate an older storyboard and its anchors once so every shot is authored natively under the new one-sentence rules. Reseeding is not required.
 
 Scene-timed narration adds the nullable `Scene.narrationArtifactId` link. Existing audio and renders are preserved, but a local checkout must stop `pnpm dev`, run `pnpm db:migrate` once, and restart `pnpm dev`. Then click **Generate Scene Narration** before the next render to replace any legacy project-wide track with measured scene clips. No seed is required.
+
+Auto mode adds persisted project preferences, the first-production Brand Kit confirmation, and resumable `AutoGenerationRun` coordination. Existing projects default to Auto mode and will see the Brand Kit handoff the next time they proceed from a selected concept. Stop `pnpm dev`, run `pnpm db:migrate`, then restart `pnpm dev`. No `pnpm install` or seed is required. See [docs/auto-mode.md](docs/auto-mode.md) for recovery behavior and the API contract.
 
 The domain-neutral creative grammar, structured cast planning, richer motion-hierarchy guardrails, recent-anchor identity recovery, and last-scene logo lockup are application-only changes. Existing databases and artifacts remain compatible; restart `pnpm dev` after pulling them, with no additional migration or seed command.
 

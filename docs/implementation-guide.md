@@ -1,6 +1,6 @@
 # Reel AI Implementation Guide
 
-Updated: July 14, 2026
+Updated: July 15, 2026
 
 This is the build contract for Reel AI. When implementation agents need to choose between options, follow this guide first, then `docs/reel-ai-blueprint.md`, then the QwenCloud docs in `docs/qwencloud-reference-links.md`.
 
@@ -25,6 +25,7 @@ Build only this before stretch work:
 - App generates 2 to 4 image-to-video clips for a reliable 15 to 30 second reel.
 - App generates narration with Qwen TTS.
 - App renders one 9:16 MP4 with captions, safe zones, optional AI disclosure, optional uploaded/sample BGM, and thumbnail.
+- Auto mode is on by default after concept selection, confirms the available Brand Kit assets before production spend, and durably advances through storyboard, anchors, clips, narration, and render. Users can opt into the original step-by-step approval flow.
 - App shows live job status, model names, task IDs, artifacts, and estimated cost/time.
 - App is deployed on Alibaba Cloud and has proof screenshot/recording.
 
@@ -61,6 +62,7 @@ Use these choices. Do not swap frameworks without an explicit decision note in `
 - Database: PostgreSQL.
 - ORM: Prisma.
 - Job orchestration: Postgres-backed `GenerationJob` table for MVP.
+- Multi-phase coordination: Postgres-backed `AutoGenerationRun` with phase verification, a short claim lease, bounded exponential retries, and manual resume.
 - Object storage: Alibaba Cloud OSS.
 - Deployment: Alibaba Cloud ECS + Docker Compose for MVP.
 - Tests: Vitest for unit tests; Playwright for smoke/e2e tests.

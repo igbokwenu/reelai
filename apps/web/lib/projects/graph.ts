@@ -18,6 +18,7 @@ export function getProjectGraph(projectId: string) {
       jobs: { orderBy: { createdAt: "desc" }, take: 12 },
       artifacts: { orderBy: { createdAt: "desc" } },
       renders: { orderBy: { createdAt: "desc" } },
+      autoRuns: { orderBy: { createdAt: "desc" }, take: 1 },
     },
   });
 }

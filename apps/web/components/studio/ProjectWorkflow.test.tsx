@@ -24,8 +24,10 @@ describe("ProjectWorkflow", () => {
         finalComplete={false}
         hasBrandKit
         hasSelectedConcept
+        latestAutoRun={null}
         production={<p>Production console</p>}
         productionComplete={false}
+        projectId="project-1"
         storyboard={
           <input aria-label="Storyboard draft" defaultValue="Opening beat" />
         }

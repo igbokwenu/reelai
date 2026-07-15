@@ -111,3 +111,34 @@ body {
 .workflow-panels[data-active-stage="assets"] > [data-workflow-panel="assets"] {
   display: block;
 }
+
+@keyframes auto-run-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translate3d(-8%, -5%, 0) scale(0.96);
+  }
+  50% {
+    opacity: 0.55;
+    transform: translate3d(4%, 3%, 0) scale(1.04);
+  }
+}
+
+.auto-run-panel::after {
+  animation: auto-run-breathe 7s ease-in-out infinite;
+  background: radial-gradient(circle, rgb(183 255 60 / 0.13), transparent 62%);
+  border-radius: 9999px;
+  content: "";
+  height: 15rem;
+  pointer-events: none;
+  position: absolute;
+  right: -5rem;
+  top: -6rem;
+  width: 15rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auto-run-panel::after {
+    animation: none;
+  }
+}

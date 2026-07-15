@@ -56,6 +56,7 @@ export default async function ProjectPage({ params }: PageProps) {
     project.jobs.find((job) => job.type === "TTS") ?? null;
   const latestRenderJob =
     project.jobs.find((job) => job.type === "RENDER") ?? null;
+  const latestAutoRun = project.autoRuns[0] ?? null;
   const selectedConcept =
     project.concepts.find((concept) => concept.selected) ?? null;
   const productionComplete = Boolean(
@@ -246,11 +247,15 @@ export default async function ProjectPage({ params }: PageProps) {
               concepts={
                 <ConceptTable
                   artifacts={project.artifacts}
+                  autoMode={project.autoMode}
+                  brandKitConfirmedAt={project.brandKitConfirmedAt}
+                  businessName={project.businessName}
                   concepts={project.concepts}
                   hasBrandKit={Boolean(project.brandKit)}
                   latestConceptJob={latestConceptJob}
                   projectId={project.id}
                   sources={project.sources}
+                  websiteUrl={project.websiteUrl}
                 />
               }
               final={
@@ -266,6 +271,7 @@ export default async function ProjectPage({ params }: PageProps) {
               finalComplete={finalComplete}
               hasBrandKit={Boolean(project.brandKit)}
               hasSelectedConcept={Boolean(selectedConcept)}
+              latestAutoRun={latestAutoRun}
               production={
                 <GenerationConsole
                   artifacts={project.artifacts}
@@ -277,6 +283,7 @@ export default async function ProjectPage({ params }: PageProps) {
                 />
               }
               productionComplete={productionComplete}
+              projectId={project.id}
               storyboard={
                 <StoryboardTimeline
                   artifacts={project.artifacts}

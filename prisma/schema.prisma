@@ -7,17 +7,19 @@ datasource db {
 }
 
 model Project {
-  id             String        @id @default(cuid())
-  name           String
-  businessName   String
-  websiteUrl     String?
-  targetAudience String?
-  offer          String?
-  videoLengthSec Int           @default(30)
-  style          VideoStyle
-  status         ProjectStatus @default(DRAFT)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                  String        @id @default(cuid())
+  name                String
+  businessName        String
+  websiteUrl          String?
+  targetAudience      String?
+  offer               String?
+  videoLengthSec      Int           @default(30)
+  style               VideoStyle
+  status              ProjectStatus @default(DRAFT)
+  autoMode            Boolean       @default(true)
+  brandKitConfirmedAt DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
   brandKit   BrandKit?
   sources    BrandSource[]
@@ -26,6 +28,29 @@ model Project {
   jobs       GenerationJob[]
   artifacts  Artifact[]
   renders    Render[]
+  autoRuns   AutoGenerationRun[]
+}
+
+model AutoGenerationRun {
+  id             String   @id @default(cuid())
+  projectId      String
+  status         String   @default("RUNNING")
+  phase          String   @default("STORYBOARD")
+  currentJobId   String?
+  attempt        Int      @default(0)
+  maxAttempts    Int      @default(3)
+  nextAttemptAt  DateTime?
+  leaseUntil     DateTime?
+  error          String?
+  startedAt      DateTime @default(now())
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+  @@index([status, nextAttemptAt])
 }
 
 model BrandKit {

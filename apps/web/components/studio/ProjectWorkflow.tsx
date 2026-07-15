@@ -12,8 +12,12 @@ import {
   PlayCircle,
   type LucideIcon,
 } from "lucide-react";
-import { memo, type ReactNode, useState } from "react";
+import { memo, type ReactNode, useEffect, useState } from "react";
 
+import {
+  AutoGenerationPanel,
+  type AutoRunView,
+} from "@/components/studio/AutoGenerationPanel";
 import { Button } from "@/components/ui/button";
 import { GuideTooltip } from "@/components/ui/guide-tooltip";
 
@@ -41,6 +45,8 @@ export function ProjectWorkflow({
   storyboardStatus,
   productionComplete,
   finalComplete,
+  projectId,
+  latestAutoRun,
 }: {
   brand: ReactNode;
   concepts: ReactNode;
@@ -53,6 +59,8 @@ export function ProjectWorkflow({
   storyboardStatus: string | null;
   productionComplete: boolean;
   finalComplete: boolean;
+  projectId: string;
+  latestAutoRun: AutoRunView | null;
 }) {
   const storyboardComplete = storyboardStatus === "APPROVED";
   const stages: Stage[] = [
@@ -141,8 +149,27 @@ export function ProjectWorkflow({
     });
   }
 
+  useEffect(() => {
+    function handleNavigation(event: Event) {
+      const stage = (event as CustomEvent<{ stage?: StageId }>).detail?.stage;
+      if (stage && stages.some((candidate) => candidate.id === stage)) {
+        selectStage(stage);
+      }
+    }
+    window.addEventListener("reelai:navigate-stage", handleNavigation);
+    return () =>
+      window.removeEventListener("reelai:navigate-stage", handleNavigation);
+  });
+
   return (
     <div className="mt-6" id="project-workspace">
+      {latestAutoRun ? (
+        <AutoGenerationPanel
+          initialRun={latestAutoRun}
+          onReviewStage={(stage) => selectStage(stage)}
+          projectId={projectId}
+        />
+      ) : null}
       <nav
         aria-label="Project workflow"
         className="workflow-rail overflow-x-auto rounded-2xl border border-border/80 bg-card/70 p-2 shadow-2xl shadow-black/20 backdrop-blur-xl"

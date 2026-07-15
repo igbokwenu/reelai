@@ -1,6 +1,6 @@
 # Reel AI Architecture
 
-Updated: July 14, 2026
+Updated: July 15, 2026
 
 This document describes the target MVP architecture. The implementation source of truth is `docs/implementation-guide.md`.
 
@@ -14,6 +14,7 @@ flowchart TB
   Api --> Db["PostgreSQL + Prisma"]
   Api --> Oss["Alibaba Cloud OSS"]
   Api --> Jobs["Postgres GenerationJob Table"]
+  Api --> AutoRuns["AutoGenerationRun Coordinator"]
 
   Api --> QwenText["QwenCloud Text / Structured Output"]
   Api --> QwenVision["QwenCloud Vision"]
@@ -22,6 +23,7 @@ flowchart TB
   Api --> QwenTts["QwenCloud TTS"]
 
   Jobs --> Worker["Job Runner / API-triggered Worker Loop"]
+  AutoRuns --> Worker
   Worker --> QwenText
   Worker --> QwenVision
   Worker --> QwenImage
@@ -53,7 +55,7 @@ flowchart TB
 4. QwenCloud vision analyzes accessible website and uploaded visuals; structured generation combines that evidence with text sources and saves the reusable `BrandKit`. Hostname-inferred project identity is replaced by a researched site name only when the user did not explicitly name the project.
 5. Concept generation derives explicit capabilities from uploaded sources. Without an uploaded logo, product image, UI screenshot/reference ad, or other visual source, prompts prohibit manufacturing those visual elements. Structured concepts are validated before image spend. A single concept can also be regenerated with an optional concise adjustment note; that prompt includes the Brand Kit, verified evidence, the target being replaced, and the two retained concepts as anti-duplication context.
 6. Preview prompts receive the same grounding constraints. Each generated preview is reviewed by QwenCloud vision; rejected or unavailable previews fall back to a clearly designed local concept card instead of presenting fabricated imagery as grounded output. Single-concept replacement is atomic from the user's perspective: the retained concepts keep their IDs and previews, the replacement keeps its concept ID and selection state, and only its superseded preview is cleaned up after persistence. If it drives a storyboard, that storyboard and its scenes return to draft review while prior production artifacts remain durable.
-7. User selects a concept. Legacy previews without grounding metadata cannot advance until regenerated.
+7. User selects a concept. Legacy previews without grounding metadata cannot advance until regenerated. Before the first production spend, a Brand Kit handoff summarizes website evidence and uploaded brand assets, explains their role in generation, and offers an add-material path. Auto mode is selected by default; step-by-step mode preserves the original manual approvals.
 8. Storyboard generation begins with a capability preflight against the selected concept. Missing visual references are treated as adaptation constraints, not upload blockers: the first prompt preserves strategy while replacing unsupported logos, products, or interfaces with unbranded human/environmental storytelling. Deterministic validation is negation-aware, so instructions such as “no logo” are not mistaken for asset requests. If a candidate still violates grounding, one bounded model recovery pass rewrites it; a deterministic safe-text fallback removes any residual unsupported visual or claim language before final validation. Only a candidate that still fails after all recovery layers stops for human review. The successful recovery method and omitted capabilities are persisted in the storyboard job output and explained in the editor. The resulting storyboard creates separate product/character/visual-world continuity locks, classifies every transition as continuous, match-cut, or intentional change, and renders as a one-anchor-per-scene story flow.
 9. Storyboard generation first selects an offer-appropriate execution lane—people/service, product/retail/food, software/digital, place/hospitality/property, expertise/B2B/education, or creator/event/abstract brand—so visual interest comes from the subject rather than a universal service-ad template. It then produces one `shotPrompt` per scene under a strict contract: exactly one mood-first sentence of 14–60 words, one focal action arc, optional low-amplitude supporting motion in a separate depth plane, at most one motivated two-beat progression, one reliable camera behavior, a visible story change, and a 5–10 second duration. Passive tableau wording is rejected, and the complete storyboard must use at least two camera behaviors.
 
@@ -67,6 +69,10 @@ This separation follows QwenCloud's [first-frame image-to-video guidance](https:
 11. One TTS job generates a durable narration artifact for each non-silent scene. It measures the WAV bytes, records a scene-local start offset and playback rate, caps timing correction at 1.20×, and rejects a line that cannot fit naturally. Editing voiceover text or scene duration invalidates the manifest and its scene links.
 12. Render job uses Remotion to sequence each narration artifact inside its owning scene, add short audio fades, and duck optional BGM during speech. Legacy project-wide narration remains supported for existing projects. Video and audio artifacts are streamed through the app's authenticated, same-origin endpoint with HTTP byte-range and CORS support; Remotion Media can therefore seek into OSS-backed clips instead of requiring a full-file download for each rendered frame. Rendering uses bounded media retries, a 120-second timeout, and conservative concurrency. Remotion then produces the final 9:16 MP4 and thumbnail. The latest uploaded `LOGO` image—or a directly discovered website asset explicitly labeled as a logo/wordmark—is composited as a timed last-scene lockup with the business name; generative image/video prompts continue to prohibit synthetic logo drawing. Without a verified logo asset, the business-name lockup remains as the fallback.
 13. Final artifacts are stored in OSS and displayed in the studio.
+
+### Auto mode coordination
+
+Auto mode persists a separate `AutoGenerationRun` over the existing provider-facing `GenerationJob` records. Its phase order is Storyboard, Scene Anchors, Video Clips, Narration, and Remotion Render. Client polling claims a time-bounded database lease and advances one phase; each phase verifies its durable prerequisites and outputs before creating work. This makes page reloads and server restarts resumable without regenerating successful media. Transient phase failures use bounded exponential backoff, provider video tasks retain their task IDs, and partial clip retries target only missing scenes. If manual editing invalidates an upstream dependency, the run moves back to the earliest required phase. Non-transient or exhausted failures stop with the completed graph intact and can be resumed from the studio.
 
 ## Evidence capability model
 

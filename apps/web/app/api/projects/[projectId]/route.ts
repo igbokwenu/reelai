@@ -12,6 +12,7 @@ type RouteContext = {
 // recently updated jobs as active so those abandoned projects remain
 // deletable. Provider jobs update their row as they progress or finish.
 const ACTIVE_JOB_STALE_AFTER_MS = 10 * 60 * 1_000;
+const ACTIVE_AUTO_RUN_STALE_AFTER_MS = 30 * 60 * 1_000;
 
 export async function GET(_request: Request, context: RouteContext) {
   return handleRoute(async () => {
@@ -30,6 +31,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
   return handleRoute(async () => {
     const { projectId } = await context.params;
     const activeJobCutoff = new Date(Date.now() - ACTIVE_JOB_STALE_AFTER_MS);
+    const activeAutoRunCutoff = new Date(
+      Date.now() - ACTIVE_AUTO_RUN_STALE_AFTER_MS,
+    );
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       select: {
@@ -42,12 +46,20 @@ export async function DELETE(_request: Request, context: RouteContext) {
           select: { id: true },
           take: 1,
         },
+        autoRuns: {
+          where: {
+            status: { in: ["RUNNING", "WAITING_RETRY"] },
+            updatedAt: { gte: activeAutoRunCutoff },
+          },
+          select: { id: true },
+          take: 1,
+        },
         artifacts: { select: { ossKey: true } },
       },
     });
 
     if (!project) return notFound("Project not found");
-    if (project.jobs.length > 0) {
+    if (project.jobs.length > 0 || project.autoRuns.length > 0) {
       return ok(
         {
           error:
