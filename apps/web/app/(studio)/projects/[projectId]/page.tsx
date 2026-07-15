@@ -306,6 +306,7 @@ export default async function ProjectPage({ params }: PageProps) {
                   autoMode={project.autoMode}
                   brandKitConfirmedAt={project.brandKitConfirmedAt}
                   businessName={project.businessName}
+                  cinematicBoost={project.cinematicBoost}
                   concepts={project.concepts}
                   hasBrandKit={Boolean(project.brandKit)}
                   latestConceptJob={latestConceptJob}

@@ -94,7 +94,9 @@ export async function PATCH(request: Request, context: RouteContext) {
         scene.voiceoverText !== existing.voiceoverText ||
         scene.shotPrompt !== existing.shotPrompt ||
         scene.continuityNotes !== existing.continuityNotes ||
-        scene.continuityMode !== existing.continuityMode
+        scene.continuityMode !== existing.continuityMode ||
+        (scene.transitionStyle !== undefined &&
+          scene.transitionStyle !== existing.transitionStyle)
       );
     });
     const narrationChanged = (body.scenes ?? []).some((scene) => {
@@ -112,7 +114,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         data: {
           title: body.title,
           script: body.script,
-          bgmEnabled: body.bgmEnabled,
+          bgmEnabled:
+            storyboard.project.outputMode === "PRODUCT_SHOWCASE"
+              ? false
+              : body.bgmEnabled,
           bgmPrompt: body.bgmPrompt,
           productContinuity: body.productContinuity,
           characterContinuity: body.characterContinuity,
@@ -132,6 +137,7 @@ export async function PATCH(request: Request, context: RouteContext) {
             shotPrompt: scene?.shotPrompt,
             continuityNotes: scene?.continuityNotes,
             continuityMode: scene?.continuityMode,
+            transitionStyle: scene?.transitionStyle,
             selectedKeyframeTakeId: stale.anchor ? null : undefined,
             selectedVideoTakeId: stale.video ? null : undefined,
             status:

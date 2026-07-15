@@ -236,7 +236,8 @@ export function FinalVideoPlayer({
         <div>
           <p className="text-sm font-medium">Final Export</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Narration, captions, safe zones, disclosure, BGM, and a 9:16 MP4.
+            Narration, final-scene closer, safe zones, disclosure, and a 9:16
+            MP4.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -351,7 +352,8 @@ export function FinalVideoPlayer({
             storyboard.scenes.every((scene) => !scene.voiceoverText.trim()) ? (
             <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
               All scenes are intentionally silent. The reel can be rendered with
-              captions and optional BGM only.
+              the final closer
+              {outputMode === "PRODUCT_SHOWCASE" ? "." : " and optional BGM."}
             </div>
           ) : (
             <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
@@ -377,12 +379,15 @@ export function FinalVideoPlayer({
             <input
               checked={bgmEnabled}
               className="size-4 accent-primary"
+              disabled={outputMode === "PRODUCT_SHOWCASE"}
               onChange={(event) => setBgmEnabled(event.target.checked)}
               type="checkbox"
             />
             <span className="flex items-center gap-2">
               <Music2 className="size-4 text-primary" aria-hidden="true" />
-              Include built-in sample BGM
+              {outputMode === "PRODUCT_SHOWCASE"
+                ? "Voiceover-only audio"
+                : "Include built-in sample BGM"}
             </span>
           </label>
           <div className="flex items-start gap-2 rounded-md border border-border p-3 text-muted-foreground">
@@ -391,8 +396,9 @@ export function FinalVideoPlayer({
               aria-hidden="true"
             />
             <span>
-              The BGM option uses a stored neutral sample bed; it does not
-              require generated music.
+              {outputMode === "PRODUCT_SHOWCASE"
+                ? "Product source clips are kept silent and muted during composition; scene narration supplies the final audio."
+                : "The BGM option uses a stored neutral sample bed; it does not require generated music."}
             </span>
           </div>
         </div>

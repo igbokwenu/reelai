@@ -118,7 +118,11 @@ export function StoryboardTimeline({
   const [error, setError] = useState<string | null>(
     latestStoryboardJob?.error ?? null,
   );
-  const [draft, setDraft] = useState<Storyboard | null>(storyboard);
+  const [draft, setDraft] = useState<Storyboard | null>(
+    storyboard && outputMode === "PRODUCT_SHOWCASE"
+      ? { ...storyboard, bgmEnabled: false }
+      : storyboard,
+  );
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(
     storyboard?.scenes[0]?.id ?? null,
   );
@@ -488,17 +492,26 @@ export function StoryboardTimeline({
                 <label className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
                   <input
                     checked={draft.bgmEnabled}
+                    disabled={outputMode === "PRODUCT_SHOWCASE"}
                     type="checkbox"
                     onChange={(event) =>
                       updateDraft({ bgmEnabled: event.target.checked })
                     }
                   />
-                  Background music
+                  {outputMode === "PRODUCT_SHOWCASE"
+                    ? "Voiceover-only audio"
+                    : "Background music"}
                 </label>
                 <input
                   className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 disabled:opacity-50"
-                  disabled={!draft.bgmEnabled}
-                  placeholder="Soundtrack mood and pacing"
+                  disabled={
+                    outputMode === "PRODUCT_SHOWCASE" || !draft.bgmEnabled
+                  }
+                  placeholder={
+                    outputMode === "PRODUCT_SHOWCASE"
+                      ? "Product Showcase keeps the soundtrack clean"
+                      : "Soundtrack mood and pacing"
+                  }
                   value={draft.bgmPrompt ?? ""}
                   onChange={(event) =>
                     updateDraft({ bgmPrompt: event.target.value })
@@ -598,7 +611,14 @@ export function StoryboardTimeline({
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(420px,1.15fr)]">
             <SelectedSceneSummary scene={selectedScene} />
-            <SceneInspector scene={selectedScene} onChange={updateScene} />
+            <SceneInspector
+              isLastScene={
+                Boolean(selectedScene) &&
+                selectedScene?.id === draft.scenes.at(-1)?.id
+              }
+              scene={selectedScene}
+              onChange={updateScene}
+            />
           </div>
 
           <div className="flex flex-col gap-3 rounded-xl border border-primary/25 bg-primary/[0.07] p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -867,6 +887,9 @@ function StitchConnector({ nextScene }: { nextScene: EditableScene }) {
         className={`rounded-lg border px-2 py-1.5 text-[9px] font-semibold uppercase leading-3 tracking-[0.1em] ${styles[nextScene.continuityMode]}`}
       >
         {formatEnum(nextScene.continuityMode)}
+      </span>
+      <span className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
+        {formatEnum(nextScene.transitionStyle)}
       </span>
     </div>
   );

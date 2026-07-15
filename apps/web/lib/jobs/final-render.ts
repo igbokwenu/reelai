@@ -83,6 +83,12 @@ export async function createAndRunFinalRenderJob({
   aiDisclosureEnabled?: boolean;
   bgmEnabled?: boolean;
 }) {
+  const projectAudioPolicy = await prisma.project.findUniqueOrThrow({
+    where: { id: projectId },
+    select: { outputMode: true },
+  });
+  const effectiveBgmEnabled =
+    projectAudioPolicy.outputMode === "PRODUCT_SHOWCASE" ? false : bgmEnabled;
   const storyboard = await getRenderableStoryboard(projectId, {
     requireVideos: true,
   });
@@ -93,7 +99,7 @@ export async function createAndRunFinalRenderJob({
     narration,
     artifactBaseUrl,
     aiDisclosureEnabled,
-    bgmEnabled,
+    bgmEnabled: effectiveBgmEnabled,
   });
   const render = await prisma.render.create({
     data: {
@@ -102,8 +108,20 @@ export async function createAndRunFinalRenderJob({
       format: "9:16",
       settings: {
         aiDisclosureEnabled,
-        bgmEnabled,
+        bgmEnabled: effectiveBgmEnabled,
+        sourceClipAudio: "MUTED",
+        audioPolicy:
+          projectAudioPolicy.outputMode === "PRODUCT_SHOWCASE"
+            ? "VOICEOVER_ONLY"
+            : "NARRATION_WITH_OPTIONAL_BGM",
         logoIncluded: Boolean(input.brandWatermark?.logoUrl),
+        brandLockupMode: input.brandWatermark?.logoUrl
+          ? "LOGO_ONLY"
+          : "TEXT_ONLY",
+        captionOverlaySceneCount: input.scenes.length > 0 ? 1 : 0,
+        transitionStyles: input.scenes.map(
+          (scene) => scene.transitionStyle ?? "CUT",
+        ),
         safeZonePreset: input.safeZonePreset,
         narrationArtifactIds: [...narration.sceneNarrations.values()].map(
           (item) => item.artifact.id,
@@ -124,7 +142,7 @@ export async function createAndRunFinalRenderJob({
         renderId: render.id,
         sceneIds: storyboard.scenes.map((scene) => scene.id),
         aiDisclosureEnabled,
-        bgmEnabled,
+        bgmEnabled: effectiveBgmEnabled,
         logoIncluded: Boolean(input.brandWatermark?.logoUrl),
       },
     },
@@ -341,6 +359,10 @@ async function runFinalRenderJob(
             : null,
         sceneNarrationCount: input.scenes.filter((scene) => scene.narration)
           .length,
+        captionOverlaySceneCount: input.scenes.length > 0 ? 1 : 0,
+        transitionStyles: input.scenes.map(
+          (scene) => scene.transitionStyle ?? "CUT",
+        ),
         safeZonePreset: input.safeZonePreset,
       },
     });
@@ -518,6 +540,7 @@ async function buildReelCompositionInput({
       captionText: scene.captionText,
       startTimeSec,
       durationSec: scene.durationSec,
+      transitionStyle: scene.transitionStyle,
       narration: narration.sceneNarrations.has(scene.id)
         ? {
             audioUrl: artifactUrl(
@@ -572,11 +595,16 @@ async function buildReelCompositionInput({
       ? artifactUrl(narration.legacyArtifact, artifactBaseUrl)
       : undefined,
     bgmUrl: bgm ? artifactUrl(bgm, artifactBaseUrl) : undefined,
-    brandWatermark: {
-      text: project.businessName,
-      logoUrl: uploadedLogoUrl ?? verifiedWebsiteLogoUrl ?? undefined,
-      showOn: "LAST",
-    },
+    brandWatermark:
+      (uploadedLogoUrl ?? verifiedWebsiteLogoUrl)
+        ? {
+            logoUrl: uploadedLogoUrl ?? verifiedWebsiteLogoUrl ?? undefined,
+            showOn: "LAST",
+          }
+        : {
+            text: project.businessName,
+            showOn: "LAST",
+          },
     aiDisclosureEnabled,
     safeZonePreset: storyboard.scenes[0]?.safeZonePreset ?? "TIKTOK_REELS",
   };

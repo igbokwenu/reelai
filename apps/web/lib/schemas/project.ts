@@ -145,6 +145,10 @@ export const sourceTypeSchema = z.enum([
   "WEBSITE",
 ]);
 
+export const projectCreativeSettingsSchema = z.object({
+  cinematicBoost: z.boolean(),
+});
+
 export const registerSourceSchema = z.object({
   type: sourceTypeSchema.default("WEBSITE"),
   url: z.string().trim().url(),

@@ -278,8 +278,32 @@ export const storyboardSceneSchema = z
     shotPrompt: shotPromptSchema,
     continuityNotes: z.string().min(6).max(700),
     continuityMode: z.enum(["CONTINUOUS", "MATCH_CUT", "INTENTIONAL_CHANGE"]),
+    transitionStyle: z
+      .enum(["CUT", "FADE", "SLIDE", "WIPE", "IRIS", "CLOCK_WIPE"])
+      .default("CUT"),
   })
   .superRefine((value, ctx) => {
+    if (value.index === 1 && value.transitionStyle !== "CUT") {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "The first scene must use CUT because there is no prior scene.",
+        path: ["transitionStyle"],
+      });
+    }
+
+    if (
+      value.continuityMode === "MATCH_CUT" &&
+      value.transitionStyle !== "CUT"
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "A match cut must use CUT so an added effect does not obscure the visual match.",
+        path: ["transitionStyle"],
+      });
+    }
+
     const voiceoverWords = value.voiceoverText
       .trim()
       .split(/\s+/)
@@ -497,6 +521,7 @@ export const storyboardJsonSchema = {
           "shotPrompt",
           "continuityNotes",
           "continuityMode",
+          "transitionStyle",
         ],
         properties: {
           index: { type: "integer", minimum: 1, maximum: 4 },
@@ -519,6 +544,12 @@ export const storyboardJsonSchema = {
           continuityMode: {
             type: "string",
             enum: ["CONTINUOUS", "MATCH_CUT", "INTENTIONAL_CHANGE"],
+          },
+          transitionStyle: {
+            type: "string",
+            enum: ["CUT", "FADE", "SLIDE", "WIPE", "IRIS", "CLOCK_WIPE"],
+            description:
+              "The visual transition into this scene. Scene 1 must use CUT. Use CUT for a true match cut; otherwise choose the least intrusive effect whose geometry or mood supports the product and story.",
           },
         },
       },
@@ -563,6 +594,9 @@ export const storyboardPatchSchema = z.object({
           "MATCH_CUT",
           "INTENTIONAL_CHANGE",
         ]),
+        transitionStyle: z
+          .enum(["CUT", "FADE", "SLIDE", "WIPE", "IRIS", "CLOCK_WIPE"])
+          .optional(),
       }),
     )
     .min(1)
@@ -940,6 +974,22 @@ function canonicalizeStoryboardValue(value: unknown) {
 
 function normalizeStoryboardScene(value: unknown, index: number) {
   const record = asRecord(value) ?? {};
+  const continuityMode = normalizeContinuityMode(
+    record.continuityMode ??
+      record.continuity_mode ??
+      record.transitionMode ??
+      record.transition_mode,
+  );
+  const transitionStyle =
+    continuityMode === "MATCH_CUT"
+      ? ("CUT" as const)
+      : normalizeTransitionStyle(
+          record.transitionStyle ??
+            record.transition_style ??
+            record.transitionEffect ??
+            record.transition_effect,
+          index,
+        );
 
   return {
     index: integerInRange(record.index ?? index + 1, {
@@ -990,12 +1040,8 @@ function normalizeStoryboardScene(value: unknown, index: number) {
         max: 700,
       },
     ),
-    continuityMode: normalizeContinuityMode(
-      record.continuityMode ??
-        record.continuity_mode ??
-        record.transitionMode ??
-        record.transition_mode,
-    ),
+    continuityMode,
+    transitionStyle,
   };
 }
 
@@ -1156,6 +1202,21 @@ function normalizeContinuityMode(value: unknown) {
   }
 
   return "CONTINUOUS" as const;
+}
+
+function normalizeTransitionStyle(value: unknown, sceneIndex: number) {
+  if (sceneIndex === 0) return "CUT" as const;
+
+  const normalized = normalizeEnum(value, [
+    "CUT",
+    "FADE",
+    "SLIDE",
+    "WIPE",
+    "IRIS",
+    "CLOCK_WIPE",
+  ] as const);
+
+  return normalized || ("CUT" as const);
 }
 
 /**

@@ -118,7 +118,7 @@ Differentiators:
 - Take-compare editing: every regeneration is additive; the user chooses between takes like an editor.
 - Token-budget planner: the agent proposes a low-cost draft path and a high-quality render path, with a live generation ticker.
 - Claim safety and platform ad-policy checks: flag unsupported claims, regulated-category risks, and likely platform rejection issues before render.
-- Output-ready reels: final export includes voiceover, optional BGM, captions, safe-zone-aware overlays, optional AI-content disclosure, and a vertical 9:16 render.
+- Output-ready reels: final export includes voiceover, optional standard-reel BGM, one final-scene closer/CTA, safe-zone-aware overlays, optional AI-content disclosure, and a vertical 9:16 render.
 - Judge-friendly pipeline visualization: a live run page shows each agent step, model used, status, and artifacts.
 
 ## Wow Moment

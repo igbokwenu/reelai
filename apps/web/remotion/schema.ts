@@ -4,6 +4,7 @@ export type ReelCompositionInput = {
     captionText: string;
     startTimeSec: number;
     durationSec: number;
+    transitionStyle?: "CUT" | "FADE" | "SLIDE" | "WIPE" | "IRIS" | "CLOCK_WIPE";
     narration?: {
       audioUrl: string;
       offsetSec: number;
@@ -28,6 +29,23 @@ export const REEL_FPS = 30;
 export const NARRATION_MIX_VOLUME = 0.96;
 export const BGM_BASE_VOLUME = 0.18;
 export const BGM_DUCKED_VOLUME = 0.065;
+
+const TRANSITION_DURATION_SEC = {
+  CUT: 0,
+  FADE: 0.34,
+  SLIDE: 0.42,
+  WIPE: 0.4,
+  IRIS: 0.46,
+  CLOCK_WIPE: 0.48,
+} as const;
+
+export function getTransitionDurationFrames(
+  scene: ReelCompositionInput["scenes"][number],
+  fps = REEL_FPS,
+) {
+  const style = scene.transitionStyle ?? "CUT";
+  return Math.max(0, Math.round(TRANSITION_DURATION_SEC[style] * fps));
+}
 
 export function getReelDurationFrames(input: ReelCompositionInput) {
   const durationSec = input.scenes.reduce(

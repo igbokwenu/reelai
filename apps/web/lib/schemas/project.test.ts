@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { createProjectSchema, inferProjectIdentity } from "./project";
+import {
+  createProjectSchema,
+  inferProjectIdentity,
+  projectCreativeSettingsSchema,
+} from "./project";
 
 describe("URL-first project intake", () => {
   it("accepts a website without names and infers a usable identity", () => {
@@ -100,6 +104,16 @@ describe("URL-first project intake", () => {
         outputMode: "STANDARD",
         videoLengthSec: 5,
       }).success,
+    ).toBe(false);
+  });
+
+  it("accepts only an explicit persisted Cinematic Boost preference", () => {
+    expect(
+      projectCreativeSettingsSchema.parse({ cinematicBoost: true }),
+    ).toEqual({ cinematicBoost: true });
+    expect(
+      projectCreativeSettingsSchema.safeParse({ cinematicBoost: "true" })
+        .success,
     ).toBe(false);
   });
 });

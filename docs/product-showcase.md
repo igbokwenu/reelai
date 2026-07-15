@@ -11,7 +11,7 @@ Product Showcase is a first-class output mode for short, product-led films. It r
 3. Choose realistic or premium 3D and a 5, 10, or 15 second target.
 4. Reel AI stores and links the images before Brand Kit research begins. Product-page URLs are researched as evidence when available.
 5. The Creative Director pitches exactly three product-first concepts. The user selects one, then continues in Auto mode or the unchanged step-by-step workflow.
-6. The storyboard uses a feasible one to three scenes totaling the exact requested duration. Five seconds resolves to one scene, 15 seconds requires at least two, and 10 seconds can use one or two. Final output remains vertical 9:16 with captions, scene-timed voiceover, optional BGM, and the verified brand lockup.
+6. The storyboard uses a feasible one to three scenes totaling the exact requested duration. Five seconds resolves to one scene, 15 seconds requires at least two, and 10 seconds can use one or two. Final output remains vertical 9:16 with scene-timed voiceover, one final closer/CTA overlay, purposeful Remotion transitions, and the verified brand lockup. Product Showcase does not add source-clip audio or BGM.
 
 ## Input policy
 
@@ -30,10 +30,15 @@ The three-image total is deliberate. Current reference-aware image generation ca
 - One hero product and one primary action per shot.
 - Multiple products appear sequentially or in a static collection composition. They do not assemble, collide, cross paths, or transform together.
 - Separation/reassembly is limited to a few large, visually grounded layers or components moving on one axis before settling. The AI must not invent internal parts.
-- Stable product-safe devices include a slow orbit, turntable, light sweep, package reveal, ingredient layering, controlled fabric motion, and one simple model/use-context action.
+- Motion is category-native rather than a universal spin: food/drink can use verified garnish, condensation, steam, pouring, crumbs, or temperature contrast; beauty can use a controlled droplet, texture ribbon, cap reveal, or light sweep; fashion can use fabric response, one silhouette turn, or one step; rigid goods/electronics favor precision rotation, parallax, surface light, or a functional reveal; home/craft objects favor material detail and a simple use-result.
+- Stable product-safe devices include a brief partial orbit, turntable, light sweep, package reveal, ingredient layering, controlled fabric motion, and one simple model/use-context action. One grounded supporting material behavior may accompany the hero action, such as a brief ice-cream rotation while verified toppings fall in one clean arc.
 - Avoid melting, spawning, tiny-part explosions, hand manipulation of fine detail, rapid turns, complex occlusion, and simultaneous camera/object choreography.
 - Wearables may use one model with a simple pose, step, turn, or fabric movement. No outfit morph or unreferenced redesign.
 - App/website products require supplied interface evidence for generated screens. Otherwise the concept shows the real-world outcome or reserves the screen for controlled compositing.
+- Every scene stores the transition into it. Match cuts stay clean; fades serve gentle continuity; slides and wipes need directional or packaging geometry; iris and clock wipes are reserved for centered circular forms or deliberately theatrical hero reveals. A clean cut remains the default when an effect would compete with the product.
+- **Cinematic Boost** is a persisted concept-stage preference. When enabled, both concept and storyboard agents materially heighten scale, lighting contrast, foreground depth, reveal timing, and physically credible motion without relaxing product-reference or single-shot constraints.
+- Source video requests omit driving audio (and force `audio: false` on compatible legacy Wan models). Remotion also mutes every source clip. Product Showcase disables BGM at storyboard save and final-render boundaries, leaving scene narration as the only audio layer.
+- Earlier scene captions are editorial labels only. Remotion composites only the final scene's concise closer or CTA.
 
 Uploaded product images are prioritized ahead of logos, reference ads, and general uploads when generating concept previews and scene anchors. Realistic mode uses commercial photography language; 3D mode uses physically based materials and studio lighting without changing product geometry.
 
@@ -44,6 +49,8 @@ During an active showcase run, the studio becomes a focused Auto production room
 ## Data and API contract
 
 - `Project.outputMode`: `STANDARD | PRODUCT_SHOWCASE`.
+- `Project.cinematicBoost`: persists balanced versus heightened creative direction.
+- `Scene.transitionStyle`: `CUT | FADE | SLIDE | WIPE | IRIS | CLOCK_WIPE`.
 - `ProjectProduct`: name, details, website URL, and stable order.
 - `BrandSource.productId`: associates a `PRODUCT_IMAGE` or product-page source with its product.
 - `POST /api/projects` accepts `outputMode` and `products[]` with an intake-only `imageCount` used for validation.
@@ -52,11 +59,11 @@ During an active showcase run, the studio becomes a focused Auto production room
 
 ## Local update
 
-This feature includes a Prisma migration. Stop the current dev process, then run:
+The current implementation includes a Prisma migration and the official `@remotion/transitions` package. After pulling it into another checkout, run `pnpm install`. In this workspace the dependency is already installed. Stop the current dev process, then run:
 
 ```bash
 pnpm db:migrate
 pnpm dev
 ```
 
-`pnpm dev` regenerates Prisma Client through the existing web pre-step. `pnpm db:generate` is only needed if an already-open editor still shows stale Prisma types. No package install or seed is required. Existing projects are migrated to `STANDARD` and keep all sources, concepts, storyboards, jobs, and artifacts.
+`pnpm dev` regenerates Prisma Client through the existing web pre-step. `pnpm db:generate` is only needed if an already-open editor still shows stale Prisma types. No seed is required. Existing projects keep their media and default to balanced creative intensity plus clean cuts until a storyboard is regenerated or edited.

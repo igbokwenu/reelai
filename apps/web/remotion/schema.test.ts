@@ -6,6 +6,7 @@ import {
   getBgmVolume,
   getBrandWatermarkWindow,
   getSceneNarrationWindow,
+  getTransitionDurationFrames,
   type ReelCompositionInput,
 } from "./schema";
 
@@ -81,5 +82,17 @@ describe("scene narration timing", () => {
   it("ducks BGM only while narration is active", () => {
     expect(getBgmVolume(input, 60, 30)).toBe(BGM_DUCKED_VOLUME);
     expect(getBgmVolume(input, 170, 30)).toBe(BGM_BASE_VOLUME);
+  });
+});
+
+describe("scene transition timing", () => {
+  it("uses short editorial transitions and keeps clean cuts at zero frames", () => {
+    expect(
+      getTransitionDurationFrames(
+        { ...baseInput.scenes[1], transitionStyle: "IRIS" },
+        30,
+      ),
+    ).toBe(14);
+    expect(getTransitionDurationFrames(baseInput.scenes[1], 30)).toBe(0);
   });
 });

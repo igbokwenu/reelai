@@ -26,6 +26,8 @@ Each poll advances at most one phase and first verifies persisted output. This m
 
 - Storyboards are auto-approved only after structured generation, exact timing, narration-fit, and policy checks. A policy blocker stops for human review.
 - Scene-count validation is output-mode aware: standard reels retain 2–4 scenes totaling 15–30 seconds, while Product Showcase uses a feasible 1–3 scenes totaling the project's exact 5, 10, or 15 second target. The same contract is enforced in the editor, production jobs, and final render.
+- The persisted Cinematic Boost preference is read by both concept and storyboard generation in Auto and step-by-step modes. Scene transition choices are stored on the storyboard, and the exact same choices reach final Remotion composition.
+- Product Showcase source clips and final composition remain voiceover-only: provider driving audio is omitted, source media is muted, BGM is suppressed at the render boundary, and only scene narration is mixed.
 - Near-valid model output is normalized before persistence: substantive multi-sentence prose becomes one safe shot sentence, conflicting camera clauses collapse to one supported behavior, voiceover is fitted after timing correction, and Product Showcase scene durations are reconciled to the exact target. Subjective creative-interest vocabulary and cross-scene camera variety remain prompt-level quality guidance rather than paid-retry blockers. A bounded schema-repair pass retains the original project requirements for genuinely incomplete output.
 - Anchor generation selects one current continuity-aware anchor per scene.
 - Video polling reuses the existing provider task IDs. If only some scenes fail, retry generation targets only missing scenes; completed siblings remain selected.

@@ -69,6 +69,10 @@ export async function createAndRunVideoJob(projectId: string) {
     model: QWEN_I2V_MODEL,
     operation: "scene_i2v",
     sceneIds: targets.map((scene) => scene.id),
+    sourceAudioPolicy:
+      scenes[0]?.storyboard.outputMode === "PRODUCT_SHOWCASE"
+        ? "SILENT"
+        : "SILENT_SOURCE_WITH_POST_MIX",
   });
 
   return runVideoSubmissionJob(job.id);
@@ -90,6 +94,10 @@ export async function createAndRunSceneVideoJob(
     model: QWEN_I2V_MODEL,
     operation: "scene_i2v_retry",
     sceneIds: [scene.id],
+    sourceAudioPolicy:
+      scene.storyboard.outputMode === "PRODUCT_SHOWCASE"
+        ? "SILENT"
+        : "SILENT_SOURCE_WITH_POST_MIX",
   });
 
   return runVideoSubmissionJob(job.id);
@@ -954,12 +962,14 @@ async function createProductionJob({
   model,
   operation,
   sceneIds,
+  sourceAudioPolicy,
 }: {
   projectId: string;
   type: "KEYFRAME" | "VIDEO";
   model: string;
   operation: string;
   sceneIds: string[];
+  sourceAudioPolicy?: "SILENT" | "SILENT_SOURCE_WITH_POST_MIX";
 }) {
   return prisma.$transaction(async (tx) => {
     // Lock the existing project row for this transaction. Unlike PostgreSQL's
@@ -1011,7 +1021,11 @@ async function createProductionJob({
         type,
         status: "QUEUED",
         model,
-        input: { operation, sceneIds },
+        input: {
+          operation,
+          sceneIds,
+          ...(sourceAudioPolicy ? { sourceAudioPolicy } : {}),
+        },
       },
     });
   });

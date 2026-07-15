@@ -1,6 +1,6 @@
 # Reel AI
 
-Reel AI is an AI showrunner studio for short-form business ads and story-led social videos. It takes a business website and optional brand materials, builds a reusable Brand Kit, pitches three distinct creative concepts, creates an editable storyboard, generates QwenCloud-powered keyframes/video/scene-timed narration, and exports a vertical 9:16 reel with captions, safe zones, optional BGM, and AI disclosure.
+Reel AI is an AI showrunner studio for short-form business ads and story-led social videos. It takes a business website and optional brand materials, builds a reusable Brand Kit, pitches three distinct creative concepts, creates an editable storyboard, generates QwenCloud-powered keyframes/video/scene-timed narration, and exports a vertical 9:16 reel with a final closer, safe zones, optional standard-reel BGM, and AI disclosure.
 
 The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The repo is intentionally public-submission friendly: no committed secrets, visible server-side QwenCloud usage, reproducible Docker deployment, and a judging checklist.
 
@@ -21,6 +21,7 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Storyboard grounding auto-recovery: missing logo, product, or interface references do not block creation. Reel AI preserves the selected strategy, adapts unsupported execution to source-safe unbranded storytelling, validates the replacement, and explains the adaptation in the editor.
 - Pre-spend concept validation and post-generation visual grounding review; previews that fail review are replaced with an honest local concept card.
 - Exactly three creative concepts before full generation spend, with optional note-guided regeneration of one direction without replacing the other two.
+- Persisted **Cinematic Boost** on the concept screen heightens scale, lighting contrast, depth, reveal timing, motion, and transition design across concept and storyboard generation while preserving grounding constraints.
 - Visual storyboard filmstrip with one anchor image and one directed shot sentence per scene, an engine-managed product/character/visual-world continuity bible, and a human approval loop. Standard reels use 2–4 scenes; Product Showcase uses a feasible 1–3 scenes at the exact selected duration.
 - A constrained shot engine validates generation-safe 14–60 word directions: one sentence, at most one motivated two-beat progression, exactly one reliable camera behavior, no passive framing, and a 5 to 10 second low-drift duration. Visible story change, layered composition, and camera variety remain creative guidance without becoming brittle retry blockers.
 - The creative grammar is domain-neutral: people/services, products/retail/food, software, places/hospitality/property, expertise/B2B/education, and creator/event/abstract-brand work each receive offer-appropriate motion devices instead of one universal problem/relief template.
@@ -29,10 +30,10 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Continuity-aware anchors reuse uploaded visual references when available. Every later anchor can reference the two most recent anchors to recover recurring identities after a scene gap while inheriting screen direction, spatial logic, lighting, and match-cut geometry; those locks are kept out of the video prompt.
 - A recommended Production story flow auto-selects the newest coherent anchor and clip, keeps older anchors, legacy closing frames, and clips as optional history, and exposes only the single shot sentence for inline tuning with downstream dependency invalidation.
 - Wan 2.7 scene video generation receives the approved shot sentence verbatim plus the anchor image. Artifact avoidance lives in the dedicated negative-prompt field, and prompt rewriting stays disabled so the provider cannot expand one action into a mangled compound shot.
-- Remotion uses clean direct scene cuts rather than fading every clip in from black, preserving continuous and match-cut handoffs in the stitched output.
+- Storyboards persist a deliberate transition into each scene. Remotion uses clean match cuts plus short motivated fade, slide, wipe, iris, or clock-wipe presentations, compensating overlap so the final duration remains exact.
 - Render media is read through Reel AI's same-origin, byte-range-aware artifact endpoint and decoded with Remotion Media. This avoids downloading an entire OSS clip for every frame, tolerates slower remote storage with bounded retries and a 120-second media timeout, and limits render concurrency to keep local exports stable.
 - Qwen TTS narration is generated and stored per scene. Reel AI measures the real WAV duration, gives each line a short lead-in/tail, applies at most a natural 1.20× fit, rejects overlong copy instead of clipping it, and ducks BGM beneath speech. Silent scenes remain silent, while legacy one-track narration stays render-compatible.
-- Final renders place the latest uploaded logo, or a directly verified website logo asset—not an AI recreation—over the last scene with a short animated brand lockup; the business name remains the fallback when no logo asset is available.
+- Final renders keep early scenes text-free and place one closer/CTA on the last scene. The latest uploaded logo, or a directly verified website logo asset—not an AI recreation—is displayed alone at 3× the former mark size; the business name appears only when no logo asset is available.
 - Remotion final render path for 9:16 MP4 export.
 - Alibaba OSS-compatible artifact storage with a local dev fallback.
 - Dockerfile, Docker Compose, deploy runbook, seed fixture, and Playwright smoke tests.
@@ -78,6 +79,8 @@ Scene-timed narration adds the nullable `Scene.narrationArtifactId` link. Existi
 Auto mode adds persisted project preferences, the first-production Brand Kit confirmation, and resumable `AutoGenerationRun` coordination. Existing projects default to Auto mode and will see the Brand Kit handoff the next time they proceed from a selected concept. Stop `pnpm dev`, run `pnpm db:migrate`, then restart `pnpm dev`. No `pnpm install` or seed is required. See [docs/auto-mode.md](docs/auto-mode.md) for recovery behavior and the API contract.
 
 Product Showcase adds `Project.outputMode`, `ProjectProduct`, and the optional product link on uploaded sources. Existing projects remain `STANDARD`. Stop `pnpm dev`, run `pnpm db:migrate`, and restart `pnpm dev`; Prisma Client is regenerated automatically. No `pnpm install` or seed is required. See [docs/product-showcase.md](docs/product-showcase.md) for limits, grounding rules, and the end-to-end flow.
+
+Cinematic Boost and scene transitions add `Project.cinematicBoost`, `Scene.transitionStyle`, and the official `@remotion/transitions` dependency. After pulling into a fresh checkout, run `pnpm install`. Then stop `pnpm dev`, run `pnpm db:migrate`, and restart `pnpm dev`. Existing projects default to balanced intensity and clean cuts; no seed is required.
 
 The domain-neutral creative grammar, structured cast planning, richer motion-hierarchy guardrails, recent-anchor identity recovery, and last-scene logo lockup are application-only changes. Existing databases and artifacts remain compatible; restart `pnpm dev` after pulling them, with no additional migration or seed command.
 

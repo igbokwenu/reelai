@@ -97,6 +97,28 @@ test("requires confirmation before deleting a project", async ({
   await expect(page.getByText(name, { exact: true })).toHaveCount(0);
 });
 
+test("persists Cinematic Boost across a project reload", async ({
+  page,
+  request,
+}) => {
+  const name = `${E2E_PROJECT_PREFIX} Cinematic boost ${Date.now()}`;
+  const response = await request.post("/api/projects", {
+    data: { name, businessName: "Cinematic Brand", generateBrandKit: false },
+  });
+  expect(response.ok()).toBeTruthy();
+  const payload = (await response.json()) as { project: { id: string } };
+
+  await page.goto(`/projects/${payload.project.id}`);
+  await page.getByRole("tab", { name: /^Concepts/ }).click();
+  const cinematicBoost = page.getByLabel("Enable Cinematic Boost");
+  await cinematicBoost.check();
+  await expect(page.getByText("Boost saved")).toBeVisible();
+
+  await page.reload();
+  await page.getByRole("tab", { name: /^Concepts/ }).click();
+  await expect(page.getByLabel("Enable Cinematic Boost")).toBeChecked();
+});
+
 test("creates a product showcase with a required product image", async ({
   page,
 }) => {

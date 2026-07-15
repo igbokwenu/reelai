@@ -2,6 +2,8 @@ import { handleRoute, notFound, ok } from "@/lib/http/responses";
 import { prisma } from "@/lib/prisma";
 import { getProjectGraph } from "@/lib/projects/graph";
 import { deleteStoredObject } from "@/lib/oss";
+import { assertManualControlAvailable } from "@/lib/jobs/manual-control";
+import { projectCreativeSettingsSchema } from "@/lib/schemas/project";
 
 type RouteContext = {
   params: Promise<{ projectId: string }>;
@@ -22,6 +24,28 @@ export async function GET(_request: Request, context: RouteContext) {
     if (!project) {
       return notFound("Project not found");
     }
+
+    return ok({ project });
+  });
+}
+
+export async function PATCH(request: Request, context: RouteContext) {
+  return handleRoute(async () => {
+    const { projectId } = await context.params;
+    const input = projectCreativeSettingsSchema.parse(await request.json());
+    const exists = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true },
+    });
+
+    if (!exists) return notFound("Project not found");
+    await assertManualControlAvailable(projectId);
+
+    const project = await prisma.project.update({
+      where: { id: projectId },
+      data: { cinematicBoost: input.cinematicBoost },
+      select: { id: true, cinematicBoost: true },
+    });
 
     return ok({ project });
   });

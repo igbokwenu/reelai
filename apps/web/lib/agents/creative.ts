@@ -511,6 +511,7 @@ export async function generateStoryboardForProject(projectId: string) {
     projectId,
     conceptId: selectedConcept.id,
     brandKit: project.brandKit,
+    outputMode: project.outputMode,
     output,
   });
   const warnings = reviewStoryboardClaims(project.brandKit, output);
@@ -582,11 +583,13 @@ async function saveStoryboard({
   projectId,
   conceptId,
   brandKit,
+  outputMode,
   output,
 }: {
   projectId: string;
   conceptId: string;
   brandKit: BrandKit;
+  outputMode: "STANDARD" | "PRODUCT_SHOWCASE";
   output: StoryboardOutput;
 }) {
   const existing = await prisma.storyboard.findUnique({
@@ -608,7 +611,8 @@ async function saveStoryboard({
       conceptId,
       title: output.title,
       script: output.script,
-      bgmEnabled: output.bgm.enabled,
+      bgmEnabled:
+        outputMode === "PRODUCT_SHOWCASE" ? false : output.bgm.enabled,
       bgmPrompt: `${output.bgm.preset}: ${output.bgm.prompt}`,
       productContinuity: output.continuityBible.product,
       characterContinuity,
@@ -623,6 +627,7 @@ async function saveStoryboard({
           shotPrompt: scene.shotPrompt,
           continuityNotes: scene.continuityNotes,
           continuityMode: scene.continuityMode,
+          transitionStyle: scene.transitionStyle,
           lockedStyleLanguage: brandKit.lockedStyle,
         })),
       },
@@ -632,7 +637,8 @@ async function saveStoryboard({
       conceptId,
       title: output.title,
       script: output.script,
-      bgmEnabled: output.bgm.enabled,
+      bgmEnabled:
+        outputMode === "PRODUCT_SHOWCASE" ? false : output.bgm.enabled,
       bgmPrompt: `${output.bgm.preset}: ${output.bgm.prompt}`,
       productContinuity: output.continuityBible.product,
       characterContinuity,
@@ -647,6 +653,7 @@ async function saveStoryboard({
           shotPrompt: scene.shotPrompt,
           continuityNotes: scene.continuityNotes,
           continuityMode: scene.continuityMode,
+          transitionStyle: scene.transitionStyle,
           lockedStyleLanguage: brandKit.lockedStyle,
         })),
       },
@@ -905,6 +912,7 @@ Audience: ${project.targetAudience?.trim() || brandKit?.audience || "Not specifi
 Offer: ${project.offer?.trim() || "Not specified"}
 Video target: ${project.videoLengthSec}s, ${project.style}
 Output mode: ${project.outputMode}
+Creative intensity: ${project.cinematicBoost ? "CINEMATIC_BOOST" : "BALANCED"}
 ${buildProductContext(project)}
 
 Brand Kit:
@@ -930,8 +938,11 @@ Requirements:
 - Do not leave strategy, narrativeArc, previewPrompt, or rationale blank or generic.
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Keep estimated scenes between 1 and 3 and duration between 5 and 15 seconds." : "Keep estimated scenes between 2 and 4 and duration between 15 and 30 seconds."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Every direction must be a premium product-first showcase grounded in the uploaded product images. Make the three routes meaningfully different: for example tactile/material reveal, cinematic hero motion, or an elegant use-context/model presentation when appropriate." : "Keep the product or service strategy grounded in verified evidence."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "First classify the hero product by its real visual behavior, then design for that behavior: food and drink may use verified garnish, condensation, steam, pours, crumbs, or temperature contrast; beauty may use a controlled droplet, texture ribbon, cap reveal, or light sweep; fashion may use fabric response, a silhouette turn, or a clean step; rigid packaged goods and electronics favor precision rotation, parallax, surface light, or a functional reveal; home and craft objects favor material detail and a simple use-result. Do not apply the same spin or floating-parts idea to every category." : "Choose a domain-specific premium visual system: service reels need visible cause-and-effect behavior; places need spatial reveals and atmosphere; software needs verified interface action or a real-world outcome; expertise needs concrete artifacts and decisions. Avoid generic montage logic."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Choose exactly one hero product and one hero action per shot. If multiple products are supplied, treat them as a restrained collection: reveal them sequentially or keep secondary products static; never merge products or choreograph several transformations at once." : "Use a clear brand-relevant visual hook."}
-- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Favor identity-safe motion: slow orbit, controlled separation/reassembly of large rigid components, ingredient layering, fabric movement, package reveal, light sweep, turntable, or a single model/use-context action. Avoid melting, spawning, tiny-part explosions, hands manipulating fine details, and simultaneous camera plus object choreography." : "Avoid overloaded scene choreography."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Favor identity-safe motion: a short partial hero rotation, controlled separation/reassembly of a few large rigid components, verified ingredient layering, fabric movement, package reveal, light sweep, turntable, or one model/use-context action. One simple supporting material behavior may accompany the hero action—for example an ice-cream makes one stylish partial rotation while toppings already supported by the references fall in a clean arc. Avoid full-speed spins, melting, spawning, tiny-part explosions, fine hand manipulation, and simultaneous camera plus object choreography." : "Build a memorable but readable visual pattern: one defining metaphor or physical motif, one visible cause-and-effect beat per scene, and a purposeful lighting progression. Avoid overloaded choreography and stock-ad montage."}
+- Plan transitions as editorial punctuation, never decoration. A true compositional match uses a clean cut; gentle continuity may use a short fade; directional movement or packaging reveals may use a slide or wipe; circular hero forms, food plating, lenses, cosmetics, and centered reveals may justify an iris or clock wipe. Use no effect when the cut is stronger.
+- ${buildCinematicBoostInstruction(project.cinematicBoost)}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "End with a concise, source-safe caption and spoken call to action that fits naturally inside the requested duration." : "Resolve with a clear, source-safe audience action."}
 - Preview prompts must be 9:16 frame prompts suitable for ${QWEN_PREVIEW_IMAGE_MODEL}.
 - Use the brand palette colors and visual motifs in your visual direction.
@@ -973,6 +984,7 @@ Audience: ${project.targetAudience?.trim() || brandKit?.audience || "Not specifi
 Offer: ${project.offer?.trim() || "Not specified"}
 Video target: ${project.videoLengthSec}s, ${project.style}
 Output mode: ${project.outputMode}
+Creative intensity: ${project.cinematicBoost ? "CINEMATIC_BOOST" : "BALANCED"}
 ${buildProductContext(project)}
 
 Brand Kit:
@@ -1015,6 +1027,9 @@ Requirements:
 - rationale must explain why this direction can work for this brand and audience.
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Keep estimated scenes between 1 and 3 and duration between 5 and 15 seconds." : "Keep estimated scenes between 2 and 4 and duration between 15 and 30 seconds."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Keep the uploaded product as the unmistakable hero. Use one hero product and one hero action per shot; secondary products stay static or appear sequentially. Reject morphing, melting, crowded transformations, and ungrounded product variants." : "Keep the execution grounded and visually legible."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Choose motion from the product's real material and use cues rather than defaulting to a generic spin: use verified garnish/temperature behavior for food, fluid or texture control for beauty, fabric response for fashion, precision parallax/light for rigid goods, and simple use-result motion for home or craft products. One restrained supporting material behavior may accompany the hero action." : "Use domain-specific action, physical metaphor, and lighting rather than a generic montage."}
+- Plan only purposeful scene transitions: clean cut for match cuts; short fade for gentle continuity; slide or wipe for directional movement; iris or clock wipe only when circular geometry or a centered hero reveal motivates it.
+- ${buildCinematicBoostInstruction(project.cinematicBoost)}
 - The preview prompt must be a 9:16 frame prompt suitable for ${QWEN_PREVIEW_IMAGE_MODEL}.
 - Use the brand palette colors and supported visual motifs.
 - Avoid unsupported claims and regulated-category promises.
@@ -1043,6 +1058,12 @@ function buildProductContext(project: { products: ProjectProduct[] }) {
         `${index + 1}. ${product.name}${product.details ? ` — ${product.details}` : ""}${product.websiteUrl ? ` — context URL: ${product.websiteUrl}` : ""}`,
     )
     .join("\n")}`;
+}
+
+function buildCinematicBoostInstruction(enabled: boolean) {
+  return enabled
+    ? "CINEMATIC BOOST IS ON: make the creative leap unmistakable. Heighten scale, contrast, lighting changes, foreground depth, reveal timing, and physically credible motion; favor an audacious first-frame pattern interrupt and one signature visual device the viewer could describe afterward. Stay brand-accurate, source-grounded, single-shot, and feasible for image-to-video—intensity must come from art direction, not extra simultaneous actions."
+    : "Use premium, confident art direction with restrained motion and transitions; clarity and brand fit outrank spectacle.";
 }
 
 function validateConceptTiming(
@@ -1104,6 +1125,7 @@ Offer: ${project.offer?.trim() || "Not specified"}
 Target length: ${project.videoLengthSec}s
 Style: ${project.style}
 Output mode: ${project.outputMode}
+Creative intensity: ${project.cinematicBoost ? "CINEMATIC_BOOST" : "BALANCED"}
 ${buildProductContext(project)}
 
 Selected concept:
@@ -1138,6 +1160,7 @@ Requirements:
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Treat the actual uploaded product photography as the source of truth for silhouette, materials, colors, proportions, surface details, packaging, and visible ingredients. The generated scene may stylize the world but must not redesign the product." : "Preserve recurring product identity whenever a product is present."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Assign exactly one hero product and one primary action to each shot. For multiple products, use sequential hero shots or a static collection composition; never ask multiple products to assemble, transform, collide, or cross paths together." : "Keep the motion hierarchy deliberately simple."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "A separation/reassembly concept may move only a few large, visually grounded layers or components on one axis, then settle cleanly. Never explode dozens of small pieces, invent internal components, melt materials, or morph one product into another." : "Avoid physically ambiguous transformations."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Choose a category-native product performance rather than a generic spin: food/drink may use supported garnish, condensation, steam, pouring, crumbs, or temperature contrast; beauty may use one droplet, texture ribbon, cap reveal, or light sweep; fashion may use fabric response, one silhouette turn, or one step; rigid goods/electronics may use a brief precision rotation, parallax, surface light, or functional reveal; home/craft objects may use material detail and one use-result. A simple supporting material behavior may accompany the hero action when it is grounded—for example a brief ice-cream rotation with verified toppings falling in one clean arc." : "Derive each scene's visual device from the offer's real behavior."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "For clothing or wearable products, a model may wear the exact referenced item, but use one simple pose, step, turn, or fabric movement and no outfit transformation. For apps/websites, only depict supplied interface references; otherwise showcase a physical device silhouette with the screen reserved for compositing or show the real-world outcome." : "Match the execution lane to available references."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "The final scene's caption and voiceover must include one concise, brand-appropriate call to action. Keep it source-safe and inside the scene's spoken-word budget; do not add pricing, availability, or guarantees without evidence." : "Keep the final audience action clear and source-safe."}
 - The storyboard must clearly execute the selected concept's strategy, narrative arc, and visual style.
@@ -1159,6 +1182,7 @@ Requirements:
 - complexionOrHeritageAnchor is optional. For FICTIONAL_CAST, it may use a neutral skin-tone or broad ethnic-appearance description when useful for clear, inclusive casting. For REFERENCE_BACKED people, describe visible complexion only and never infer ethnicity from a name, job, website, or location. Never connect ethnicity or physical traits to personality, ability, social status, or stereotyped behavior.
 - Preserve each recurring person's face geometry, complexion, hair, build, age band, wardrobe anchor, and distinguishing feature unchanged across anchors. A scene-only supporting person must remain distinct within that shot but must not silently replace a recurring role later.
 - Set continuityMode on every scene: CONTINUOUS for a seamless handoff, MATCH_CUT when the composition/action intentionally bridges from the prior scene, or INTENTIONAL_CHANGE only when the plot requires a different character, location, time, or visual world.
+- Set transitionStyle on every scene using CUT, FADE, SLIDE, WIPE, IRIS, or CLOCK_WIPE. Scene 1 must use CUT. MATCH_CUT must use CUT. Use FADE only for a soft tonal continuation; SLIDE or WIPE only when screen direction, packaging geometry, or a foreground pass motivates it; IRIS or CLOCK_WIPE only for centered circular products/forms or a deliberately theatrical hero reveal. Prefer CUT whenever an effect would distract, and avoid repeating a conspicuous effect.
 - shotPrompt is the only creative direction sent to video generation. It must be exactly one substantive sentence of 14 to 60 words: begin with a specific mood/emotional anchor, identify the focal subject, describe a visible story beat, and specify exactly one camera behavior.
 - Use only one reliable camera behavior per shot: fixed camera, slow push-in, slow pull-back, gentle product orbit, or handheld follow. Never combine pan, tilt, zoom, dolly, orbit, rack focus, or handheld movement in one scene.
 - Keep every scene single-shot. Do not describe cuts, montages, transformations, multiple locations, dialogue, lip-sync, or a checklist of actions inside shotPrompt.
@@ -1182,6 +1206,10 @@ Requirements:
 - Prompts must keep product and character identity stable and respect the locked brand style unless INTENTIONAL_CHANGE explicitly justifies the difference.
 - Use the brand palette colors and visual motifs in scene descriptions.
 - The final scene must resolve with a clear brand-value payoff and preserve calm negative space in the upper-left safe area for Reel AI's composited brand lockup. When an uploaded logo is available, the renderer places that exact asset over the final scene; never ask the image or video model to redraw it.
+- Only the final scene caption is composited into the rendered reel as the closer or call to action; earlier captionText values are editorial labels and must not duplicate narration or be designed as on-screen typography.
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Generated source clips must be silent: do not describe dialogue, music, sound effects, ambience, or auto-dubbing. Narration is created separately and is the only Product Showcase audio layer." : "Do not ask source-video generation for dialogue or lip-sync; narration and optional music are composed separately."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Set bgm.enabled to false. Product Showcase uses scene narration as its only final audio layer." : "Choose bgm only when it adds real pacing value; narration remains primary."}
+- ${buildCinematicBoostInstruction(project.cinematicBoost)}
 - Match the ${project.style === "THREE_D_ANIMATION" ? "3D animation" : "realistic"} visual style.
 - Do not create unsupported performance, medical, financial, or legal claims.
 - ${buildGroundingInstructions(grounding)}

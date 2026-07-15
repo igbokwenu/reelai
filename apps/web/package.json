@@ -23,6 +23,7 @@
     "@remotion/bundler": "^4.0.394",
     "@remotion/media": "4.0.484",
     "@remotion/renderer": "^4.0.394",
+    "@remotion/transitions": "4.0.484",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.23.0",

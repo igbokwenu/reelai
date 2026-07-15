@@ -1,9 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Captions, Clock3, Film, type LucideIcon } from "lucide-react";
+import { Captions, Clock3, Film, Shuffle, type LucideIcon } from "lucide-react";
 
 export type ContinuityMode = "CONTINUOUS" | "MATCH_CUT" | "INTENTIONAL_CHANGE";
+export type TransitionStyle =
+  "CUT" | "FADE" | "SLIDE" | "WIPE" | "IRIS" | "CLOCK_WIPE";
 
 export type EditableScene = {
   id: string;
@@ -14,6 +16,7 @@ export type EditableScene = {
   shotPrompt: string;
   continuityNotes: string;
   continuityMode: ContinuityMode;
+  transitionStyle: TransitionStyle;
   status?: string;
   selectedKeyframeTakeId?: string | null;
   takes?: Array<{
@@ -27,9 +30,11 @@ export type EditableScene = {
 
 export function SceneInspector({
   scene,
+  isLastScene,
   onChange,
 }: {
   scene: EditableScene | null;
+  isLastScene: boolean;
   onChange: (scene: EditableScene) => void;
 }) {
   if (!scene) {
@@ -74,7 +79,13 @@ export function SceneInspector({
       <div className="grid gap-5 p-4">
         <section className="grid gap-3">
           <SectionLabel icon={Captions} label="Story & sound" />
-          <Field label="On-screen caption">
+          <Field
+            label={
+              isLastScene
+                ? "Final closer / call to action"
+                : "Editorial scene label (not rendered)"
+            }
+          >
             <textarea
               className="min-h-20 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
               maxLength={140}
@@ -84,6 +95,11 @@ export function SceneInspector({
               }
             />
             <Counter current={scene.captionText.length} max={140} />
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              {isLastScene
+                ? "This is the reel's only text overlay. Keep it concise and complementary to the narration."
+                : "Used to organize the storyboard. Earlier scenes stay visually clean and rely on narration."}
+            </p>
           </Field>
           <Field label="Voiceover">
             <textarea
@@ -117,6 +133,36 @@ export function SceneInspector({
             <p className="text-[11px] leading-5 text-muted-foreground">
               Mood first · one focal action arc · optional simple supporting
               motion · one camera behavior · 14–60 words.
+            </p>
+          </Field>
+        </section>
+
+        <section className="grid gap-3 border-t border-border pt-5">
+          <SectionLabel icon={Shuffle} label="Scene handoff" />
+          <Field label="Transition into this scene">
+            <select
+              className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-55"
+              disabled={
+                scene.index === 1 || scene.continuityMode === "MATCH_CUT"
+              }
+              value={scene.transitionStyle}
+              onChange={(event) =>
+                onChange({
+                  ...scene,
+                  transitionStyle: event.target.value as TransitionStyle,
+                })
+              }
+            >
+              <option value="CUT">Clean cut</option>
+              <option value="FADE">Soft fade</option>
+              <option value="SLIDE">Directional slide</option>
+              <option value="WIPE">Editorial wipe</option>
+              <option value="IRIS">Hero iris</option>
+              <option value="CLOCK_WIPE">Circular clock wipe</option>
+            </select>
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              Reel AI chooses a restrained handoff that supports the product,
+              motion, and continuity. Match cuts stay effect-free.
             </p>
           </Field>
         </section>

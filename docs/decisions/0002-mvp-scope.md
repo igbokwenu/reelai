@@ -22,7 +22,7 @@ The MVP ships:
 - Image-to-video generation for 2 to 4 scenes.
 - Qwen TTS narration.
 - 9:16 Remotion final render.
-- Safe-zone captions and optional AI disclosure.
+- One safe-zone final closer/CTA and optional AI disclosure.
 - Alibaba Cloud deployment proof.
 
 The MVP excludes:

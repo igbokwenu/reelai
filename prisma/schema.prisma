@@ -18,6 +18,7 @@ model Project {
   outputMode          VideoOutputMode @default(STANDARD)
   status              ProjectStatus   @default(DRAFT)
   autoMode            Boolean         @default(true)
+  cinematicBoost      Boolean         @default(false)
   brandKitConfirmedAt DateTime?
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
@@ -146,23 +147,24 @@ model Storyboard {
 }
 
 model Scene {
-  id                     String         @id @default(cuid())
+  id                     String          @id @default(cuid())
   storyboardId           String
   index                  Int
   durationSec            Int
   captionText            String
   voiceoverText          String
   shotPrompt             String
-  continuityNotes        String         @default("")
-  continuityMode         ContinuityMode @default(CONTINUOUS)
+  continuityNotes        String          @default("")
+  continuityMode         ContinuityMode  @default(CONTINUOUS)
+  transitionStyle        TransitionStyle @default(CUT)
   lockedStyleLanguage    String
-  safeZonePreset         SafeZonePreset @default(TIKTOK_REELS)
-  status                 SceneStatus    @default(DRAFT)
+  safeZonePreset         SafeZonePreset  @default(TIKTOK_REELS)
+  status                 SceneStatus     @default(DRAFT)
   selectedKeyframeTakeId String?
   selectedVideoTakeId    String?
   narrationArtifactId    String?
-  createdAt              DateTime       @default(now())
-  updatedAt              DateTime       @updatedAt
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
 
   storyboard Storyboard @relation(fields: [storyboardId], references: [id], onDelete: Cascade)
   takes      Take[]
@@ -285,6 +287,15 @@ enum ContinuityMode {
   CONTINUOUS
   MATCH_CUT
   INTENTIONAL_CHANGE
+}
+
+enum TransitionStyle {
+  CUT
+  FADE
+  SLIDE
+  WIPE
+  IRIS
+  CLOCK_WIPE
 }
 
 enum TakeKind {

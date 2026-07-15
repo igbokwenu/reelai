@@ -26,6 +26,9 @@ export function buildVideoSubmissionBody({
       parameters: {
         duration,
         resolution,
+        // wan2.7-i2v only receives audio when driving audio is explicitly
+        // supplied. Omit it so source clips stay silent; narration is mixed
+        // later in Remotion.
         // Keep the approved anchor exact; production intentionally omits a
         // last_frame so the clip can exit with natural motion.
         prompt_extend: false,

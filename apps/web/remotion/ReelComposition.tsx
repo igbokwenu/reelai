@@ -2,6 +2,16 @@
 
 import { Video } from "@remotion/media";
 import {
+  linearTiming,
+  TransitionSeries,
+  type TransitionPresentation,
+} from "@remotion/transitions";
+import { clockWipe } from "@remotion/transitions/clock-wipe";
+import { fade } from "@remotion/transitions/fade";
+import { iris } from "@remotion/transitions/iris";
+import { slide } from "@remotion/transitions/slide";
+import { wipe } from "@remotion/transitions/wipe";
+import {
   AbsoluteFill,
   Audio,
   interpolate,
@@ -17,56 +27,76 @@ import {
   getBgmVolume,
   getBrandWatermarkWindow,
   getSceneNarrationWindow,
+  getTransitionDurationFrames,
   NARRATION_MIX_VOLUME,
 } from "./schema";
 
 export function ReelComposition(input: ReelCompositionInput) {
   const { fps } = useVideoConfig();
   const brandWindow = getBrandWatermarkWindow(input, fps);
+  const sceneLayers = input.scenes.flatMap((scene, index) => {
+    const transitionDurationInFrames =
+      index === 0 ? 0 : getTransitionDurationFrames(scene, fps);
+    const sceneDurationInFrames = Math.max(
+      1,
+      Math.round(scene.durationSec * fps),
+    );
+    const sequenceDurationInFrames =
+      sceneDurationInFrames + transitionDurationInFrames;
+    const narrationWindow = getSceneNarrationWindow(scene, fps);
+    const layers = [];
+
+    if (transitionDurationInFrames > 0) {
+      layers.push(
+        <TransitionSeries.Transition
+          key={`transition-${index}`}
+          presentation={transitionPresentation(scene.transitionStyle)}
+          timing={linearTiming({
+            durationInFrames: transitionDurationInFrames,
+          })}
+        />,
+      );
+    }
+
+    layers.push(
+      <TransitionSeries.Sequence
+        durationInFrames={sequenceDurationInFrames}
+        key={`${scene.videoUrl}-${index}`}
+      >
+        <SceneLayer
+          caption={scene.captionText}
+          contentStartFrame={transitionDurationInFrames}
+          playbackRate={sceneDurationInFrames / sequenceDurationInFrames}
+          scene={scene}
+          safeZonePreset={input.safeZonePreset}
+          showCaption={index === input.scenes.length - 1}
+        />
+        {scene.narration && narrationWindow ? (
+          <Sequence
+            durationInFrames={narrationWindow.durationInFrames}
+            from={
+              transitionDurationInFrames +
+              Math.max(0, Math.round(scene.narration.offsetSec * fps))
+            }
+          >
+            <Audio
+              playbackRate={scene.narration.playbackRate}
+              src={scene.narration.audioUrl}
+              volume={(frame) =>
+                narrationEnvelope(frame, narrationWindow.durationInFrames, fps)
+              }
+            />
+          </Sequence>
+        ) : null}
+      </TransitionSeries.Sequence>,
+    );
+
+    return layers;
+  });
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#080b10" }}>
-      {input.scenes.map((scene, index) => {
-        const from = Math.round(scene.startTimeSec * fps);
-        const durationInFrames = Math.max(
-          1,
-          Math.round(scene.durationSec * fps),
-        );
-
-        const narrationWindow = getSceneNarrationWindow(scene, fps);
-
-        return (
-          <Sequence
-            durationInFrames={durationInFrames}
-            from={from}
-            key={`${scene.videoUrl}-${index}`}
-          >
-            <SceneLayer
-              caption={scene.captionText}
-              scene={scene}
-              safeZonePreset={input.safeZonePreset}
-            />
-            {scene.narration && narrationWindow ? (
-              <Sequence
-                durationInFrames={narrationWindow.durationInFrames}
-                from={Math.max(0, narrationWindow.from - from)}
-              >
-                <Audio
-                  playbackRate={scene.narration.playbackRate}
-                  src={scene.narration.audioUrl}
-                  volume={(frame) =>
-                    narrationEnvelope(
-                      frame,
-                      narrationWindow.durationInFrames,
-                      fps,
-                    )
-                  }
-                />
-              </Sequence>
-            ) : null}
-          </Sequence>
-        );
-      })}
+      <TransitionSeries>{sceneLayers}</TransitionSeries>
 
       {input.narrationUrl ? <Audio src={input.narrationUrl} /> : null}
       {input.bgmUrl ? <BgmLayer input={input} /> : null}
@@ -111,12 +141,19 @@ function SceneLayer({
   scene,
   caption,
   safeZonePreset,
+  showCaption,
+  contentStartFrame,
+  playbackRate,
 }: {
   scene: ReelCompositionInput["scenes"][number];
   caption: string;
   safeZonePreset: ReelCompositionInput["safeZonePreset"];
+  showCaption: boolean;
+  contentStartFrame: number;
+  playbackRate: number;
 }) {
-  const frame = useCurrentFrame();
+  const currentFrame = useCurrentFrame();
+  const frame = Math.max(0, currentFrame - contentStartFrame);
   const { fps } = useVideoConfig();
   const scale = spring({
     frame,
@@ -131,20 +168,27 @@ function SceneLayer({
         delayRenderTimeoutInMilliseconds={120_000}
         muted
         objectFit="cover"
+        playbackRate={playbackRate}
         src={scene.videoUrl}
         style={{
           height: "100%",
           width: "100%",
         }}
       />
-      <div
-        style={{
-          ...captionStyle(safeZonePreset),
-          transform: `translateX(-50%) scale(${0.96 + scale * 0.04})`,
-        }}
-      >
-        {caption}
-      </div>
+      {showCaption && currentFrame >= contentStartFrame ? (
+        <div
+          style={{
+            ...captionStyle(safeZonePreset),
+            opacity: interpolate(frame, [0, Math.max(1, fps * 0.24)], [0, 1], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            }),
+            transform: `translateX(-50%) scale(${0.96 + scale * 0.04})`,
+          }}
+        >
+          {caption}
+        </div>
+      ) : null}
     </AbsoluteFill>
   );
 }
@@ -197,18 +241,51 @@ function BrandWatermark({
           src={watermark.logoUrl}
           style={{
             borderRadius: 8,
-            height: 58,
-            maxWidth: 240,
+            height: 174,
+            maxWidth: 720,
             objectFit: "contain",
             width: "auto",
           }}
         />
       ) : null}
-      {watermark.text ? (
+      {!watermark.logoUrl && watermark.text ? (
         <span style={{ maxWidth: 420 }}>{watermark.text}</span>
       ) : null}
     </div>
   );
+}
+
+function transitionPresentation(
+  style: ReelCompositionInput["scenes"][number]["transitionStyle"],
+): TransitionPresentation<Record<string, unknown>> {
+  switch (style) {
+    case "FADE":
+      return fade({
+        shouldFadeOutExitingScene: true,
+      }) as unknown as TransitionPresentation<Record<string, unknown>>;
+    case "SLIDE":
+      return slide({
+        direction: "from-right",
+      }) as unknown as TransitionPresentation<Record<string, unknown>>;
+    case "WIPE":
+      return wipe({
+        direction: "from-left",
+      }) as unknown as TransitionPresentation<Record<string, unknown>>;
+    case "IRIS":
+      return iris({
+        width: 1080,
+        height: 1920,
+      }) as unknown as TransitionPresentation<Record<string, unknown>>;
+    case "CLOCK_WIPE":
+      return clockWipe({
+        width: 1080,
+        height: 1920,
+      }) as unknown as TransitionPresentation<Record<string, unknown>>;
+    default:
+      return fade({
+        shouldFadeOutExitingScene: true,
+      }) as unknown as TransitionPresentation<Record<string, unknown>>;
+  }
 }
 
 function Disclosure() {

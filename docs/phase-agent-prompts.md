@@ -327,7 +327,7 @@ If all exit checklist items pass, update Phase 5 `Implementation done` to `[x]` 
 
 You are implementing Phase 6 of Reel AI. First follow the Universal Agent Instructions above. Read `docs/implementation-guide.md`, the Remotion media pipeline section, and the installed qwencloud-audio-tts skill. This phase must produce a complete downloadable reel.
 
-Goal: turn selected scene clips into one complete 9:16 MP4 with narration, captions, safe zones, optional BGM, and optional AI disclosure.
+Goal: turn selected scene clips into one complete 9:16 MP4 with narration, one final-scene closer/CTA, purposeful scene transitions, safe zones, optional standard-reel BGM, and optional AI disclosure.
 
 Build exactly Phase 6:
 

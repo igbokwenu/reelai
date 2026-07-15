@@ -490,11 +490,49 @@ describe("Phase 4 agent schemas", () => {
     expect(scenes.items.properties.shotPrompt.maxLength).toBe(480);
     expect(scenes.items.properties.shotPrompt.pattern).toBeDefined();
     expect(scenes.items.required).toContain("continuityMode");
+    expect(scenes.items.required).toContain("transitionStyle");
+    expect(scenes.items.properties.transitionStyle.enum).toEqual([
+      "CUT",
+      "FADE",
+      "SLIDE",
+      "WIPE",
+      "IRIS",
+      "CLOCK_WIPE",
+    ]);
     expect(scenes.items.properties.continuityNotes.minLength).toBe(6);
     expect(storyboardJsonSchema.required).toContain("continuityBible");
     expect(storyboardJsonSchema.properties.continuityBible.required).toContain(
       "cast",
     );
+  });
+
+  it("keeps match cuts clean while allowing motivated product transitions", () => {
+    const scene = {
+      index: 2,
+      durationSec: 8,
+      captionText: "Taste the finish",
+      voiceoverText: "A final detail worth slowing down for.",
+      shotPrompt:
+        "Quiet anticipation: the ice-cream turns through falling verified toppings while the fixed camera holds its crisp silhouette.",
+      continuityNotes:
+        "Keep the same ice-cream shape, topping colors, centered scale, and cool side light.",
+      continuityMode: "CONTINUOUS" as const,
+      transitionStyle: "IRIS" as const,
+    };
+
+    expect(storyboardSceneSchema.safeParse(scene).success).toBe(true);
+    expect(
+      storyboardSceneSchema.safeParse({
+        ...scene,
+        continuityMode: "MATCH_CUT",
+      }).success,
+    ).toBe(false);
+    expect(
+      storyboardSceneSchema.safeParse({
+        ...scene,
+        index: 1,
+      }).success,
+    ).toBe(false);
   });
 
   it("requires unique cast identities without forcing people into every ad", () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Aperture,
   AlertTriangle,
   ArrowRight,
   Check,
@@ -66,6 +67,7 @@ export function ConceptTable({
   latestConceptJob,
   sources,
   autoMode: initialAutoMode,
+  cinematicBoost: initialCinematicBoost,
   brandKitConfirmedAt,
   businessName,
   websiteUrl,
@@ -77,6 +79,7 @@ export function ConceptTable({
   latestConceptJob: Job | null;
   sources: Source[];
   autoMode: boolean;
+  cinematicBoost: boolean;
   brandKitConfirmedAt: Date | string | null;
   businessName: string;
   websiteUrl: string | null;
@@ -95,6 +98,8 @@ export function ConceptTable({
     Boolean(brandKitConfirmedAt),
   );
   const [autoMode, setAutoMode] = useState(initialAutoMode);
+  const [cinematicBoost, setCinematicBoost] = useState(initialCinematicBoost);
+  const [isSavingBoost, setIsSavingBoost] = useState(false);
   const [isProceeding, setIsProceeding] = useState(false);
   const [error, setError] = useState<string | null>(
     latestConceptJob?.error ?? null,
@@ -164,6 +169,31 @@ export function ConceptTable({
 
     if (data.job.status === "FAILED") {
       setError(data.job.error ?? "Creative concept generation failed.");
+    }
+
+    router.refresh();
+  }
+
+  async function updateCinematicBoost(enabled: boolean) {
+    const previous = cinematicBoost;
+    setCinematicBoost(enabled);
+    setIsSavingBoost(true);
+    setError(null);
+
+    const response = await fetch(`/api/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cinematicBoost: enabled }),
+    });
+    const data = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    };
+    setIsSavingBoost(false);
+
+    if (!response.ok) {
+      setCinematicBoost(previous);
+      setError(data.error ?? "Cinematic Boost could not be saved.");
+      return;
     }
 
     router.refresh();
@@ -265,7 +295,11 @@ export function ConceptTable({
         </div>
         <Button
           disabled={
-            !hasBrandKit || isStarting || isRunning || regeneratingId !== null
+            !hasBrandKit ||
+            isStarting ||
+            isRunning ||
+            isSavingBoost ||
+            regeneratingId !== null
           }
           onClick={generateConcepts}
           size="sm"
@@ -286,6 +320,56 @@ export function ConceptTable({
             : "Generate 3 Concepts"}
         </Button>
       </div>
+
+      <label
+        className={`group relative flex cursor-pointer items-start justify-between gap-5 overflow-hidden rounded-2xl border p-4 transition-all sm:p-5 ${
+          cinematicBoost
+            ? "border-primary/35 bg-[radial-gradient(circle_at_top_left,rgba(183,255,60,0.16),transparent_44%),linear-gradient(135deg,rgba(183,255,60,0.07),rgba(255,255,255,0.015))] shadow-[0_18px_50px_rgba(0,0,0,0.18)]"
+            : "border-border bg-background/45 hover:border-primary/20"
+        }`}
+      >
+        <span className="flex min-w-0 gap-3.5">
+          <span
+            className={`flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+              cinematicBoost
+                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/15"
+                : "bg-muted text-muted-foreground"
+            }`}
+          >
+            <Aperture className="size-5" aria-hidden="true" />
+          </span>
+          <span>
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold">Cinematic Boost</span>
+              <span className="rounded-full border border-primary/20 bg-primary/[0.08] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-primary">
+                {isSavingBoost
+                  ? "Saving…"
+                  : cinematicBoost
+                    ? "Boost saved"
+                    : "Creative intensity"}
+              </span>
+            </span>
+            <span className="mt-1.5 block max-w-2xl text-xs leading-5 text-muted-foreground">
+              Push the next concepts and every downstream shot toward bolder
+              lighting, more surprising but physically credible motion, and
+              expressive scene transitions—while keeping product and brand
+              details exact.
+            </span>
+          </span>
+        </span>
+        <span className="relative mt-1 shrink-0">
+          <input
+            aria-label="Enable Cinematic Boost"
+            checked={cinematicBoost}
+            className="peer absolute inset-0 z-10 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+            disabled={isSavingBoost || isRunning || isStarting}
+            onChange={(event) => updateCinematicBoost(event.target.checked)}
+            type="checkbox"
+          />
+          <span className="pointer-events-none block h-7 w-12 rounded-full bg-muted ring-1 ring-border transition-colors peer-checked:bg-primary peer-disabled:opacity-60" />
+          <span className="pointer-events-none absolute left-1 top-1 size-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-primary-foreground" />
+        </span>
+      </label>
 
       {job ? (
         <div className="grid gap-2 rounded-md border border-border bg-background/60 p-3 text-sm md:grid-cols-3">
@@ -350,7 +434,9 @@ export function ConceptTable({
             </span>
             <div>
               <p className="text-sm font-medium">
-                {brandConfirmed ? "Ready to build this direction" : "One final grounding check"}
+                {brandConfirmed
+                  ? "Ready to build this direction"
+                  : "One final grounding check"}
               </p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 {brandConfirmed
@@ -375,7 +461,11 @@ export function ConceptTable({
             ) : null}
             <Button
               disabled={isProceeding}
-              onClick={brandConfirmed ? proceedFromBrandHandoff : () => setShowBrandHandoff(true)}
+              onClick={
+                brandConfirmed
+                  ? proceedFromBrandHandoff
+                  : () => setShowBrandHandoff(true)
+              }
               size="sm"
             >
               {isProceeding ? (
@@ -503,18 +593,25 @@ function BrandKitHandoff({
           <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
             Ready for production
           </p>
-          <h2 className="mt-2 max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl" id="brand-handoff-title">
+          <h2
+            className="mt-2 max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl"
+            id="brand-handoff-title"
+          >
             Your brand, carried through every scene
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Reel AI will use these verified {businessName} materials to guide visual continuity, product details, colors, and the final brand lockup. You can add more before any production spend begins.
+            Reel AI will use these verified {businessName} materials to guide
+            visual continuity, product details, colors, and the final brand
+            lockup. You can add more before any production spend begins.
           </p>
         </div>
 
         <div className="grid gap-5 p-5 sm:p-7">
           <div className="grid gap-3 sm:grid-cols-2">
             <AssetSummary
-              detail={websiteSources[0]?.url ?? websiteUrl ?? "No website provided"}
+              detail={
+                websiteSources[0]?.url ?? websiteUrl ?? "No website provided"
+              }
               icon={Globe2}
               label="Website evidence"
               ready={Boolean(websiteSources.length || websiteUrl)}
@@ -546,11 +643,18 @@ function BrandKitHandoff({
             </div>
           ) : (
             <div className="flex gap-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.055] p-4 text-sm">
-              <PackageOpen className="mt-0.5 size-4 shrink-0 text-amber-200" aria-hidden="true" />
+              <PackageOpen
+                className="mt-0.5 size-4 shrink-0 text-amber-200"
+                aria-hidden="true"
+              />
               <div>
-                <p className="font-medium text-amber-100">Website-only visuals</p>
+                <p className="font-medium text-amber-100">
+                  Website-only visuals
+                </p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  Reel AI can proceed with safe, unbranded lifestyle imagery. Add a logo or product image now for more exact brand continuity and a visual end-card mark.
+                  Reel AI can proceed with safe, unbranded lifestyle imagery.
+                  Add a logo or product image now for more exact brand
+                  continuity and a visual end-card mark.
                 </p>
               </div>
             </div>
@@ -564,7 +668,9 @@ function BrandKitHandoff({
               <span>
                 <span className="block text-sm font-medium">Auto mode</span>
                 <span className="mt-1 block max-w-lg text-xs leading-5 text-muted-foreground">
-                  Continue from storyboard through scene anchors, clips, narration, and final render automatically. You can review or regenerate every part afterward.
+                  Continue from storyboard through scene anchors, clips,
+                  narration, and final render automatically. You can review or
+                  regenerate every part afterward.
                 </span>
               </span>
             </span>
@@ -582,13 +688,20 @@ function BrandKitHandoff({
 
           {error ? (
             <div className="flex gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <AlertTriangle
+                className="mt-0.5 size-4 shrink-0"
+                aria-hidden="true"
+              />
               <span>{error}</span>
             </div>
           ) : null}
 
           <div className="flex flex-col-reverse gap-2 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <Button disabled={isProceeding} onClick={onUpdateBrand} variant="outline">
+            <Button
+              disabled={isProceeding}
+              onClick={onUpdateBrand}
+              variant="outline"
+            >
               <Palette className="size-4" aria-hidden="true" />
               Add brand material
             </Button>
@@ -626,7 +739,9 @@ function AssetSummary({
         <span className="flex size-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
           <Icon className="size-4" aria-hidden="true" />
         </span>
-        <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${ready ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+        <span
+          className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${ready ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}
+        >
           {ready ? "Ready" : "Optional"}
         </span>
       </div>
@@ -648,7 +763,10 @@ function assetBreakdown(sources: Source[]) {
 }
 
 function sourceName(source: Source) {
-  const metadata = source.metadata as { originalName?: unknown; label?: unknown } | null;
+  const metadata = source.metadata as {
+    originalName?: unknown;
+    label?: unknown;
+  } | null;
   const value = metadata?.originalName ?? metadata?.label;
   return typeof value === "string" ? value : null;
 }
