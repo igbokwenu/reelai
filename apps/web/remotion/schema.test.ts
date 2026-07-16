@@ -130,6 +130,11 @@ describe("scene narration timing", () => {
     expect(getBgmVolume(input, 60, 30)).toBe(BGM_DUCKED_VOLUME);
     expect(getBgmVolume(input, 170, 30)).toBe(BGM_BASE_VOLUME);
   });
+
+  it("fades the music bed at both reel edges", () => {
+    expect(getBgmVolume(input, 0, 30)).toBe(0);
+    expect(getBgmVolume(input, getReelDurationFrames(input) - 1, 30)).toBe(0);
+  });
 });
 
 describe("scene transition timing", () => {

@@ -18,7 +18,6 @@ import {
   interpolate,
   Sequence,
   spring,
-  staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
@@ -120,7 +119,9 @@ function BgmLayer({ input }: { input: ReelCompositionInput }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  return <Audio src={input.bgmUrl!} volume={getBgmVolume(input, frame, fps)} />;
+  return (
+    <Audio loop src={input.bgmUrl!} volume={getBgmVolume(input, frame, fps)} />
+  );
 }
 
 function narrationEnvelope(frame: number, duration: number, fps: number) {
@@ -411,8 +412,4 @@ function captionPositionStyle(
     transform: "translateX(-50%)",
     width: 900,
   };
-}
-
-export function SampleBgmAudio() {
-  return staticFile("sample-bgm.mp3");
 }

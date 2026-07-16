@@ -16,6 +16,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  BGM_TRACKS,
+  getBgmTrack,
+  selectBgmTrack,
+  type BgmTrackSelection,
+} from "@/lib/bgm/catalog";
 import { isStoryboardTimingValid } from "@/lib/storyboards/timing";
 
 type Artifact = {
@@ -54,7 +60,9 @@ type Scene = {
 type Storyboard = {
   id: string;
   status: string;
+  bgmPrompt: string | null;
   bgmEnabled: boolean;
+  bgmTrackId: string | null;
   scenes: Scene[];
 };
 
@@ -94,7 +102,11 @@ export function FinalVideoPlayer({
   const [renderJob, setRenderJob] = useState<Job | null>(latestRenderJob);
   const [starting, setStarting] = useState<"narration" | "render" | null>(null);
   const [aiDisclosureEnabled, setAiDisclosureEnabled] = useState(true);
-  const [bgmEnabled, setBgmEnabled] = useState(false);
+  const [bgmEnabled, setBgmEnabled] = useState(
+    outputMode === "STANDARD" && Boolean(storyboard?.bgmEnabled),
+  );
+  const [bgmTrackSelection, setBgmTrackSelection] =
+    useState<BgmTrackSelection>("AUTO");
   const [error, setError] = useState<string | null>(
     latestNarrationJob?.error ?? latestRenderJob?.error ?? null,
   );
@@ -110,6 +122,18 @@ export function FinalVideoPlayer({
       findSceneNarrations(artifacts, narrationJob, storyboard?.scenes ?? []),
     [artifacts, narrationJob, storyboard?.scenes],
   );
+  const aiSelectedBgmTrack = useMemo(
+    () =>
+      selectBgmTrack({
+        preferredTrackId: storyboard?.bgmTrackId,
+        creativeText: storyboard?.bgmPrompt,
+      }),
+    [storyboard?.bgmPrompt, storyboard?.bgmTrackId],
+  );
+  const activeBgmTrack =
+    bgmTrackSelection === "AUTO"
+      ? aiSelectedBgmTrack
+      : getBgmTrack(bgmTrackSelection);
   const completeRender =
     renders.find(
       (render) => render.status === "COMPLETE" && render.artifactId,
@@ -205,7 +229,11 @@ export function FinalVideoPlayer({
     setError(null);
 
     const response = await fetch(`/api/projects/${projectId}/render`, {
-      body: JSON.stringify({ aiDisclosureEnabled, bgmEnabled }),
+      body: JSON.stringify({
+        aiDisclosureEnabled,
+        bgmEnabled,
+        bgmTrackId: bgmTrackSelection,
+      }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
@@ -297,7 +325,7 @@ export function FinalVideoPlayer({
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="rounded-md border border-border bg-background/50 p-4">
           <div className="mb-3 flex items-center gap-2 text-sm font-medium">
             <Volume2 className="size-4 text-primary" aria-hidden="true" />
@@ -364,7 +392,7 @@ export function FinalVideoPlayer({
           )}
         </div>
 
-        <div className="grid gap-3 rounded-md border border-border bg-background/50 p-4 text-sm">
+        <div className="grid content-start gap-3 rounded-xl border border-border bg-background/50 p-4 text-sm">
           <label className="flex items-center gap-3">
             <input
               checked={aiDisclosureEnabled}
@@ -389,9 +417,61 @@ export function FinalVideoPlayer({
               <Music2 className="size-4 text-primary" aria-hidden="true" />
               {outputMode === "PRODUCT_SHOWCASE"
                 ? "Voiceover-only audio"
-                : "Include built-in sample BGM"}
+                : "Include background music"}
             </span>
           </label>
+          {outputMode === "STANDARD" && bgmEnabled ? (
+            <div
+              className={`overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br ${activeBgmTrack.color} p-3.5`}
+            >
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold">{activeBgmTrack.name}</p>
+                  <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                    {activeBgmTrack.shortDescription}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full border border-primary/20 bg-background/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
+                  {bgmTrackSelection === "AUTO" ? "AI match" : "Manual"}
+                </span>
+              </div>
+              <label className="grid gap-1.5">
+                <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  Soundtrack
+                </span>
+                <select
+                  aria-label="Background music soundtrack"
+                  className="w-full rounded-lg border border-border bg-background/85 px-3 py-2.5 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
+                  onChange={(event) =>
+                    setBgmTrackSelection(
+                      event.target.value as BgmTrackSelection,
+                    )
+                  }
+                  value={bgmTrackSelection}
+                >
+                  <option value="AUTO">
+                    AI match · {aiSelectedBgmTrack.name}
+                  </option>
+                  {BGM_TRACKS.map((track) => (
+                    <option key={track.id} value={track.id}>
+                      {track.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <audio
+                className="mt-3 h-9 w-full"
+                controls
+                key={activeBgmTrack.id}
+                preload="metadata"
+                src={activeBgmTrack.assetPath}
+              />
+              <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
+                Best for {activeBgmTrack.bestFor}. Narration is automatically
+                kept in front of the mix.
+              </p>
+            </div>
+          ) : null}
           <div className="flex items-start gap-2 rounded-md border border-border p-3 text-muted-foreground">
             <Captions
               className="mt-0.5 size-4 shrink-0 text-primary"
@@ -400,7 +480,7 @@ export function FinalVideoPlayer({
             <span>
               {outputMode === "PRODUCT_SHOWCASE"
                 ? "Product source clips are kept silent and muted during composition; scene narration supplies the final audio."
-                : "The BGM option uses a stored neutral sample bed; it does not require generated music."}
+                : "AI Match follows the storyboard mood; you can preview or override it before rendering. Music loops cleanly, fades at the reel edges, and ducks under every narration scene."}
             </span>
           </div>
         </div>

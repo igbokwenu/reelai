@@ -339,12 +339,15 @@ Source: https://docs.qwencloud.com/developer-guides/speech/tts
 
 ### Background Music
 
-QwenCloud video models can generate or accept audio in several video paths, but for controllable hackathon scope, treat BGM as a separate media layer:
+Qwen audio models cover speech rather than dedicated music generation. Alibaba Model Studio separately offers the limited-preview, Beijing-only Fun-Music model, so the reliable international path is a curated media layer:
 
-- Store `bgm_enabled`, `bgm_preset`, and `bgm_prompt` on the project.
-- Presets: cinematic pulse, upbeat startup, luxury minimal, documentary tension, playful 3D, ambient tech, dramatic reveal.
-- MVP: let the user download without BGM or upload/select a sample loop.
-- Stretch: generate/obtain music externally, store in OSS, and mix it in the Remotion composition.
+- Persist `bgmEnabled`, `bgmPrompt`, and the exact curated `bgmTrackId` on the storyboard.
+- Use five broad beds: Warm Uplift, Clean Momentum, Bold Kinetic, Cinematic Wonder, and Calm Organic.
+- Let the storyboard agent choose, let the Final step preview/override, and keep Product Showcase narration-only.
+- Store the chosen public asset as a hash-versioned project artifact, then loop, edge-fade, and narration-duck it in Remotion.
+- Treat on-demand Fun-Music or another licensed provider as a future opt-in path, not a render-time dependency.
+
+See [background-music.md](background-music.md) for the asset contract and production prompts.
 
 Do not attempt lip sync for MVP. Narrative voiceover over generated visuals is the right scope. If later using avatar/dialogue, evaluate `wan2.7-r2v` or audio-sync features separately.
 

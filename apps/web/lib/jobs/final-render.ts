@@ -1,7 +1,17 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
 import type { Artifact, Prisma, Scene, Storyboard, Take } from "@prisma/client";
 
+import {
+  getBgmTrack,
+  selectBgmTrack,
+  type BgmTrack,
+  type BgmTrackSelection,
+} from "@/lib/bgm/catalog";
 import { researchWebsite } from "@/lib/brand/website-research";
 import { createStoredArtifact } from "@/lib/media/artifacts";
 import {
@@ -77,11 +87,13 @@ export async function createAndRunFinalRenderJob({
   artifactBaseUrl,
   aiDisclosureEnabled = true,
   bgmEnabled = false,
+  bgmTrackId = "AUTO",
 }: {
   projectId: string;
   artifactBaseUrl: string;
   aiDisclosureEnabled?: boolean;
   bgmEnabled?: boolean;
+  bgmTrackId?: BgmTrackSelection;
 }) {
   const projectAudioPolicy = await prisma.project.findUniqueOrThrow({
     where: { id: projectId },
@@ -100,6 +112,7 @@ export async function createAndRunFinalRenderJob({
     artifactBaseUrl,
     aiDisclosureEnabled,
     bgmEnabled: effectiveBgmEnabled,
+    bgmTrackId,
   });
   const render = await prisma.render.create({
     data: {
@@ -109,6 +122,16 @@ export async function createAndRunFinalRenderJob({
       settings: {
         aiDisclosureEnabled,
         bgmEnabled: effectiveBgmEnabled,
+        bgmSelectionMode: effectiveBgmEnabled
+          ? bgmTrackId === "AUTO"
+            ? "AUTO"
+            : "MANUAL"
+          : null,
+        bgmTrackId: effectiveBgmEnabled ? (input.bgmTrackId ?? null) : null,
+        bgmTrackName:
+          effectiveBgmEnabled && input.bgmTrackId
+            ? getBgmTrack(input.bgmTrackId).name
+            : null,
         sourceClipAudio: "MUTED",
         audioPolicy:
           projectAudioPolicy.outputMode === "PRODUCT_SHOWCASE"
@@ -151,6 +174,7 @@ export async function createAndRunFinalRenderJob({
         sceneIds: storyboard.scenes.map((scene) => scene.id),
         aiDisclosureEnabled,
         bgmEnabled: effectiveBgmEnabled,
+        bgmTrackId: effectiveBgmEnabled ? (input.bgmTrackId ?? null) : null,
         logoIncluded: Boolean(input.brandWatermark?.logoUrl),
       },
     },
@@ -519,6 +543,7 @@ async function buildReelCompositionInput({
   artifactBaseUrl,
   aiDisclosureEnabled,
   bgmEnabled,
+  bgmTrackId,
 }: {
   projectId: string;
   storyboard: StoryboardWithScenes;
@@ -526,6 +551,7 @@ async function buildReelCompositionInput({
   artifactBaseUrl: string;
   aiDisclosureEnabled: boolean;
   bgmEnabled: boolean;
+  bgmTrackId: BgmTrackSelection;
 }): Promise<ReelCompositionInput> {
   let startTimeSec = 0;
   const scenes = [];
@@ -595,7 +621,16 @@ async function buildReelCompositionInput({
   const verifiedWebsiteLogoUrl = uploadedLogoUrl
     ? null
     : await findVerifiedWebsiteLogoUrl(project.websiteUrl);
-  const bgm = bgmEnabled ? await getOrCreateSampleBgmArtifact(projectId) : null;
+  const selectedBgmTrack = bgmEnabled
+    ? selectBgmTrack({
+        preferredTrackId:
+          bgmTrackId === "AUTO" ? storyboard.bgmTrackId : bgmTrackId,
+        creativeText: `${storyboard.title} ${storyboard.script} ${storyboard.bgmPrompt ?? ""}`,
+      })
+    : null;
+  const bgm = selectedBgmTrack
+    ? await getOrCreateCuratedBgmArtifact(projectId, selectedBgmTrack)
+    : null;
 
   return {
     scenes,
@@ -603,6 +638,7 @@ async function buildReelCompositionInput({
       ? artifactUrl(narration.legacyArtifact, artifactBaseUrl)
       : undefined,
     bgmUrl: bgm ? artifactUrl(bgm, artifactBaseUrl) : undefined,
+    bgmTrackId: selectedBgmTrack?.id,
     brandWatermark:
       (uploadedLogoUrl ?? verifiedWebsiteLogoUrl)
         ? {
@@ -725,15 +761,42 @@ function artifactUrl(artifact: Artifact, artifactBaseUrl: string) {
   return `${artifactBaseUrl.replace(/\/$/, "")}/api/artifacts/${artifact.id}/file`;
 }
 
-async function getOrCreateSampleBgmArtifact(projectId: string) {
+async function getOrCreateCuratedBgmArtifact(
+  projectId: string,
+  track: BgmTrack,
+) {
+  const relativeAssetPath = track.assetPath.replace(/^\//, "");
+  const absoluteAssetPath = path.join(
+    process.cwd(),
+    "public",
+    relativeAssetPath,
+  );
+  let body: Buffer;
+
+  try {
+    body = await readFile(absoluteAssetPath);
+  } catch {
+    throw new Error(
+      `The ${track.name} BGM asset is missing at public/${relativeAssetPath}.`,
+    );
+  }
+
+  const assetSha256 = createHash("sha256").update(body).digest("hex");
   const existing = await prisma.artifact.findFirst({
     where: {
       projectId,
       type: "AUDIO",
-      metadata: {
-        path: ["operation"],
-        equals: "sample_bgm",
-      },
+      AND: [
+        {
+          metadata: { path: ["operation"], equals: "curated_bgm" },
+        },
+        {
+          metadata: { path: ["trackId"], equals: track.id },
+        },
+        {
+          metadata: { path: ["assetSha256"], equals: assetSha256 },
+        },
+      ],
     },
     orderBy: { createdAt: "desc" },
   });
@@ -744,54 +807,21 @@ async function getOrCreateSampleBgmArtifact(projectId: string) {
 
   return createStoredArtifact({
     projectId,
-    fileName: "sample-bgm.wav",
+    fileName: path.basename(relativeAssetPath),
     mimeType: "audio/wav",
     type: "AUDIO",
-    body: generateSampleBgmWav(),
-    durationSec: 30,
+    body,
+    durationSec: parseWav(body).durationSec,
     metadata: {
-      operation: "sample_bgm",
-      source: "generated_local_sample",
-      description: "Low-volume neutral tone bed for optional MVP BGM mixing.",
+      operation: "curated_bgm",
+      source: "public_asset_catalog",
+      trackId: track.id,
+      trackName: track.name,
+      assetPath: track.assetPath,
+      assetSha256,
+      description: track.shortDescription,
     },
   });
-}
-
-function generateSampleBgmWav() {
-  const sampleRate = 24000;
-  const durationSec = 30;
-  const samples = sampleRate * durationSec;
-  const data = Buffer.alloc(samples * 2);
-
-  for (let i = 0; i < samples; i += 1) {
-    const t = i / sampleRate;
-    const fade = Math.min(1, t / 1.5, (durationSec - t) / 1.5);
-    const tone =
-      Math.sin(2 * Math.PI * 110 * t) * 0.18 +
-      Math.sin(2 * Math.PI * 165 * t) * 0.08 +
-      Math.sin(2 * Math.PI * 220 * t) * 0.035;
-    data.writeInt16LE(
-      Math.trunc(Math.max(-1, Math.min(1, tone * fade)) * 0x7fff),
-      i * 2,
-    );
-  }
-
-  const wav = Buffer.alloc(44 + data.length);
-  wav.write("RIFF", 0);
-  wav.writeUInt32LE(36 + data.length, 4);
-  wav.write("WAVE", 8);
-  wav.write("fmt ", 12);
-  wav.writeUInt32LE(16, 16);
-  wav.writeUInt16LE(1, 20);
-  wav.writeUInt16LE(1, 22);
-  wav.writeUInt32LE(sampleRate, 24);
-  wav.writeUInt32LE(sampleRate * 2, 28);
-  wav.writeUInt16LE(2, 32);
-  wav.writeUInt16LE(16, 34);
-  wav.write("data", 36);
-  wav.writeUInt32LE(data.length, 40);
-  data.copy(wav, 44);
-  return wav;
 }
 
 function toJsonSafe(value: unknown): Prisma.InputJsonValue {

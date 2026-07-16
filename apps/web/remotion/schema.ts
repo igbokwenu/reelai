@@ -1,3 +1,5 @@
+import type { BgmTrackId } from "@/lib/bgm/catalog";
+
 export type ReelCompositionInput = {
   scenes: Array<{
     videoUrl: string;
@@ -14,6 +16,7 @@ export type ReelCompositionInput = {
   }>;
   narrationUrl?: string;
   bgmUrl?: string;
+  bgmTrackId?: BgmTrackId;
   brandWatermark?: {
     text?: string;
     logoUrl?: string;
@@ -140,6 +143,8 @@ export function getBgmVolume(
   fps = REEL_FPS,
 ) {
   const fadeFrames = Math.max(1, Math.round(fps * 0.12));
+  const edgeFadeFrames = Math.max(1, Math.round(fps * 0.65));
+  const totalFrames = getReelDurationFrames(input);
   let duckAmount = 0;
 
   for (const scene of input.scenes) {
@@ -152,7 +157,14 @@ export function getBgmVolume(
     duckAmount = Math.max(duckAmount, Math.min(fadeIn, fadeOut));
   }
 
-  return BGM_BASE_VOLUME - (BGM_BASE_VOLUME - BGM_DUCKED_VOLUME) * duckAmount;
+  const narrationAwareVolume =
+    BGM_BASE_VOLUME - (BGM_BASE_VOLUME - BGM_DUCKED_VOLUME) * duckAmount;
+  const edgeEnvelope = Math.min(
+    clamp01(frame / edgeFadeFrames),
+    clamp01((totalFrames - 1 - frame) / edgeFadeFrames),
+  );
+
+  return narrationAwareVolume * edgeEnvelope;
 }
 
 function clamp01(value: number) {

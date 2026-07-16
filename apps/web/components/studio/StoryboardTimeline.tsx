@@ -29,6 +29,7 @@ import {
 } from "@/components/studio/SceneInspector";
 import { Button } from "@/components/ui/button";
 import { GuideTooltip } from "@/components/ui/guide-tooltip";
+import { BGM_TRACKS, selectBgmTrack } from "@/lib/bgm/catalog";
 import { storyboardTimingIssue } from "@/lib/storyboards/timing";
 
 type Storyboard = {
@@ -40,6 +41,7 @@ type Storyboard = {
   visualContinuity: string;
   bgmPrompt: string | null;
   bgmEnabled: boolean;
+  bgmTrackId: string | null;
   status: string;
   scenes: EditableScene[];
 };
@@ -258,6 +260,7 @@ export function StoryboardTimeline({
         visualContinuity: draft.visualContinuity,
         bgmEnabled: draft.bgmEnabled,
         bgmPrompt: draft.bgmPrompt,
+        bgmTrackId: draft.bgmTrackId,
         scenes: draft.scenes,
       }),
     });
@@ -488,7 +491,7 @@ export function StoryboardTimeline({
                   }
                 />
               </label>
-              <div className="grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)]">
+              <div className="grid gap-3 sm:grid-cols-[180px_220px_minmax(0,1fr)]">
                 <label className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
                   <input
                     checked={draft.bgmEnabled}
@@ -501,6 +504,30 @@ export function StoryboardTimeline({
                   {outputMode === "PRODUCT_SHOWCASE"
                     ? "Voiceover-only audio"
                     : "Background music"}
+                </label>
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Curated track
+                  </span>
+                  <select
+                    className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 disabled:opacity-50"
+                    disabled={
+                      outputMode === "PRODUCT_SHOWCASE" || !draft.bgmEnabled
+                    }
+                    onChange={(event) =>
+                      updateDraft({ bgmTrackId: event.target.value })
+                    }
+                    value={
+                      draft.bgmTrackId ??
+                      selectBgmTrack({ creativeText: draft.bgmPrompt }).id
+                    }
+                  >
+                    {BGM_TRACKS.map((track) => (
+                      <option key={track.id} value={track.id}>
+                        {track.name}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <input
                   className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 disabled:opacity-50"

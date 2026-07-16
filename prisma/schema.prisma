@@ -109,21 +109,21 @@ model BrandSource {
 }
 
 model CreativeConcept {
-  id                String   @id @default(cuid())
-  projectId         String
-  title             String
-  hook              String
-  strategy          String
-  narrativeArc      String
-  visualStyle       String
-  estimatedScenes   Int
-  estimatedDuration Int
-  previewPrompt     String
-  previewArtifactId String?
+  id                 String   @id @default(cuid())
+  projectId          String
+  title              String
+  hook               String
+  strategy           String
+  narrativeArc       String
+  visualStyle        String
+  estimatedScenes    Int
+  estimatedDuration  Int
+  previewPrompt      String
+  previewArtifactId  String?
   showcaseMotionPlan Json?
-  selected          Boolean  @default(false)
-  rationale         String
-  createdAt         DateTime @default(now())
+  selected           Boolean  @default(false)
+  rationale          String
+  createdAt          DateTime @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
@@ -139,6 +139,7 @@ model Storyboard {
   visualContinuity    String           @default("Preserve the locked brand palette, lighting, lens language, texture, and time of day across scenes.")
   bgmPrompt           String?
   bgmEnabled          Boolean          @default(true)
+  bgmTrackId          String?
   status              StoryboardStatus @default(DRAFT)
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt

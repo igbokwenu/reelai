@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { BGM_TRACK_IDS } from "@/lib/bgm/catalog";
 import {
   normalizeShowcaseDurations,
   normalizeShowcaseSceneCount,
@@ -497,10 +498,10 @@ export const storyboardJsonSchema = {
         enabled: { type: "boolean" },
         preset: {
           type: "string",
+          enum: ["none", ...BGM_TRACK_IDS],
           minLength: 2,
           maxLength: 80,
-          description:
-            'Never empty. Use "none" when background music is disabled.',
+          description: `Select exactly one curated soundtrack id (${BGM_TRACK_IDS.join(", ")}) when enabled. Use "none" when background music is disabled.`,
         },
         prompt: {
           type: "string",
@@ -677,6 +678,7 @@ export const storyboardPatchSchema = z.object({
   script: z.string().min(20).max(2400).optional(),
   bgmEnabled: z.boolean().optional(),
   bgmPrompt: z.string().max(400).nullable().optional(),
+  bgmTrackId: z.enum(BGM_TRACK_IDS).nullable().optional(),
   productContinuity: z.string().min(1).max(700).optional(),
   characterContinuity: z.string().min(1).max(2400).optional(),
   visualContinuity: z.string().min(1).max(700).optional(),

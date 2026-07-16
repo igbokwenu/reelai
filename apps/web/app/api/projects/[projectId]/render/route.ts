@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { BGM_TRACK_IDS } from "@/lib/bgm/catalog";
 import { handleRoute, notFound, ok } from "@/lib/http/responses";
 import { createAndRunFinalRenderJob } from "@/lib/jobs/final-render";
 import { assertManualControlAvailable } from "@/lib/jobs/manual-control";
@@ -12,6 +13,9 @@ type RouteContext = {
 const renderRequestSchema = z.object({
   aiDisclosureEnabled: z.boolean().default(true),
   bgmEnabled: z.boolean().default(false),
+  bgmTrackId: z
+    .union([z.literal("AUTO"), z.enum(BGM_TRACK_IDS)])
+    .default("AUTO"),
 });
 
 export async function POST(request: Request, context: RouteContext) {
@@ -35,6 +39,7 @@ export async function POST(request: Request, context: RouteContext) {
       artifactBaseUrl: new URL(request.url).origin,
       aiDisclosureEnabled: body.aiDisclosureEnabled,
       bgmEnabled: body.bgmEnabled,
+      bgmTrackId: body.bgmTrackId,
     });
     return ok({ job });
   });

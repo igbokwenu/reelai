@@ -146,6 +146,10 @@ export async function PATCH(request: Request, context: RouteContext) {
               ? false
               : body.bgmEnabled,
           bgmPrompt: body.bgmPrompt,
+          bgmTrackId:
+            storyboard.project.outputMode === "PRODUCT_SHOWCASE"
+              ? null
+              : body.bgmTrackId,
           productContinuity: body.productContinuity,
           characterContinuity: body.characterContinuity,
           visualContinuity: body.visualContinuity,
