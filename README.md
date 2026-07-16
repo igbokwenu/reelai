@@ -12,6 +12,7 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - URL-first project creation that automatically queues Brand Kit research; project and business names can be inferred from the website.
 - Product Showcase output mode for premium 5–15 second realistic or 3D product films. Intake requires a real product image, supports up to three products and three product images total, collects per-product details/product-page context, pitches exactly three directions, and constrains every shot to one hero product action to reduce morphing.
 - Focused two-column landing workspace with optional pipeline guidance and confirmed project deletion, including local/OSS artifact cleanup.
+- Dedicated premium media library at `/library` that collects only completed merged MP4 exports, groups them by originating project, labels Brand Reels and Product Showcases, preserves every completed cut, and supports search, filtering, focused playback, project return, and direct download.
 - Focused horizontal project workflow with six navigable stages: Brand, Concepts, Storyboard, Production, Final, and Assets. Stage readiness and completion are visible at a glance, and switching stages preserves in-progress client state.
 - Default-on Auto mode turns a selected concept into a finished reel without tab-by-tab approval: a one-time Brand Kit asset handoff precedes spend, a focused phase tracker replaces manual controls during active production, and resilient retries resume from the last valid storyboard, anchor, clip, narration, or render output. Step-by-step mode remains available before starting; manual editors return on pause or completion.
 - Premium contextual action guidance across consequential controls. Mouse hover and keyboard focus explain outcomes in plain language, including replacement, deletion, generation, and downstream effects; disabled controls remain discoverable and the guidance is screen-reader and reduced-motion aware.
@@ -87,6 +88,8 @@ The domain-neutral creative grammar, structured cast planning, richer motion-hie
 The range-aware render media path is also application-only. Run `pnpm install` to install the Remotion Media dependency, then restart `pnpm dev`; no database migration or seed is required.
 
 The contextual action guidance layer is application-only and adds no package or database dependency. Next.js hot reload should pick it up during `pnpm dev`; otherwise restart `pnpm dev` once. Do not run `pnpm install`, `pnpm db:migrate`, `pnpm db:generate`, or `pnpm db:seed` for this update. See [docs/contextual-guidance.md](docs/contextual-guidance.md) for interaction behavior and the contributor pattern for future actions.
+
+The media library is also application-only. It reads the existing `Render` and `Artifact` records, so existing completed finals appear automatically and no backfill is needed. Stop and restart `pnpm dev` once after pulling the update. Do not run `pnpm install`, `pnpm db:migrate`, `pnpm db:generate`, or `pnpm db:seed`. See [docs/media-library.md](docs/media-library.md) for inclusion rules and UI behavior.
 
 The seed creates:
 

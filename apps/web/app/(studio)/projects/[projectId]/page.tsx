@@ -1,4 +1,4 @@
-import { ArrowLeft, Boxes, ChevronDown, Globe2 } from "lucide-react";
+import { ArrowLeft, Boxes, ChevronDown, Film, Globe2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -103,6 +103,16 @@ export default async function ProjectPage({ params }: PageProps) {
               <p className="text-muted-foreground text-xs">Creative studio</p>
             </div>
           </div>
+          <Link
+            className="mt-5 flex items-center gap-2.5 rounded-xl border border-border/70 bg-card/45 px-3 py-2.5 text-sm text-muted-foreground transition hover:border-primary/20 hover:bg-primary/[0.06] hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            href="/library"
+          >
+            <Film className="size-4" aria-hidden="true" />
+            Media library
+            <span className="ml-auto text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">
+              Finals
+            </span>
+          </Link>
           <div className="mt-6">
             <details className="group lg:hidden">
               <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl border border-border bg-card/60 px-3 py-2.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
@@ -176,16 +186,18 @@ export default async function ProjectPage({ params }: PageProps) {
                       Your uploaded product photography is the source of truth.
                       {project.videoLengthSec === 5 ? (
                         <>
-                          {" "}This five-second format is one continuous hero
-                          clip: an immediate product hook, one signature action,
-                          a concise narrated CTA, and the verified logo composed
+                          {" "}
+                          This five-second format is one continuous hero clip:
+                          an immediate product hook, one signature action, a
+                          concise narrated CTA, and the verified logo composed
                           over the shot.
                         </>
                       ) : (
                         <>
-                          {" "}Reel AI will pitch three restrained concepts,
-                          then build a {project.videoLengthSec}-second showcase
-                          with one hero action per shot.
+                          {" "}
+                          Reel AI will pitch three restrained concepts, then
+                          build a {project.videoLengthSec}-second showcase with
+                          one hero action per shot.
                         </>
                       )}
                     </p>

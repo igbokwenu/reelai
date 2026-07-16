@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Captions,
   Download,
+  Film,
   Loader2,
   Music2,
   PlayCircle,
@@ -11,6 +12,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -413,17 +415,25 @@ export function FinalVideoPlayer({
                 Stored as FINAL_RENDER · {finalArtifact.mimeType}
               </p>
             </div>
-            <Button
-              asChild
-              size="sm"
-              tooltip="Downloads the latest finished reel as an MP4 file."
-              tooltipSide="bottom"
-            >
-              <a href={`/api/artifacts/${finalArtifact.id}/file`} download>
-                <Download className="size-4" aria-hidden="true" />
-                Download MP4
-              </a>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link href="/library">
+                  <Film className="size-4" aria-hidden="true" />
+                  View in library
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                tooltip="Downloads the latest finished reel as an MP4 file."
+                tooltipSide="bottom"
+              >
+                <a href={`/api/artifacts/${finalArtifact.id}/file`} download>
+                  <Download className="size-4" aria-hidden="true" />
+                  Download MP4
+                </a>
+              </Button>
+            </div>
           </div>
           <video
             className="aspect-[9/16] max-h-[720px] w-full rounded-md border border-border bg-black object-contain"

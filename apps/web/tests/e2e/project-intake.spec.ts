@@ -2,6 +2,20 @@ import { expect, test } from "@playwright/test";
 
 import { E2E_PROJECT_PREFIX } from "./project-cleanup";
 
+test("opens the final-only media library from the studio", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: /Media library/ }).click();
+
+  await expect(page).toHaveURL(/\/library$/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Media library" }),
+  ).toBeVisible();
+  await expect(page.getByText(/Every final merged video/)).toBeVisible();
+  await expect(
+    page.getByText(/Only completed, fully merged MP4 exports/),
+  ).toBeVisible();
+});
+
 test("creates and navigates a URL-first project", async ({ page }) => {
   const projectName = `${E2E_PROJECT_PREFIX} URL intake ${Date.now()} reel`;
   await page.route("**/api/projects", async (route) => {

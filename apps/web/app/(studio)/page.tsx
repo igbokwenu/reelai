@@ -1,5 +1,12 @@
-import { ChevronDown, Film, Layers3, Sparkles, WandSparkles } from "lucide-react";
+import {
+  ChevronDown,
+  Film,
+  Layers3,
+  Sparkles,
+  WandSparkles,
+} from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 import { ProjectIntakeForm } from "@/components/studio/ProjectIntakeForm";
 import { ProjectList } from "@/components/studio/ProjectList";
@@ -7,7 +14,11 @@ import { prisma } from "@/lib/prisma";
 
 const pipelineSteps = [
   { label: "Research", detail: "Brand Kit from your website", icon: Sparkles },
-  { label: "Direct", detail: "Three distinct creative routes", icon: WandSparkles },
+  {
+    label: "Direct",
+    detail: "Three distinct creative routes",
+    icon: WandSparkles,
+  },
   { label: "Shape", detail: "An editable scene-by-scene plan", icon: Layers3 },
   { label: "Produce", detail: "Visuals, voice, and final reel", icon: Film },
 ];
@@ -26,17 +37,39 @@ export default async function StudioHome() {
       <div className="relative grid min-h-screen grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="border-border/70 bg-sidebar/95 z-20 flex flex-col border-b px-5 py-5 lg:sticky lg:top-0 lg:h-screen lg:overflow-hidden lg:border-r lg:border-b-0 lg:px-5 lg:py-7">
           <div className="flex items-center gap-3 px-1">
-            <Image alt="ReelAI logo" className="size-10 rounded-xl object-cover ring-1 ring-white/10" height={40} priority src="/reelai_logo.jpeg" width={40} />
+            <Image
+              alt="ReelAI logo"
+              className="size-10 rounded-xl object-cover ring-1 ring-white/10"
+              height={40}
+              priority
+              src="/reelai_logo.jpeg"
+              width={40}
+            />
             <div>
               <p className="text-sm font-semibold tracking-tight">ReelAI</p>
               <p className="text-xs text-muted-foreground">Creative studio</p>
             </div>
           </div>
 
-          <div className="mt-8 flex min-h-0 flex-1 flex-col">
+          <Link
+            className="mt-6 flex items-center gap-2.5 rounded-xl border border-border/70 bg-card/45 px-3 py-2.5 text-sm text-muted-foreground transition hover:border-primary/20 hover:bg-primary/[0.06] hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            href="/library"
+          >
+            <Film className="size-4" aria-hidden="true" />
+            <span className="font-medium">Media library</span>
+            <span className="ml-auto text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">
+              Finals
+            </span>
+          </Link>
+
+          <div className="mt-6 flex min-h-0 flex-1 flex-col">
             <div className="mb-2 flex items-center justify-between px-2">
-              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Projects</p>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{projects.length}</span>
+              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Projects
+              </p>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                {projects.length}
+              </span>
             </div>
             <div className="min-h-0 overflow-y-auto pr-1 lg:pb-6">
               <ProjectList allowDelete projects={projects} />
@@ -55,7 +88,9 @@ export default async function StudioHome() {
                 Your next reel starts with your brand.
               </h1>
               <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-                Share your company website. ReelAI researches the business, builds the Brand Kit, and prepares a creative workspace you can shape before production.
+                Share your company website. ReelAI researches the business,
+                builds the Brand Kit, and prepares a creative workspace you can
+                shape before production.
               </p>
             </header>
 
@@ -67,8 +102,16 @@ export default async function StudioHome() {
 
             <details className="group mt-6 rounded-xl border border-border/60 bg-card/30">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm text-muted-foreground transition hover:text-foreground sm:px-5">
-                <span><span className="font-medium text-foreground">What happens next</span> · Review every stage before production</span>
-                <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+                <span>
+                  <span className="font-medium text-foreground">
+                    What happens next
+                  </span>{" "}
+                  · Review every stage before production
+                </span>
+                <ChevronDown
+                  className="size-4 shrink-0 transition-transform group-open:rotate-180"
+                  aria-hidden="true"
+                />
               </summary>
               <div className="grid gap-px border-t border-border/60 bg-border/60 sm:grid-cols-2 xl:grid-cols-4">
                 {pipelineSteps.map((step, index) => {
@@ -76,18 +119,28 @@ export default async function StudioHome() {
                   return (
                     <div className="bg-background/95 p-4" key={step.label}>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-primary">0{index + 1}</span>
-                        <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
+                        <span className="text-xs font-medium text-primary">
+                          0{index + 1}
+                        </span>
+                        <Icon
+                          className="size-4 text-muted-foreground"
+                          aria-hidden="true"
+                        />
                       </div>
                       <p className="mt-3 text-sm font-medium">{step.label}</p>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{step.detail}</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {step.detail}
+                      </p>
                     </div>
                   );
                 })}
               </div>
             </details>
 
-            <p className="mt-8 text-center text-xs text-muted-foreground/70">Source-grounded research · Editable creative decisions · You approve before generation</p>
+            <p className="mt-8 text-center text-xs text-muted-foreground/70">
+              Source-grounded research · Editable creative decisions · You
+              approve before generation
+            </p>
           </div>
         </section>
       </div>
