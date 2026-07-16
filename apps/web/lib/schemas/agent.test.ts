@@ -493,8 +493,8 @@ describe("Phase 4 agent schemas", () => {
     ).toBe(true);
   });
 
-  it("rejects an impossible showcase scene count for coherent model repair", () => {
-    const invalid = {
+  it("collapses an over-segmented five-second showcase into one hero clip", () => {
+    const overSegmented = {
       title: "Five second product reveal",
       script:
         "A compact product reveal that moves from tactile anticipation to a crisp branded finish.",
@@ -537,10 +537,81 @@ describe("Phase 4 agent schemas", () => {
       ],
     };
 
-    expect(() => parseStoryboardOutput(invalid, "PRODUCT_SHOWCASE", 5)).toThrow(
-      /exactly one scene and one video clip/,
-    );
+    const parsed = parseStoryboardOutput(overSegmented, "PRODUCT_SHOWCASE", 5);
+
+    expect(parsed.scenes).toHaveLength(1);
+    expect(parsed.scenes[0]).toMatchObject({
+      index: 1,
+      durationSec: 5,
+      captionText: "Reveal",
+      voiceoverText: "Made for the moment.",
+      shotPrompt:
+        "Tactile anticipation: the ribbon separates from the package while a fixed camera holds the layered composition behind it.",
+      continuityMode: "CONTINUOUS",
+      transitionStyle: "CUT",
+    });
   });
+
+  it.each([
+    {
+      label: "caption",
+      sceneCopy: {
+        voiceoverText:
+          "Taste Sarah's handcrafted freshness, finished for the moment.",
+      },
+    },
+    {
+      label: "voiceover",
+      sceneCopy: {
+        captionText:
+          "Taste Sarah's handcrafted freshness, finished for the moment.",
+      },
+    },
+  ])(
+    "recovers missing $label and safe product-only continuity metadata locally",
+    ({ sceneCopy }) => {
+      const parsed = parseStoryboardOutput(
+        {
+          title: "Sarah's signature finish",
+          script: "",
+          continuityBible: {
+            product:
+              "Preserve the exact frozen dessert, serving cup, colors, texture, and verified toppings.",
+            visualWorld:
+              "Rich studio shadows, cool highlights, and premium macro food texture.",
+          },
+          scenes: [
+            {
+              index: 1,
+              durationSec: 5,
+              ...sceneCopy,
+              shotPrompt:
+                "Joyful appetite: the frozen dessert turns briefly beneath cool highlights while verified toppings fall as a fixed camera holds the composition.",
+            },
+          ],
+        },
+        "PRODUCT_SHOWCASE",
+        5,
+      );
+
+      expect(parsed.scenes).toHaveLength(1);
+      expect(parsed.scenes[0]?.captionText).toBe(
+        "Taste Sarah's handcrafted freshness, finished for the moment.",
+      );
+      expect(parsed.scenes[0]?.voiceoverText).toBe(
+        "Taste Sarah's handcrafted freshness, finished for the moment.",
+      );
+      expect(parsed.scenes[0]?.continuityNotes).toContain(
+        "Preserve the focal subject",
+      );
+      expect(parsed.continuityBible.characters).toContain("No people appear");
+      expect(parsed.continuityBible.cast).toEqual({
+        mode: "NO_PEOPLE",
+        members: [],
+      });
+      expect(parsed.bgm.enabled).toBe(false);
+    },
+  );
 
   it("rejects incomplete storyboards instead of filling generic scene prompts", () => {
     expect(() =>

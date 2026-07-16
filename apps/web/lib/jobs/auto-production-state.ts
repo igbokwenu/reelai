@@ -8,11 +8,7 @@ export const AUTO_PHASES = [
 
 export type AutoPhase = (typeof AUTO_PHASES)[number] | "COMPLETE";
 export type AutoRunStatus =
-  | "RUNNING"
-  | "WAITING_RETRY"
-  | "COMPLETE"
-  | "FAILED"
-  | "CANCELLED";
+  "RUNNING" | "WAITING_RETRY" | "COMPLETE" | "FAILED" | "CANCELLED";
 
 export function nextAutoPhase(phase: AutoPhase): AutoPhase {
   const index = AUTO_PHASES.indexOf(phase as (typeof AUTO_PHASES)[number]);
@@ -27,11 +23,7 @@ export function autoProgress(phase: AutoPhase, status: AutoRunStatus) {
   return index < 0 ? 0 : Math.round((index / AUTO_PHASES.length) * 100);
 }
 
-export function retryDelayMs(
-  attempt: number,
-  baseMs = 3_000,
-  maxMs = 30_000,
-) {
+export function retryDelayMs(attempt: number, baseMs = 3_000, maxMs = 30_000) {
   return Math.min(maxMs, baseMs * 2 ** Math.max(0, attempt - 1));
 }
 
@@ -40,15 +32,25 @@ export function isAutoRunActive(status: string) {
 }
 
 const NON_RETRYABLE_AUTO_FAILURE =
-  /shorten|must be approved|not found|select (?:exactly )?one|before (?:proceeding|resuming)|policy|requires human review|upload the|schema mismatch|after automatic repair/i;
+  /shorten|must be approved|not found|select (?:exactly )?one|before (?:proceeding|resuming)|policy|requires human review|upload the/i;
+
+const CREATIVE_OUTPUT_VALIDATION_FAILURE =
+  /schema mismatch|after automatic repair/i;
 
 /**
- * Provider outages and polling failures can improve on retry. Validation and
- * user-input failures cannot, and structured creative jobs have already used
- * their own bounded repair pass before reaching the Auto coordinator.
+ * Provider outages and polling failures can improve on retry. Creative output
+ * gets one fresh reroll after local/schema repair; user-input failures do not.
  */
 export function isRetryableAutoFailure(message: string) {
   return !NON_RETRYABLE_AUTO_FAILURE.test(message);
+}
+
+export function isCreativeOutputValidationFailure(message: string) {
+  return CREATIVE_OUTPUT_VALIDATION_FAILURE.test(message);
+}
+
+export function creativeOutputAttemptLimit(message: string) {
+  return isCreativeOutputValidationFailure(message) ? 2 : undefined;
 }
 
 const TECHNICAL_CREATIVE_VALIDATION =

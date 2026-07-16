@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   autoProgress,
+  creativeOutputAttemptLimit,
   isAutoRunActive,
   isRetryableAutoFailure,
   nextAutoPhase,
@@ -33,19 +34,24 @@ describe("auto production state", () => {
     expect(isAutoRunActive("FAILED")).toBe(false);
   });
 
-  it("retries transient failures but does not repeat deterministic creative validation", () => {
+  it("gives repaired creative output one bounded fresh reroll", () => {
     expect(
       isRetryableAutoFailure("Video provider returned a temporary 503."),
     ).toBe(true);
+    const schemaFailure =
+      "Creative output schema mismatch: script is too short.";
+    const repairedFailure =
+      "Reel AI could not complete the plan after automatic repair.";
+
+    expect(isRetryableAutoFailure(schemaFailure)).toBe(true);
+    expect(isRetryableAutoFailure(repairedFailure)).toBe(true);
+    expect(creativeOutputAttemptLimit(schemaFailure)).toBe(2);
+    expect(creativeOutputAttemptLimit(repairedFailure)).toBe(2);
     expect(
-      isRetryableAutoFailure(
-        "Creative output schema mismatch: script is too short.",
-      ),
-    ).toBe(false);
+      creativeOutputAttemptLimit("Video provider returned a temporary 503."),
+    ).toBeUndefined();
     expect(
-      isRetryableAutoFailure(
-        "Reel AI could not complete the plan after automatic repair.",
-      ),
+      isRetryableAutoFailure("Select exactly one concept before proceeding."),
     ).toBe(false);
   });
 

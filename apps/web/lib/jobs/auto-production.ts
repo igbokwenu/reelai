@@ -5,6 +5,7 @@ import type { AutoGenerationRun, GenerationJob } from "@prisma/client";
 import { PublicError } from "@/lib/errors";
 import { createAndRunStoryboardJob } from "@/lib/jobs/creative";
 import {
+  creativeOutputAttemptLimit,
   isAutoRunActive,
   isRetryableAutoFailure,
   nextAutoPhase,
@@ -29,6 +30,7 @@ class AutoPipelineError extends Error {
   constructor(
     message: string,
     readonly retryable = true,
+    readonly maxAttempts?: number,
   ) {
     super(message);
   }
@@ -419,7 +421,11 @@ async function handlePhaseFailure(run: AutoGenerationRun, error: unknown) {
   const message = autoErrorMessage(error, run.phase);
   const nextAttempt = run.attempt + 1;
   const retryable = !(error instanceof AutoPipelineError) || error.retryable;
-  const exhausted = !retryable || nextAttempt >= run.maxAttempts;
+  const maxAttempts =
+    error instanceof AutoPipelineError && error.maxAttempts
+      ? Math.min(error.maxAttempts, run.maxAttempts)
+      : run.maxAttempts;
+  const exhausted = !retryable || nextAttempt >= maxAttempts;
 
   await prisma.autoGenerationRun.update({
     where: { id: run.id },
@@ -450,7 +456,11 @@ function assertCompleteJob(job: GenerationJob, label: string) {
     ? `${label}: ${job.error}`
     : `${label} did not complete.`;
   const retryable = isRetryableAutoFailure(message);
-  throw new AutoPipelineError(message, retryable);
+  throw new AutoPipelineError(
+    message,
+    retryable,
+    creativeOutputAttemptLimit(message),
+  );
 }
 
 function rejectPolicyBlockers(job: GenerationJob) {

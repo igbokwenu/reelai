@@ -790,25 +790,30 @@ export function parseStoryboardOutput(
     .slice(0, outputMode === "PRODUCT_SHOWCASE" ? 3 : 4)
     .map((scene, index) => normalizeStoryboardScene(scene, index));
 
-  if (
-    outputMode === "PRODUCT_SHOWCASE" &&
-    targetDurationSec !== undefined &&
-    scenes.length >= Math.ceil(targetDurationSec / 10) &&
-    scenes.length <= Math.floor(targetDurationSec / 5)
-  ) {
+  if (outputMode === "PRODUCT_SHOWCASE" && targetDurationSec !== undefined) {
+    const desiredSceneCount = normalizeShowcaseSceneCount(
+      scenes.length || 1,
+      targetDurationSec,
+    );
+    if (desiredSceneCount <= scenes.length) {
+      scenes = selectShowcaseScenes(scenes, desiredSceneCount);
+    }
     const durations = normalizeShowcaseDurations(
       scenes.map((scene) => scene.durationSec),
       targetDurationSec,
     );
-    scenes = scenes.map((scene, index) => ({
-      ...scene,
-      index: index + 1,
-      durationSec: durations[index]!,
-      voiceoverText: fitVoiceoverToDuration(
-        scene.voiceoverText,
-        durations[index]!,
-      ),
-    }));
+    if (durations.length === scenes.length) {
+      scenes = scenes.map((scene, index) => ({
+        ...scene,
+        index: index + 1,
+        durationSec: durations[index]!,
+        transitionStyle: index === 0 ? ("CUT" as const) : scene.transitionStyle,
+        voiceoverText: fitVoiceoverToDuration(
+          scene.voiceoverText,
+          durations[index]!,
+        ),
+      }));
+    }
   }
 
   const title = text(record.title ?? record.name, {
@@ -829,6 +834,7 @@ export function parseStoryboardOutput(
         record.continuity_bible ??
         record.consistencyBible ??
         record.consistency_bible,
+      { outputMode, scenes },
     ),
     scenes,
   });
@@ -1022,6 +1028,25 @@ function canonicalizeStoryboardValue(value: unknown) {
 
 function normalizeStoryboardScene(value: unknown, index: number) {
   const record = asRecord(value) ?? {};
+  const caption = text(
+    record.captionText ?? record.caption ?? record.onScreenText,
+    {
+      fallback: "",
+      min: 1,
+      max: 140,
+    },
+  );
+  const voiceover = text(
+    record.voiceoverText ??
+      record.voiceover ??
+      record.narration ??
+      record.voiceOver,
+    {
+      fallback: "",
+      min: 1,
+      max: 600,
+    },
+  );
   const continuityMode = normalizeContinuityMode(
     record.continuityMode ??
       record.continuity_mode ??
@@ -1049,25 +1074,9 @@ function normalizeStoryboardScene(value: unknown, index: number) {
       record.durationSec ?? record.duration_sec ?? record.duration,
       { fallback: 8, min: 5, max: 10 },
     ),
-    captionText: text(
-      record.captionText ?? record.caption ?? record.onScreenText,
-      {
-        fallback: "",
-        min: 1,
-        max: 140,
-      },
-    ),
-    voiceoverText: text(
-      record.voiceoverText ??
-        record.voiceover ??
-        record.narration ??
-        record.voiceOver,
-      {
-        fallback: "",
-        min: 1,
-        max: 600,
-      },
-    ),
+    captionText: caption || text(voiceover, { fallback: "", min: 1, max: 140 }),
+    voiceoverText:
+      voiceover || text(caption, { fallback: "", min: 1, max: 600 }),
     shotPrompt: normalizeGeneratedShotPrompt(
       record.shotPrompt ??
         record.shot_prompt ??
@@ -1083,7 +1092,8 @@ function normalizeStoryboardScene(value: unknown, index: number) {
         record.continuity ??
         record.notes,
       {
-        fallback: "",
+        fallback:
+          "Preserve the focal subject, established palette, lighting direction, and spatial composition throughout the shot.",
         min: 6,
         max: 700,
       },
@@ -1093,16 +1103,57 @@ function normalizeStoryboardScene(value: unknown, index: number) {
   };
 }
 
-function normalizeContinuityBible(value: unknown) {
+function selectShowcaseScenes(
+  scenes: ReturnType<typeof normalizeStoryboardScene>[],
+  desiredCount: number,
+) {
+  if (scenes.length <= desiredCount) return scenes;
+
+  const first = scenes[0]!;
+  const closer = scenes.at(-1)!;
+  if (desiredCount === 1) {
+    return [
+      {
+        ...first,
+        captionText: closer.captionText || first.captionText,
+        continuityMode: "CONTINUOUS" as const,
+        index: 1,
+        transitionStyle: "CUT" as const,
+        voiceoverText: closer.voiceoverText || first.voiceoverText,
+      },
+    ];
+  }
+
+  return [first, closer].slice(0, desiredCount);
+}
+
+function normalizeContinuityBible(
+  value: unknown,
+  {
+    outputMode,
+    scenes,
+  }: {
+    outputMode: "STANDARD" | "PRODUCT_SHOWCASE";
+    scenes: ReturnType<typeof normalizeStoryboardScene>[];
+  },
+) {
   const record = asRecord(value) ?? {};
+  const productOnlyShowcase =
+    outputMode === "PRODUCT_SHOWCASE" &&
+    !scenes.some((scene) =>
+      /\b(?:person|people|woman|man|girl|boy|founder|server|model|customer|guest|staff|worker|chef|hands?|face|wardrobe|wears?)\b/i.test(
+        `${scene.shotPrompt} ${scene.continuityNotes}`,
+      ),
+    );
   const characters = text(
     record.characters ??
       record.character ??
       record.characterContinuity ??
       record.character_continuity,
     {
-      fallback:
-        "Keep recurring characters' identity, wardrobe, age, hair, and defining features stable across scenes.",
+      fallback: productOnlyShowcase
+        ? "No people appear; keep the supplied product as the only focal subject."
+        : "Keep recurring characters' identity, wardrobe, age, hair, and defining features stable across scenes.",
       min: 20,
       max: 500,
     },

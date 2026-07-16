@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
+import { ZodError } from "zod";
 
 import {
   generateConceptsForProject,
@@ -223,11 +224,13 @@ async function runStoryboardJob(jobId: string) {
 
 async function failJob(jobId: string, projectId: string, error: unknown) {
   const safeError = getCreativeGenerationError(error);
+  const diagnostics = creativeFailureDiagnostics(error);
   const failed = await prisma.generationJob.update({
     where: { id: jobId },
     data: {
       status: "FAILED",
       error: safeError,
+      output: diagnostics,
       completedAt: new Date(),
     },
   });
@@ -238,6 +241,21 @@ async function failJob(jobId: string, projectId: string, error: unknown) {
   });
 
   return failed;
+}
+
+function creativeFailureDiagnostics(
+  error: unknown,
+): Prisma.InputJsonValue | undefined {
+  if (!(error instanceof ZodError)) return undefined;
+
+  return {
+    failureKind: "STRUCTURED_OUTPUT_VALIDATION",
+    validationIssues: error.issues.slice(0, 12).map((issue) => ({
+      code: issue.code,
+      message: issue.message,
+      path: issue.path.map(String).join("."),
+    })),
+  };
 }
 
 function toJsonValue(value: unknown): Prisma.InputJsonValue | null {

@@ -436,8 +436,8 @@ Rules:
 - Log model, operation, elapsed time, provider task id, and sanitized errors.
 - Do not log prompts containing uploaded private content unless `NODE_ENV !== "production"` and the log is explicitly redacted.
 - For structured JSON, always use Zod schemas and validate the model output before saving.
-- Normalize only policy-derived or safely reconstructable structured fields before requesting a paid repair. Storyboard script may be derived from validated scene narration; disabled BGM must use explicit non-empty sentinel metadata. Never invent a missing shot direction, product fact, claim, or cast identity.
-- A structured creative call gets one bounded schema-repair pass. If validation still fails, preserve the technical issue in sanitized server logs but show plain-language recovery copy. Auto mode must not automatically repeat the whole creative phase for that deterministic failure; an explicit user retry is allowed.
+- Normalize only policy-derived or safely reconstructable structured fields before requesting a paid repair. Storyboard script may be derived from validated scene narration; caption and narration may recover from one another; disabled BGM must use explicit non-empty sentinel metadata; an unambiguously product-only showcase may receive a no-people cast plan. A five-second showcase must collapse excess segmentation into one hero visual carrying the closing CTA. Never invent a missing shot direction, product fact, claim, or ambiguous cast identity.
+- A structured creative call gets one bounded schema-repair pass. If validation still fails, Auto mode gets one fresh creative reroll (two full attempts total), then pauses with plain-language recovery copy. Persist only safe validation issue codes, paths, and messages in the failed job output so local diagnosis does not depend on exposing provider content or schema internals to the user.
 - For async video tasks, save the provider `task_id` to `GenerationJob.providerTaskId`.
 
 ## Agent Output Schemas
