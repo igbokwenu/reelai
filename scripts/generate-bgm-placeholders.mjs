@@ -1,16 +1,20 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
+
+const run = promisify(execFile);
 
 const outputDirectory = path.resolve("apps/web/public/audio/bgm");
 const sampleRate = 24_000;
 const durationSec = 8;
 
 const tracks = [
-  { file: "warm-uplift.wav", root: 196, pulse: 2 },
-  { file: "clean-momentum.wav", root: 220, pulse: 4 },
-  { file: "bold-kinetic.wav", root: 110, pulse: 8 },
-  { file: "cinematic-wonder.wav", root: 146.83, pulse: 1 },
-  { file: "calm-organic.wav", root: 174.61, pulse: 0.5 },
+  { file: "warm-uplift.mp3", root: 196, pulse: 2 },
+  { file: "clean-momentum.mp3", root: 220, pulse: 4 },
+  { file: "bold-kinetic.mp3", root: 110, pulse: 8 },
+  { file: "cinematic-wonder.mp3", root: 146.83, pulse: 1 },
+  { file: "calm-organic.mp3", root: 174.61, pulse: 0.5 },
 ];
 
 await mkdir(outputDirectory, { recursive: true });
@@ -50,5 +54,33 @@ for (const track of tracks) {
   wav.writeUInt32LE(data.length, 40);
   data.copy(wav, 44);
 
-  await writeFile(path.join(outputDirectory, track.file), wav);
+  const temporaryWav = path.join(
+    outputDirectory,
+    `.${track.file.replace(/\.mp3$/, "")}.source.wav`,
+  );
+  const outputMp3 = path.join(outputDirectory, track.file);
+
+  await writeFile(temporaryWav, wav);
+  try {
+    await run("ffmpeg", [
+      "-y",
+      "-loglevel",
+      "error",
+      "-i",
+      temporaryWav,
+      "-codec:a",
+      "libmp3lame",
+      "-b:a",
+      "96k",
+      "-ar",
+      "44100",
+      "-ac",
+      "2",
+      outputMp3,
+    ]);
+  } finally {
+    await rm(temporaryWav, { force: true });
+  }
+
+  await rm(outputMp3.replace(/\.mp3$/, ".wav"), { force: true });
 }

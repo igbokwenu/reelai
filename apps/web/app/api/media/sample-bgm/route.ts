@@ -4,7 +4,7 @@
  */
 export function GET(request: Request) {
   return Response.redirect(
-    new URL("/audio/bgm/warm-uplift.wav", request.url),
+    new URL("/audio/bgm/warm-uplift.mp3", request.url),
     307,
   );
 }

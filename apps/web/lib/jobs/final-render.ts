@@ -808,10 +808,9 @@ async function getOrCreateCuratedBgmArtifact(
   return createStoredArtifact({
     projectId,
     fileName: path.basename(relativeAssetPath),
-    mimeType: "audio/wav",
+    mimeType: "audio/mpeg",
     type: "AUDIO",
     body,
-    durationSec: parseWav(body).durationSec,
     metadata: {
       operation: "curated_bgm",
       source: "public_asset_catalog",

@@ -15,13 +15,15 @@ describe("curated BGM catalog", () => {
     );
   });
 
-  it("ships a valid WAV placeholder for every catalog entry", async () => {
+  it("ships a valid MP3 placeholder for every catalog entry", async () => {
     for (const track of BGM_TRACKS) {
       const bytes = await readFile(
         path.join(process.cwd(), "public", track.assetPath),
       );
-      expect(bytes.subarray(0, 4).toString("ascii")).toBe("RIFF");
-      expect(bytes.subarray(8, 12).toString("ascii")).toBe("WAVE");
+      const hasId3Tag = bytes.subarray(0, 3).toString("ascii") === "ID3";
+      const hasMpegFrameSync = bytes[0] === 0xff && (bytes[1]! & 0xe0) === 0xe0;
+      expect(hasId3Tag || hasMpegFrameSync).toBe(true);
+      expect(bytes.length).toBeGreaterThan(1_000);
     }
   });
 

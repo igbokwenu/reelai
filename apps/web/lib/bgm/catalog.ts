@@ -24,7 +24,7 @@ export const BGM_TRACKS: readonly BgmTrack[] = [
     name: "Warm Uplift",
     shortDescription: "Human, optimistic and quietly confident",
     bestFor: "services, testimonials, community, lifestyle",
-    assetPath: "/audio/bgm/warm-uplift.wav",
+    assetPath: "/audio/bgm/warm-uplift.mp3",
     color: "from-amber-400/25 to-rose-400/10",
   },
   {
@@ -32,7 +32,7 @@ export const BGM_TRACKS: readonly BgmTrack[] = [
     name: "Clean Momentum",
     shortDescription: "Precise, modern and forward-moving",
     bestFor: "technology, SaaS, explainers, business",
-    assetPath: "/audio/bgm/clean-momentum.wav",
+    assetPath: "/audio/bgm/clean-momentum.mp3",
     color: "from-cyan-400/25 to-blue-500/10",
   },
   {
@@ -40,7 +40,7 @@ export const BGM_TRACKS: readonly BgmTrack[] = [
     name: "Bold Kinetic",
     shortDescription: "Punchy, energetic and launch-ready",
     bestFor: "sports, fashion, events, product launches",
-    assetPath: "/audio/bgm/bold-kinetic.wav",
+    assetPath: "/audio/bgm/bold-kinetic.mp3",
     color: "from-fuchsia-400/25 to-orange-500/10",
   },
   {
@@ -48,7 +48,7 @@ export const BGM_TRACKS: readonly BgmTrack[] = [
     name: "Cinematic Wonder",
     shortDescription: "Expansive, premium and story-led",
     bestFor: "luxury, travel, property, emotional reveals",
-    assetPath: "/audio/bgm/cinematic-wonder.wav",
+    assetPath: "/audio/bgm/cinematic-wonder.mp3",
     color: "from-violet-400/25 to-indigo-500/10",
   },
   {
@@ -56,7 +56,7 @@ export const BGM_TRACKS: readonly BgmTrack[] = [
     name: "Calm Organic",
     shortDescription: "Natural, spacious and reassuring",
     bestFor: "wellness, food, beauty, craft, sustainability",
-    assetPath: "/audio/bgm/calm-organic.wav",
+    assetPath: "/audio/bgm/calm-organic.mp3",
     color: "from-emerald-400/25 to-teal-500/10",
   },
 ] as const;

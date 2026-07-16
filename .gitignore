@@ -39,4 +39,4 @@ apps/web/.data/
 *.mp3
 
 # Curated source BGM is an intentional application asset.
-!apps/web/public/audio/bgm/*.wav
+!apps/web/public/audio/bgm/*.mp3
