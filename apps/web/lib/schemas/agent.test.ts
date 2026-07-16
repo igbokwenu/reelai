@@ -211,6 +211,87 @@ describe("Phase 4 agent schemas", () => {
     ]);
   });
 
+  it("normalizes common safe motion-plan aliases from provider output", () => {
+    const concept = (index: number) => ({
+      title: `Polo direction ${index}`,
+      hook: "Let the exact polo silhouette carry the first-frame reveal.",
+      strategy:
+        "Use a restrained material-first product film with one readable action and no teardown.",
+      narrativeArc:
+        "Open on the intact polo, move through one fabric response, and close on a calm hero frame.",
+      visualStyle:
+        "Premium pearl studio light with tactile cotton texture and deep shadow.",
+      estimatedScenes: 2,
+      estimatedDurationSec: 10,
+      previewPrompt:
+        "Vertical 9:16 intact polo in pearl studio light, exact silhouette, clean background, no text.",
+      rationale:
+        "The restrained motion keeps the garment recognizable while giving the reveal a premium payoff.",
+      motionPlan: {
+        heroAction: "The intact polo turns slowly into a clean hero angle.",
+        supportingMotion: "One soft fabric ripple crosses the sleeve.",
+        cameraBehavior: "slow zoom in",
+        humanPresence: "NO_PEOPLE",
+        separationTreatment: "NO_TEARDOWN",
+        safetyRationale:
+          "The intact silhouette and one fabric response are stable for image-to-video generation.",
+      },
+    });
+    const parsed = parseCreativeConceptsOutput(
+      { concepts: [concept(1), concept(2), concept(3)] },
+      "PRODUCT_SHOWCASE",
+      10,
+    );
+
+    expect(parsed.concepts[0]?.motionPlan).toMatchObject({
+      cameraBehavior: "SLOW_PUSH_IN",
+      humanPresence: "NO_PERSON",
+      separationTreatment: "AVOID",
+    });
+  });
+
+  it("reports nested motion-plan paths when an alias is genuinely unknown", () => {
+    const invalid = {
+      title: "Unknown motion",
+      hook: "Keep the product readable from the first frame onward.",
+      strategy:
+        "Use one controlled hero action with a simple camera and stable product geometry.",
+      narrativeArc:
+        "Open on the product, complete one action, and settle into the final hero composition.",
+      visualStyle: "Clean studio light with restrained product-first styling.",
+      estimatedScenes: 1,
+      estimatedDurationSec: 5,
+      previewPrompt:
+        "Vertical product hero frame with clean studio light and no generated text.",
+      rationale:
+        "The concept remains readable and preserves the exact supplied product identity.",
+      motionPlan: {
+        heroAction: "The product rotates slowly into its hero angle.",
+        supportingMotion: "None",
+        cameraBehavior: "FIXED",
+        humanPresence: "A_FEW_PEOPLE",
+        separationTreatment: "AVOID",
+        safetyRationale:
+          "The stable frame keeps product geometry clear throughout the shot.",
+      },
+    };
+
+    try {
+      parseCreativeConceptsOutput(
+        { concepts: [invalid, invalid, invalid] },
+        "PRODUCT_SHOWCASE",
+        5,
+      );
+      throw new Error("Expected Product Showcase validation to fail");
+    } catch (error) {
+      const issues = (error as { issues?: Array<{ path: PropertyKey[] }> })
+        .issues;
+      expect(issues?.[0]?.path.join(".")).toBe(
+        "concepts.0.motionPlan.humanPresence",
+      );
+    }
+  });
+
   it("never permits a multi-person Product Showcase cast", () => {
     const scene = {
       index: 1,

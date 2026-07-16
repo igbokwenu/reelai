@@ -106,6 +106,7 @@ export async function generateConceptsForProject(projectId: string) {
         project.outputMode,
         project.videoLengthSec,
       ),
+    preserveOriginalOnRepair: true,
     system: conceptSystemPrompt,
     user: buildConceptPrompt(project),
   });
@@ -254,6 +255,7 @@ export async function regenerateConceptForProject({
         project.outputMode,
         project.videoLengthSec,
       ),
+    preserveOriginalOnRepair: true,
     system: conceptSystemPrompt,
     user: buildConceptRegenerationPrompt({
       project,

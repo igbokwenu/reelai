@@ -1099,7 +1099,7 @@ function normalizeConcept(
 
 function normalizeShowcaseMotionPlan(value: unknown) {
   const record = asRecord(value) ?? {};
-  return showcaseMotionPlanSchema.parse({
+  return {
     heroAction: text(record.heroAction ?? record.hero_action, {
       fallback: "",
       min: 8,
@@ -1109,13 +1109,13 @@ function normalizeShowcaseMotionPlan(value: unknown) {
       record.supportingMotion ?? record.supporting_motion,
       { fallback: "", min: 3, max: 180 },
     ),
-    cameraBehavior: normalizeEnumValue(
+    cameraBehavior: normalizeShowcaseCameraBehavior(
       record.cameraBehavior ?? record.camera_behavior,
     ),
-    humanPresence: normalizeEnumValue(
+    humanPresence: normalizeShowcaseHumanPresence(
       record.humanPresence ?? record.human_presence,
     ),
-    separationTreatment: normalizeEnumValue(
+    separationTreatment: normalizeShowcaseSeparationTreatment(
       record.separationTreatment ?? record.separation_treatment,
     ),
     safetyRationale: text(record.safetyRationale ?? record.safety_rationale, {
@@ -1123,7 +1123,7 @@ function normalizeShowcaseMotionPlan(value: unknown) {
       min: 12,
       max: 280,
     }),
-  });
+  };
 }
 
 function normalizeEnumValue(value: unknown) {
@@ -1133,6 +1133,62 @@ function normalizeEnumValue(value: unknown) {
         .replace(/[\s-]+/g, "_")
         .toUpperCase()
     : value;
+}
+
+function normalizeShowcaseCameraBehavior(value: unknown) {
+  const normalized = normalizeEnumValue(value);
+  if (typeof normalized !== "string") return normalized;
+  const aliases: Record<string, string> = {
+    FIXED_CAMERA: "FIXED",
+    STATIC: "FIXED",
+    STATIC_CAMERA: "FIXED",
+    SLOW_ZOOM: "SLOW_PUSH_IN",
+    SLOW_ZOOM_IN: "SLOW_PUSH_IN",
+    ZOOM_IN: "SLOW_PUSH_IN",
+    SLOW_DOLLY_IN: "SLOW_PUSH_IN",
+    SLOW_ZOOM_OUT: "SLOW_PULL_BACK",
+    ZOOM_OUT: "SLOW_PULL_BACK",
+    SLOW_DOLLY_OUT: "SLOW_PULL_BACK",
+    GENTLE_PRODUCT_ORBIT: "GENTLE_ORBIT",
+    PARTIAL_ORBIT: "GENTLE_ORBIT",
+    SLOW_ORBIT: "GENTLE_ORBIT",
+  };
+  return aliases[normalized] ?? normalized;
+}
+
+function normalizeShowcaseHumanPresence(value: unknown) {
+  const normalized = normalizeEnumValue(value);
+  if (typeof normalized !== "string") return normalized;
+  const aliases: Record<string, string> = {
+    NONE: "NO_PERSON",
+    NO_HUMAN: "NO_PERSON",
+    NO_HUMANS: "NO_PERSON",
+    NO_PEOPLE: "NO_PERSON",
+    PRODUCT_ONLY: "NO_PERSON",
+    PRODUCT_ONLY_NO_PERSON: "NO_PERSON",
+    SINGLE_HUMAN: "ONE_PERSON",
+    SINGLE_PERSON: "ONE_PERSON",
+    ONE_HUMAN: "ONE_PERSON",
+    ONE_MODEL: "ONE_PERSON",
+  };
+  return aliases[normalized] ?? normalized;
+}
+
+function normalizeShowcaseSeparationTreatment(value: unknown) {
+  const normalized = normalizeEnumValue(value);
+  if (typeof normalized !== "string") return normalized;
+  const aliases: Record<string, string> = {
+    NONE: "AVOID",
+    NO_SEPARATION: "AVOID",
+    NO_TEARDOWN: "AVOID",
+    AVOID_SEPARATION: "AVOID",
+    AVOID_TEARDOWN: "AVOID",
+    SAFE_FOOD_LAYERS: "FOOD_LAYER_SEPARATION",
+    FOOD_LAYERS: "FOOD_LAYER_SEPARATION",
+    LARGE_VISIBLE_COMPONENTS: "VISIBLE_COMPONENT_SEPARATION",
+    VISIBLE_COMPONENTS: "VISIBLE_COMPONENT_SEPARATION",
+  };
+  return aliases[normalized] ?? normalized;
 }
 
 function canonicalizeStoryboardValue(value: unknown) {

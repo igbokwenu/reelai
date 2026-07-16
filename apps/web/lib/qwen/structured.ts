@@ -8,6 +8,7 @@ import {
   qwenChatCompletion,
   QWEN_STRUCTURED_MODEL,
 } from "@/lib/qwen/client";
+import { preserveOriginalValues } from "@/lib/qwen/structured-repair";
 
 export async function generateStructuredWithQwen<T>({
   operation,
@@ -18,6 +19,7 @@ export async function generateStructuredWithQwen<T>({
   user,
   model = QWEN_STRUCTURED_MODEL,
   parse = (value) => schema.parse(value),
+  preserveOriginalOnRepair = false,
 }: {
   operation: string;
   schema: ZodType<T>;
@@ -27,6 +29,7 @@ export async function generateStructuredWithQwen<T>({
   user: string;
   model?: string;
   parse?: (value: unknown) => T;
+  preserveOriginalOnRepair?: boolean;
 }) {
   const messages = [
     { role: "system" as const, content: system },
@@ -107,7 +110,12 @@ export async function generateStructuredWithQwen<T>({
       ],
     );
 
-    data = parse(parseQwenJson(repaired.content));
+    const repairedJson = parseQwenJson(repaired.content);
+    data = parse(
+      preserveOriginalOnRepair
+        ? preserveOriginalValues(parsed, repairedJson)
+        : repairedJson,
+    );
     result = repaired;
   }
 
