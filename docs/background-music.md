@@ -2,7 +2,7 @@
 
 Updated: July 16, 2026
 
-Reel AI uses a small, curated soundtrack catalog for dependable final renders. The creative agent selects a track while writing the storyboard, Auto mode carries that choice into Remotion, and the Final step lets a user preview the AI match or override it before rendering. Product Showcase remains voiceover-only by design.
+Reel AI uses a small, curated soundtrack catalog for dependable final renders. The creative agent selects a track while writing the storyboard, Auto mode carries that choice into Remotion, and the Final step lets a user preview the AI match, override it, or turn music off before rendering. Product Showcase defaults BGM on for its first Auto final so users experience the complete audio mix immediately.
 
 ## Capability fact-check
 
@@ -22,7 +22,8 @@ Official references:
 4. **AI match** uses the storyboard choice. A user can preview all five assets and make a render-only manual override in the Final step.
 5. At render time the chosen public MP3 is hashed and copied into the normal project artifact store. Replacing a public file therefore creates a fresh artifact on the next render while unchanged tracks are reused.
 6. Remotion loops short beds, fades music at both reel edges, keeps source-video audio muted, and automatically ducks the bed under scene narration.
-7. Product Showcase suppresses BGM at storyboard save and at the final render boundary, even if a stale client sends a track id.
+7. Product Showcase keeps generated source-clip audio muted but defaults the independent curated BGM layer on. An explicit Final-step toggle-off is honored for voiceover-only re-renders.
+8. The Final tab restores the latest render's current-policy BGM toggle and manual selection. Legacy Product Showcase renders used the former `VOICEOVER_ONLY` policy, so they intentionally open on the new default-on AI Match instead of restoring the obsolete forced-off state.
 
 ## Asset contract
 
@@ -64,15 +65,17 @@ These prompts are intentionally instrumental and voiceover-friendly. If the musi
 
 ## Local upgrade and testing
 
-This feature adds nullable `Storyboard.bgmTrackId`. Stop `pnpm dev`, run `pnpm db:migrate`, then restart with `pnpm dev`. No package install or seed is required. `pnpm dev` regenerates Prisma Client automatically; run `pnpm db:generate` only if an already-open editor still shows the old Prisma type.
+The original curated catalog adds nullable `Storyboard.bgmTrackId`. If that migration is not yet applied, stop `pnpm dev`, run `pnpm db:migrate`, then restart with `pnpm dev`. No package install or seed is required. `pnpm dev` regenerates Prisma Client automatically; run `pnpm db:generate` only if an already-open editor still shows the old Prisma type.
 
-An existing completed **Brand Reel** is the fastest test and does not need regeneration:
+Expanding BGM to Product Showcase adds no schema or dependency change. When the curated catalog migration is already applied, only restart `pnpm dev`; do not run `pnpm db:migrate`, `pnpm install`, or `pnpm db:seed` for this update.
 
-1. Open the project and go to **Final** after the migration.
-2. Enable **Include background music**. Confirm **AI match** names a track and its preview plays.
+An existing completed project is the fastest test and does not need scene regeneration:
+
+1. Open an existing Product Showcase and go to **Final**.
+2. Confirm **Include background music** starts enabled, **AI match** names a track, and its preview plays.
 3. Preview a manual alternative, render once, and listen for music under silent portions and reduced music under narration.
 4. Switch back to **AI match**, render again, and confirm the new final appears in the media library.
 5. Temporarily replace one MP3 with another valid MP3 using the same filename, render again, and confirm the replacement is heard; the content hash prevents stale artifact reuse.
-6. Open a Product Showcase and confirm the control remains disabled and its render has narration only.
+6. Toggle music off and render again; confirm the second output is voiceover-only while source-clip audio stays muted in both versions.
 
-Use a new project only to verify fresh AI selection end to end: generate a Standard/Brand Reel in Auto mode and confirm its storyboard receives a non-null curated track id and Auto's final render uses it. Auto and manual rendering share the same catalog resolver and Remotion mixer.
+Use a new project only to verify fresh AI selection end to end: generate a Product Showcase in Auto mode and confirm its storyboard receives `bgmEnabled = true`, a non-null curated track id, and a first final render containing mood-matched music. Auto and manual rendering share the same catalog resolver and Remotion mixer.

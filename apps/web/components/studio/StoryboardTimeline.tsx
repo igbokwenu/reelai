@@ -122,7 +122,15 @@ export function StoryboardTimeline({
   );
   const [draft, setDraft] = useState<Storyboard | null>(
     storyboard && outputMode === "PRODUCT_SHOWCASE"
-      ? { ...storyboard, bgmEnabled: false }
+      ? {
+          ...storyboard,
+          bgmEnabled: true,
+          bgmTrackId:
+            storyboard.bgmTrackId ??
+            selectBgmTrack({
+              creativeText: `${storyboard.title} ${storyboard.script} ${storyboard.bgmPrompt ?? ""}`,
+            }).id,
+        }
       : storyboard,
   );
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(
@@ -495,15 +503,12 @@ export function StoryboardTimeline({
                 <label className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
                   <input
                     checked={draft.bgmEnabled}
-                    disabled={outputMode === "PRODUCT_SHOWCASE"}
                     type="checkbox"
                     onChange={(event) =>
                       updateDraft({ bgmEnabled: event.target.checked })
                     }
                   />
-                  {outputMode === "PRODUCT_SHOWCASE"
-                    ? "Voiceover-only audio"
-                    : "Background music"}
+                  Background music
                 </label>
                 <label className="grid gap-1.5">
                   <span className="text-xs font-medium text-muted-foreground">
@@ -511,15 +516,15 @@ export function StoryboardTimeline({
                   </span>
                   <select
                     className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 disabled:opacity-50"
-                    disabled={
-                      outputMode === "PRODUCT_SHOWCASE" || !draft.bgmEnabled
-                    }
+                    disabled={!draft.bgmEnabled}
                     onChange={(event) =>
                       updateDraft({ bgmTrackId: event.target.value })
                     }
                     value={
                       draft.bgmTrackId ??
-                      selectBgmTrack({ creativeText: draft.bgmPrompt }).id
+                      selectBgmTrack({
+                        creativeText: `${draft.title} ${draft.script} ${draft.bgmPrompt ?? ""}`,
+                      }).id
                     }
                   >
                     {BGM_TRACKS.map((track) => (
@@ -531,12 +536,10 @@ export function StoryboardTimeline({
                 </label>
                 <input
                   className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 disabled:opacity-50"
-                  disabled={
-                    outputMode === "PRODUCT_SHOWCASE" || !draft.bgmEnabled
-                  }
+                  disabled={!draft.bgmEnabled}
                   placeholder={
                     outputMode === "PRODUCT_SHOWCASE"
-                      ? "Product Showcase keeps the soundtrack clean"
+                      ? "Product energy, pacing, and premium finish"
                       : "Soundtrack mood and pacing"
                   }
                   value={draft.bgmPrompt ?? ""}

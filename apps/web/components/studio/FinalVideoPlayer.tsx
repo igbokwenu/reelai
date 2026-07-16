@@ -19,9 +19,11 @@ import { Button } from "@/components/ui/button";
 import {
   BGM_TRACKS,
   getBgmTrack,
+  isBgmTrackId,
   selectBgmTrack,
   type BgmTrackSelection,
 } from "@/lib/bgm/catalog";
+import { getInitialFinalBgmEnabled } from "@/lib/bgm/policy";
 import { isStoryboardTimingValid } from "@/lib/storyboards/timing";
 
 type Artifact = {
@@ -59,6 +61,8 @@ type Scene = {
 
 type Storyboard = {
   id: string;
+  title: string;
+  script: string;
   status: string;
   bgmPrompt: string | null;
   bgmEnabled: boolean;
@@ -96,6 +100,23 @@ export function FinalVideoPlayer({
   targetDurationSec: number;
 }) {
   const router = useRouter();
+  const latestCompletedRenderSettings = asRecord(
+    renders.find((render) => render.status === "COMPLETE")?.settings,
+  );
+  const latestUsesCurrentBgmPolicy =
+    latestCompletedRenderSettings?.audioPolicy ===
+    "NARRATION_WITH_OPTIONAL_BGM";
+  const latestBgmEnabled =
+    latestUsesCurrentBgmPolicy &&
+    typeof latestCompletedRenderSettings?.bgmEnabled === "boolean"
+      ? latestCompletedRenderSettings.bgmEnabled
+      : undefined;
+  const latestManualTrackId =
+    latestUsesCurrentBgmPolicy &&
+    latestCompletedRenderSettings?.bgmSelectionMode === "MANUAL" &&
+    isBgmTrackId(latestCompletedRenderSettings.bgmTrackId)
+      ? latestCompletedRenderSettings.bgmTrackId
+      : null;
   const [narrationJob, setNarrationJob] = useState<Job | null>(
     latestNarrationJob,
   );
@@ -103,10 +124,12 @@ export function FinalVideoPlayer({
   const [starting, setStarting] = useState<"narration" | "render" | null>(null);
   const [aiDisclosureEnabled, setAiDisclosureEnabled] = useState(true);
   const [bgmEnabled, setBgmEnabled] = useState(
-    outputMode === "STANDARD" && Boolean(storyboard?.bgmEnabled),
+    latestBgmEnabled ??
+      getInitialFinalBgmEnabled(outputMode, storyboard?.bgmEnabled),
   );
-  const [bgmTrackSelection, setBgmTrackSelection] =
-    useState<BgmTrackSelection>("AUTO");
+  const [bgmTrackSelection, setBgmTrackSelection] = useState<BgmTrackSelection>(
+    latestManualTrackId ?? "AUTO",
+  );
   const [error, setError] = useState<string | null>(
     latestNarrationJob?.error ?? latestRenderJob?.error ?? null,
   );
@@ -122,14 +145,12 @@ export function FinalVideoPlayer({
       findSceneNarrations(artifacts, narrationJob, storyboard?.scenes ?? []),
     [artifacts, narrationJob, storyboard?.scenes],
   );
-  const aiSelectedBgmTrack = useMemo(
-    () =>
-      selectBgmTrack({
-        preferredTrackId: storyboard?.bgmTrackId,
-        creativeText: storyboard?.bgmPrompt,
-      }),
-    [storyboard?.bgmPrompt, storyboard?.bgmTrackId],
-  );
+  const aiSelectedBgmTrack = selectBgmTrack({
+    preferredTrackId: storyboard?.bgmTrackId,
+    creativeText: storyboard
+      ? `${storyboard.title} ${storyboard.script} ${storyboard.bgmPrompt ?? ""}`
+      : "",
+  });
   const activeBgmTrack =
     bgmTrackSelection === "AUTO"
       ? aiSelectedBgmTrack
@@ -382,8 +403,7 @@ export function FinalVideoPlayer({
             storyboard.scenes.every((scene) => !scene.voiceoverText.trim()) ? (
             <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
               All scenes are intentionally silent. The reel can be rendered with
-              the final closer
-              {outputMode === "PRODUCT_SHOWCASE" ? "." : " and optional BGM."}
+              the final closer and optional BGM.
             </div>
           ) : (
             <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
@@ -409,18 +429,15 @@ export function FinalVideoPlayer({
             <input
               checked={bgmEnabled}
               className="size-4 accent-primary"
-              disabled={outputMode === "PRODUCT_SHOWCASE"}
               onChange={(event) => setBgmEnabled(event.target.checked)}
               type="checkbox"
             />
             <span className="flex items-center gap-2">
               <Music2 className="size-4 text-primary" aria-hidden="true" />
-              {outputMode === "PRODUCT_SHOWCASE"
-                ? "Voiceover-only audio"
-                : "Include background music"}
+              Include background music
             </span>
           </label>
-          {outputMode === "STANDARD" && bgmEnabled ? (
+          {bgmEnabled ? (
             <div
               className={`overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br ${activeBgmTrack.color} p-3.5`}
             >
@@ -479,7 +496,7 @@ export function FinalVideoPlayer({
             />
             <span>
               {outputMode === "PRODUCT_SHOWCASE"
-                ? "Product source clips are kept silent and muted during composition; scene narration supplies the final audio."
+                ? "Source-clip sound stays muted for a clean product film. AI Match adds a curated music bed, fades it at the reel edges, and automatically ducks it beneath narration."
                 : "AI Match follows the storyboard mood; you can preview or override it before rendering. Music loops cleanly, fades at the reel edges, and ducks under every narration scene."}
             </span>
           </div>

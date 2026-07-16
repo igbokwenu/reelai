@@ -471,13 +471,13 @@ describe("Phase 4 agent schemas", () => {
     ).toBeLessThanOrEqual(12);
     expect(parsed.scenes[0]?.voiceoverText).not.toMatch(/\band\.$/i);
     expect(parsed.bgm).toEqual({
-      enabled: false,
-      preset: "none",
-      prompt: "Voiceover only; no background music.",
+      enabled: true,
+      preset: "polished pulse",
+      prompt: "A restrained premium pulse with a tactile finish.",
     });
   });
 
-  it("derives missing storyboard script and narration-only BGM metadata without a paid reroll", () => {
+  it("derives missing storyboard script and default-on showcase BGM metadata without a paid reroll", () => {
     const parsed = parseStoryboardOutput(
       {
         title: "Sarah's signature finish",
@@ -516,9 +516,10 @@ describe("Phase 4 agent schemas", () => {
       "A joyful scoop, finished with Sarah's signature flourish.",
     );
     expect(parsed.bgm).toEqual({
-      enabled: false,
-      preset: "none",
-      prompt: "Voiceover only; no background music.",
+      enabled: true,
+      preset: "cinematic-wonder",
+      prompt:
+        "Premium instrumental background music matched to the product mood and kept beneath narration.",
     });
   });
 
@@ -752,7 +753,7 @@ describe("Phase 4 agent schemas", () => {
         mode: "NO_PEOPLE",
         members: [],
       });
-      expect(parsed.bgm.enabled).toBe(false);
+      expect(parsed.bgm.enabled).toBe(true);
     },
   );
 

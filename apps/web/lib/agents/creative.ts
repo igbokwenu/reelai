@@ -578,7 +578,6 @@ export async function generateStoryboardForProject(projectId: string) {
     projectId,
     conceptId: selectedConcept.id,
     brandKit: project.brandKit,
-    outputMode: project.outputMode,
     output,
   });
   const warnings = reviewStoryboardClaims(project.brandKit, output);
@@ -659,13 +658,11 @@ async function saveStoryboard({
   projectId,
   conceptId,
   brandKit,
-  outputMode,
   output,
 }: {
   projectId: string;
   conceptId: string;
   brandKit: BrandKit;
-  outputMode: "STANDARD" | "PRODUCT_SHOWCASE";
   output: StoryboardOutput;
 }) {
   const existing = await prisma.storyboard.findUnique({
@@ -680,13 +677,12 @@ async function saveStoryboard({
     output.continuityBible.characters,
     output.continuityBible.cast,
   );
-  const bgmTrack =
-    outputMode === "PRODUCT_SHOWCASE" || !output.bgm.enabled
-      ? null
-      : selectBgmTrack({
-          preferredTrackId: output.bgm.preset,
-          creativeText: `${output.title} ${output.bgm.preset} ${output.bgm.prompt}`,
-        });
+  const bgmTrack = !output.bgm.enabled
+    ? null
+    : selectBgmTrack({
+        preferredTrackId: output.bgm.preset,
+        creativeText: `${output.title} ${output.bgm.preset} ${output.bgm.prompt}`,
+      });
 
   const storyboard = await prisma.storyboard.upsert({
     where: { projectId },
@@ -694,8 +690,7 @@ async function saveStoryboard({
       conceptId,
       title: output.title,
       script: output.script,
-      bgmEnabled:
-        outputMode === "PRODUCT_SHOWCASE" ? false : output.bgm.enabled,
+      bgmEnabled: output.bgm.enabled,
       bgmPrompt: `${output.bgm.preset}: ${output.bgm.prompt}`,
       bgmTrackId: bgmTrack?.id ?? null,
       productContinuity: output.continuityBible.product,
@@ -721,8 +716,7 @@ async function saveStoryboard({
       conceptId,
       title: output.title,
       script: output.script,
-      bgmEnabled:
-        outputMode === "PRODUCT_SHOWCASE" ? false : output.bgm.enabled,
+      bgmEnabled: output.bgm.enabled,
       bgmPrompt: `${output.bgm.preset}: ${output.bgm.prompt}`,
       bgmTrackId: bgmTrack?.id ?? null,
       productContinuity: output.continuityBible.product,
@@ -1326,8 +1320,8 @@ Requirements:
 - Use the brand palette colors and visual motifs in scene descriptions.
 - The final scene must resolve with a clear brand-value payoff and preserve calm negative space in the upper-left safe area for Reel AI's composited brand lockup. When an uploaded logo is available, the renderer places that exact asset over the final scene; never ask the image or video model to redraw it.
 - Only the final scene caption is composited into the rendered reel as the closer or call to action; earlier captionText values are editorial labels and must not duplicate narration or be designed as on-screen typography.
-- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Generated source clips must be silent: do not describe dialogue, music, sound effects, ambience, or auto-dubbing. Narration is created separately and is the only Product Showcase audio layer." : "Do not ask source-video generation for dialogue or lip-sync; narration and optional music are composed separately."}
-- ${project.outputMode === "PRODUCT_SHOWCASE" ? 'Set bgm.enabled to false, bgm.preset to "none", and bgm.prompt to "Voiceover only; no background music." Product Showcase uses scene narration as its only final audio layer.' : `Choose bgm only when it adds real pacing value; narration remains primary. When enabled, set bgm.preset to exactly one curated id based on the concept mood: ${BGM_TRACKS.map((track) => `${track.id} (${track.shortDescription}; ${track.bestFor})`).join("; ")}. Use bgm.prompt to briefly explain the music direction and why that id fits. When disabled, return bgm.preset as "none" and bgm.prompt as "Voiceover only; no background music."`}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Generated source clips must be silent: do not describe dialogue, music, sound effects, ambience, or auto-dubbing. Scene narration and curated background music are composed separately in Remotion." : "Do not ask source-video generation for dialogue or lip-sync; narration and optional music are composed separately."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? `Set bgm.enabled to true so the first Auto render demonstrates the complete Reel AI mix. Set bgm.preset to exactly one curated id based on the product concept's mood: ${BGM_TRACKS.map((track) => `${track.id} (${track.shortDescription}; ${track.bestFor})`).join("; ")}. Use bgm.prompt to explain the fit briefly. Narration remains primary and the user can turn music off or change the track before a later re-render.` : `Choose bgm only when it adds real pacing value; narration remains primary. When enabled, set bgm.preset to exactly one curated id based on the concept mood: ${BGM_TRACKS.map((track) => `${track.id} (${track.shortDescription}; ${track.bestFor})`).join("; ")}. Use bgm.prompt to briefly explain the music direction and why that id fits. When disabled, return bgm.preset as "none" and bgm.prompt as "Voiceover only; no background music."`}
 - ${buildCinematicBoostInstruction(project.cinematicBoost)}
 - Match the ${project.style === "THREE_D_ANIMATION" ? "3D animation" : "realistic"} visual style.
 - Do not create unsupported performance, medical, financial, or legal claims.

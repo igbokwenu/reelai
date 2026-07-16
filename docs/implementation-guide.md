@@ -710,7 +710,7 @@ Composition behavior:
 - Remotion uses the official transition presentations and compensates sequence lengths for overlap so the final duration remains the sum of storyboard scene durations.
 - Only the last scene renders `captionText`. Its first half remains unobstructed except for the verified logo; the closer enters smoothly at the midpoint and remains for the second half. Earlier captions remain useful editorial labels in the storyboard UI.
 - A verified logo is rendered alone at 3× the former mark height. Business-name text is a fallback only when no verified logo exists.
-- Product Showcase source media is silent/muted and BGM is disabled; scene narration is the only final audio layer.
+- Product Showcase source media is silent/muted. Scene narration and default-on curated BGM are mixed separately; users can disable or replace the music and re-render.
 
 ## Deployment Contract
 

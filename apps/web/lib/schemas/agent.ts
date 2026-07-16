@@ -474,6 +474,14 @@ export const productShowcaseStoryboardSchema = storyboardBaseSchema.superRefine(
         path: ["continuityBible", "cast"],
       });
     }
+    if (!value.bgm.enabled) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Product Showcase defaults to a curated background-music bed for its first final render.",
+        path: ["bgm", "enabled"],
+      });
+    }
   },
 );
 
@@ -659,9 +667,9 @@ export const productShowcaseStoryboardJsonSchema = {
         ...storyboardJsonSchema.properties.bgm.properties,
         enabled: {
           type: "boolean",
-          const: false,
+          const: true,
           description:
-            "Product Showcase is narration-only and must not use background music.",
+            "Product Showcase defaults to curated background music so the first Auto render demonstrates the complete audio mix.",
         },
       },
     },
@@ -859,9 +867,7 @@ export function parseStoryboardOutput(
   const strict = validationSchema.safeParse(canonical);
 
   if (strict.success) {
-    return outputMode === "PRODUCT_SHOWCASE"
-      ? { ...strict.data, bgm: narrationOnlyBgm() }
-      : strict.data;
+    return strict.data;
   }
 
   const record = asRecord(canonical) ?? {};
@@ -1730,29 +1736,40 @@ function normalizeBgm(
   value: unknown,
   outputMode: "STANDARD" | "PRODUCT_SHOWCASE",
 ) {
-  if (outputMode === "PRODUCT_SHOWCASE") return narrationOnlyBgm();
-
   const record = asRecord(value);
+  const showcase = outputMode === "PRODUCT_SHOWCASE";
   const requestedEnabled =
     typeof record?.enabled === "boolean"
       ? record.enabled
       : typeof record?.bgmEnabled === "boolean"
         ? record.bgmEnabled
         : false;
-  const enabled = requestedEnabled;
-  const presetFallback = enabled ? "subtle" : "none";
-  const promptFallback = enabled
-    ? "Subtle background music that stays beneath the narration."
-    : "Voiceover only; no background music.";
+  const enabled = showcase ? true : requestedEnabled;
+  const presetFallback = showcase
+    ? "cinematic-wonder"
+    : enabled
+      ? "subtle"
+      : "none";
+  const promptFallback = showcase
+    ? "Premium instrumental background music matched to the product mood and kept beneath narration."
+    : enabled
+      ? "Subtle background music that stays beneath the narration."
+      : "Voiceover only; no background music.";
+  const rawPreset = record?.preset ?? record?.mood ?? record?.style;
+  const rawPrompt = record?.prompt ?? record?.description;
+  const presetSource =
+    enabled && isDisabledBgmText(rawPreset) ? undefined : rawPreset;
+  const promptSource =
+    enabled && isDisabledBgmText(rawPrompt) ? undefined : rawPrompt;
 
   return {
     enabled,
-    preset: text(record?.preset ?? record?.mood ?? record?.style, {
+    preset: text(presetSource, {
       fallback: presetFallback,
       min: 2,
       max: 80,
     }),
-    prompt: text(record?.prompt ?? record?.description, {
+    prompt: text(promptSource, {
       fallback: promptFallback,
       min: 4,
       max: 400,
@@ -1760,12 +1777,13 @@ function normalizeBgm(
   };
 }
 
-function narrationOnlyBgm() {
-  return {
-    enabled: false,
-    preset: "none",
-    prompt: "Voiceover only; no background music.",
-  };
+function isDisabledBgmText(value: unknown) {
+  return (
+    typeof value === "string" &&
+    /^(?:none|off|disabled|no (?:bgm|music)|voiceover only)\b/i.test(
+      value.trim(),
+    )
+  );
 }
 
 function text(

@@ -12,7 +12,7 @@ type RouteContext = {
 
 const renderRequestSchema = z.object({
   aiDisclosureEnabled: z.boolean().default(true),
-  bgmEnabled: z.boolean().default(false),
+  bgmEnabled: z.boolean().optional(),
   bgmTrackId: z
     .union([z.literal("AUTO"), z.enum(BGM_TRACK_IDS)])
     .default("AUTO"),

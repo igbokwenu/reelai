@@ -343,7 +343,7 @@ Qwen audio models cover speech rather than dedicated music generation. Alibaba M
 
 - Persist `bgmEnabled`, `bgmPrompt`, and the exact curated `bgmTrackId` on the storyboard.
 - Use five broad beds: Warm Uplift, Clean Momentum, Bold Kinetic, Cinematic Wonder, and Calm Organic.
-- Let the storyboard agent choose, let the Final step preview/override, and keep Product Showcase narration-only.
+- Let the storyboard agent choose and let the Final step preview, override, or disable it. Product Showcase defaults BGM on for its first Auto final while keeping generated source clips silent.
 - Store the chosen public asset as a hash-versioned project artifact, then loop, edge-fade, and narration-duck it in Remotion.
 - Treat on-demand Fun-Music or another licensed provider as a future opt-in path, not a render-time dependency.
 

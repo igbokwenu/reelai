@@ -12,6 +12,7 @@ import {
   type BgmTrack,
   type BgmTrackSelection,
 } from "@/lib/bgm/catalog";
+import { resolveFinalBgmEnabled } from "@/lib/bgm/policy";
 import { researchWebsite } from "@/lib/brand/website-research";
 import { createStoredArtifact } from "@/lib/media/artifacts";
 import {
@@ -86,7 +87,7 @@ export async function createAndRunFinalRenderJob({
   projectId,
   artifactBaseUrl,
   aiDisclosureEnabled = true,
-  bgmEnabled = false,
+  bgmEnabled,
   bgmTrackId = "AUTO",
 }: {
   projectId: string;
@@ -99,8 +100,10 @@ export async function createAndRunFinalRenderJob({
     where: { id: projectId },
     select: { outputMode: true, videoLengthSec: true },
   });
-  const effectiveBgmEnabled =
-    projectAudioPolicy.outputMode === "PRODUCT_SHOWCASE" ? false : bgmEnabled;
+  const effectiveBgmEnabled = resolveFinalBgmEnabled(
+    projectAudioPolicy.outputMode,
+    bgmEnabled,
+  );
   const storyboard = await getRenderableStoryboard(projectId, {
     requireVideos: true,
   });
@@ -133,10 +136,7 @@ export async function createAndRunFinalRenderJob({
             ? getBgmTrack(input.bgmTrackId).name
             : null,
         sourceClipAudio: "MUTED",
-        audioPolicy:
-          projectAudioPolicy.outputMode === "PRODUCT_SHOWCASE"
-            ? "VOICEOVER_ONLY"
-            : "NARRATION_WITH_OPTIONAL_BGM",
+        audioPolicy: "NARRATION_WITH_OPTIONAL_BGM",
         logoIncluded: Boolean(input.brandWatermark?.logoUrl),
         logoLoadPolicy: input.brandWatermark?.logoUrl
           ? "WAIT_FOR_DOWNLOAD_AND_DECODE"
