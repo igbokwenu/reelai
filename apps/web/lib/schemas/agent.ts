@@ -5,6 +5,11 @@ import {
   normalizeShowcaseSceneCount,
   productShowcaseSceneRange,
 } from "@/lib/storyboards/timing";
+import {
+  showcaseCameraBehaviors,
+  showcaseHumanPresence,
+  showcaseSeparationTreatments,
+} from "@/lib/product-showcase/guardrails";
 
 export const creativeConceptSchema = z.object({
   title: z.string().min(3).max(90),
@@ -18,10 +23,20 @@ export const creativeConceptSchema = z.object({
   rationale: z.string().min(20).max(520),
 });
 
+export const showcaseMotionPlanSchema = z.object({
+  heroAction: z.string().trim().min(8).max(180),
+  supportingMotion: z.string().trim().min(3).max(180),
+  cameraBehavior: z.enum(showcaseCameraBehaviors),
+  humanPresence: z.enum(showcaseHumanPresence),
+  separationTreatment: z.enum(showcaseSeparationTreatments),
+  safetyRationale: z.string().trim().min(12).max(280),
+});
+
 export const productShowcaseCreativeConceptSchema =
   creativeConceptSchema.extend({
     estimatedScenes: z.number().int().min(1).max(3),
     estimatedDurationSec: z.number().int().min(5).max(15),
+    motionPlan: showcaseMotionPlanSchema,
   });
 
 export const creativeConceptsSchema = z.object({
@@ -90,10 +105,55 @@ export const productShowcaseCreativeConceptsJsonSchema = {
       ...creativeConceptsJsonSchema.properties.concepts,
       items: {
         ...creativeConceptsJsonSchema.properties.concepts.items,
+        required: [
+          ...creativeConceptsJsonSchema.properties.concepts.items.required,
+          "motionPlan",
+        ],
         properties: {
           ...creativeConceptsJsonSchema.properties.concepts.items.properties,
           estimatedScenes: { type: "integer", minimum: 1, maximum: 3 },
           estimatedDurationSec: { type: "integer", minimum: 5, maximum: 15 },
+          motionPlan: {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "heroAction",
+              "supportingMotion",
+              "cameraBehavior",
+              "humanPresence",
+              "separationTreatment",
+              "safetyRationale",
+            ],
+            properties: {
+              heroAction: { type: "string", minLength: 8, maxLength: 180 },
+              supportingMotion: {
+                type: "string",
+                minLength: 3,
+                maxLength: 180,
+                description:
+                  'Use "None" when the hero action should remain visually isolated.',
+              },
+              cameraBehavior: {
+                type: "string",
+                enum: showcaseCameraBehaviors,
+              },
+              humanPresence: {
+                type: "string",
+                enum: showcaseHumanPresence,
+                description:
+                  "If a human appears, ONE_PERSON means exactly one person total across the concept.",
+              },
+              separationTreatment: {
+                type: "string",
+                enum: showcaseSeparationTreatments,
+              },
+              safetyRationale: {
+                type: "string",
+                minLength: 12,
+                maxLength: 280,
+              },
+            },
+          },
         },
       },
     },
@@ -395,13 +455,25 @@ export const storyboardSchema = storyboardBaseSchema.superRefine((value, ctx) =>
 );
 
 export const productShowcaseStoryboardSchema = storyboardBaseSchema.superRefine(
-  (value, ctx) =>
+  (value, ctx) => {
     validateStoryboardStructure(value, ctx, {
       minScenes: 1,
       maxScenes: 3,
       minDuration: 5,
       maxDuration: 15,
-    }),
+    });
+    if (
+      value.continuityBible.cast.mode === "MULTI_PERSON" ||
+      value.continuityBible.cast.members.length > 1
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Product Showcase may use no people or exactly one person total.",
+        path: ["continuityBible", "cast"],
+      });
+    }
+  },
 );
 
 export const storyboardJsonSchema = {
@@ -642,7 +714,13 @@ export const policyWarningSchema = z.object({
   mitigation: z.string().min(4).max(280),
 });
 
-export type CreativeConceptsOutput = z.infer<typeof creativeConceptsSchema>;
+export type ProductShowcaseCreativeConcept = z.infer<
+  typeof productShowcaseCreativeConceptSchema
+>;
+export type CreativeConceptOutput = z.infer<typeof creativeConceptSchema> & {
+  motionPlan?: ProductShowcaseCreativeConcept["motionPlan"];
+};
+export type CreativeConceptsOutput = { concepts: CreativeConceptOutput[] };
 export type StoryboardOutput = z.infer<typeof storyboardSchema>;
 export type PolicyWarning = z.infer<typeof policyWarningSchema>;
 
@@ -683,6 +761,10 @@ const flexibleConceptSchema = z
     why: z.unknown().optional(),
     whyItWorks: z.unknown().optional(),
     why_it_works: z.unknown().optional(),
+    motionPlan: z.unknown().optional(),
+    motion_plan: z.unknown().optional(),
+    motionTreatment: z.unknown().optional(),
+    motion_treatment: z.unknown().optional(),
   })
   .passthrough();
 
@@ -976,7 +1058,7 @@ function normalizeConcept(
       ? Math.min(15, Math.max(5, Math.round(targetDurationSec)))
       : estimatedDurationSec;
 
-  return {
+  const concept = {
     title,
     hook,
     strategy,
@@ -1001,6 +1083,56 @@ function normalizeConcept(
       },
     ),
   };
+
+  return productShowcase
+    ? {
+        ...concept,
+        motionPlan: normalizeShowcaseMotionPlan(
+          parsed.motionPlan ??
+            parsed.motion_plan ??
+            parsed.motionTreatment ??
+            parsed.motion_treatment,
+        ),
+      }
+    : concept;
+}
+
+function normalizeShowcaseMotionPlan(value: unknown) {
+  const record = asRecord(value) ?? {};
+  return showcaseMotionPlanSchema.parse({
+    heroAction: text(record.heroAction ?? record.hero_action, {
+      fallback: "",
+      min: 8,
+      max: 180,
+    }),
+    supportingMotion: text(
+      record.supportingMotion ?? record.supporting_motion,
+      { fallback: "", min: 3, max: 180 },
+    ),
+    cameraBehavior: normalizeEnumValue(
+      record.cameraBehavior ?? record.camera_behavior,
+    ),
+    humanPresence: normalizeEnumValue(
+      record.humanPresence ?? record.human_presence,
+    ),
+    separationTreatment: normalizeEnumValue(
+      record.separationTreatment ?? record.separation_treatment,
+    ),
+    safetyRationale: text(record.safetyRationale ?? record.safety_rationale, {
+      fallback: "",
+      min: 12,
+      max: 280,
+    }),
+  });
+}
+
+function normalizeEnumValue(value: unknown) {
+  return typeof value === "string"
+    ? value
+        .trim()
+        .replace(/[\s-]+/g, "_")
+        .toUpperCase()
+    : value;
 }
 
 function canonicalizeStoryboardValue(value: unknown) {

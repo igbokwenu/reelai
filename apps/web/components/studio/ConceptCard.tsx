@@ -1,11 +1,14 @@
 "use client";
 
 import {
+  Aperture,
   CheckCircle2,
   ImageIcon,
   Loader2,
   MousePointer2,
   RefreshCw,
+  ShieldCheck,
+  UserRound,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -22,6 +25,7 @@ type Concept = {
   estimatedDuration: number;
   previewPrompt: string;
   previewArtifactId: string | null;
+  showcaseMotionPlan?: unknown;
   selected: boolean;
   rationale: string;
 };
@@ -38,6 +42,7 @@ export function ConceptCard({
   isRegenerating,
   isBusy,
   requiresRegeneration,
+  outputMode,
   onRegenerate,
 }: {
   concept: Concept;
@@ -47,10 +52,12 @@ export function ConceptCard({
   isRegenerating: boolean;
   isBusy: boolean;
   requiresRegeneration: boolean;
+  outputMode: "STANDARD" | "PRODUCT_SHOWCASE";
 }) {
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [adjustmentNote, setAdjustmentNote] = useState("");
   const previewHref = artifact ? `/api/artifacts/${artifact.id}/file` : null;
+  const motionPlan = parseMotionPlan(concept.showcaseMotionPlan);
 
   return (
     <article className="grid min-h-full gap-3 rounded-md border border-border bg-background/50 p-3">
@@ -94,6 +101,67 @@ export function ConceptCard({
         />
         <Info label="Rationale" value={concept.rationale} />
       </dl>
+
+      {outputMode === "PRODUCT_SHOWCASE" ? (
+        motionPlan ? (
+          <section className="relative overflow-hidden rounded-xl border border-primary/20 bg-[radial-gradient(circle_at_top_right,rgba(183,255,60,0.13),transparent_44%),linear-gradient(145deg,rgba(183,255,60,0.055),rgba(255,255,255,0.012))] p-3.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="flex size-7 items-center justify-center rounded-lg bg-primary/12 text-primary">
+                  <ShieldCheck className="size-3.5" aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+                    Motion treatment
+                  </p>
+                  <p className="text-xs font-medium">
+                    Production-safe by design
+                  </p>
+                </div>
+              </div>
+              <span className="rounded-full border border-primary/20 bg-primary/[0.08] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-primary">
+                Guarded
+              </span>
+            </div>
+
+            <div className="mt-3 grid gap-2">
+              <MotionDetail label="Hero action" value={motionPlan.heroAction} />
+              <MotionDetail
+                label="Supporting motion"
+                value={motionPlan.supportingMotion}
+              />
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <MotionChip
+                icon={Aperture}
+                value={formatMotionValue(motionPlan.cameraBehavior)}
+              />
+              <MotionChip
+                icon={UserRound}
+                value={
+                  motionPlan.humanPresence === "ONE_PERSON"
+                    ? "One person only"
+                    : "Product only"
+                }
+              />
+              <MotionChip
+                icon={ShieldCheck}
+                value={separationLabel(motionPlan.separationTreatment)}
+              />
+            </div>
+
+            <p className="mt-3 border-t border-primary/10 pt-3 text-[11px] leading-5 text-muted-foreground">
+              {motionPlan.safetyRationale}
+            </p>
+          </section>
+        ) : (
+          <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.05] p-3 text-xs leading-5 text-amber-100">
+            Regenerate this legacy direction to add the current motion safety
+            plan before selection.
+          </div>
+        )
+      ) : null}
 
       <div className="mt-auto grid gap-3">
         {isAdjusting ? (
@@ -213,6 +281,77 @@ export function ConceptCard({
       </div>
     </article>
   );
+}
+
+type MotionPlan = {
+  heroAction: string;
+  supportingMotion: string;
+  cameraBehavior: string;
+  humanPresence: "NO_PERSON" | "ONE_PERSON";
+  separationTreatment:
+    "AVOID" | "FOOD_LAYER_SEPARATION" | "VISIBLE_COMPONENT_SEPARATION";
+  safetyRationale: string;
+};
+
+function parseMotionPlan(value: unknown): MotionPlan | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const plan = value as Record<string, unknown>;
+  if (
+    typeof plan.heroAction !== "string" ||
+    typeof plan.supportingMotion !== "string" ||
+    typeof plan.cameraBehavior !== "string" ||
+    (plan.humanPresence !== "NO_PERSON" &&
+      plan.humanPresence !== "ONE_PERSON") ||
+    (plan.separationTreatment !== "AVOID" &&
+      plan.separationTreatment !== "FOOD_LAYER_SEPARATION" &&
+      plan.separationTreatment !== "VISIBLE_COMPONENT_SEPARATION") ||
+    typeof plan.safetyRationale !== "string"
+  ) {
+    return null;
+  }
+  return plan as MotionPlan;
+}
+
+function MotionDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-white/[0.055] bg-black/10 px-2.5 py-2">
+      <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 text-xs leading-5 text-foreground/90">{value}</p>
+    </div>
+  );
+}
+
+function MotionChip({
+  icon: Icon,
+  value,
+}: {
+  icon: typeof Aperture;
+  value: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-background/45 px-2 py-1 text-[10px] text-muted-foreground">
+      <Icon className="size-3 text-primary" aria-hidden="true" />
+      {value}
+    </span>
+  );
+}
+
+function formatMotionValue(value: string) {
+  return value
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function separationLabel(value: MotionPlan["separationTreatment"]) {
+  if (value === "FOOD_LAYER_SEPARATION") return "Food layers eligible";
+  if (value === "VISIBLE_COMPONENT_SEPARATION") {
+    return "Visible parts eligible";
+  }
+  return "No teardown";
 }
 
 function Info({ label, value }: { label: string; value: string }) {

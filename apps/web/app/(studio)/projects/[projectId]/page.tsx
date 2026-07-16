@@ -333,6 +333,7 @@ export default async function ProjectPage({ params }: PageProps) {
                   concepts={project.concepts}
                   hasBrandKit={Boolean(project.brandKit)}
                   latestConceptJob={latestConceptJob}
+                  outputMode={project.outputMode}
                   projectId={project.id}
                   sources={project.sources}
                   websiteUrl={project.websiteUrl}

@@ -12,7 +12,7 @@ export async function POST(_request: Request, context: RouteContext) {
     const { projectId, conceptId } = await context.params;
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true },
+      select: { id: true, outputMode: true },
     });
 
     if (!project) {
@@ -22,7 +22,7 @@ export async function POST(_request: Request, context: RouteContext) {
 
     const candidate = await prisma.creativeConcept.findFirst({
       where: { id: conceptId, projectId },
-      select: { previewArtifactId: true },
+      select: { previewArtifactId: true, showcaseMotionPlan: true },
     });
     if (!candidate) return notFound("Concept not found");
     const preview = candidate.previewArtifactId
@@ -37,6 +37,18 @@ export async function POST(_request: Request, context: RouteContext) {
         {
           error:
             "Regenerate this concept with the current visual grounding safeguards before selecting it.",
+        },
+        { status: 409 },
+      );
+    }
+    if (
+      project.outputMode === "PRODUCT_SHOWCASE" &&
+      !candidate.showcaseMotionPlan
+    ) {
+      return ok(
+        {
+          error:
+            "Regenerate this legacy Product Showcase concept to add its motion safety plan before selecting it.",
         },
         { status: 409 },
       );

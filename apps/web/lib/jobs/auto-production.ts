@@ -53,7 +53,10 @@ export async function startAutoGeneration({
       where: { id: projectId },
       include: {
         brandKit: { select: { id: true } },
-        concepts: { where: { selected: true }, select: { id: true } },
+        concepts: {
+          where: { selected: true },
+          select: { id: true, showcaseMotionPlan: true },
+        },
       },
     });
     if (!project.brandKit) {
@@ -62,6 +65,15 @@ export async function startAutoGeneration({
     if (project.concepts.length !== 1) {
       throw new PublicError(
         "Select exactly one creative concept before proceeding.",
+        409,
+      );
+    }
+    if (
+      project.outputMode === "PRODUCT_SHOWCASE" &&
+      !project.concepts[0]?.showcaseMotionPlan
+    ) {
+      throw new PublicError(
+        "Regenerate the selected Product Showcase concept to add its motion safety plan before proceeding.",
         409,
       );
     }

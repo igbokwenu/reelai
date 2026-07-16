@@ -33,6 +33,7 @@ type Concept = {
   estimatedDuration: number;
   previewPrompt: string;
   previewArtifactId: string | null;
+  showcaseMotionPlan?: unknown;
   selected: boolean;
   rationale: string;
 };
@@ -71,6 +72,7 @@ export function ConceptTable({
   brandKitConfirmedAt,
   businessName,
   websiteUrl,
+  outputMode,
 }: {
   projectId: string;
   hasBrandKit: boolean;
@@ -83,6 +85,7 @@ export function ConceptTable({
   brandKitConfirmedAt: Date | string | null;
   businessName: string;
   websiteUrl: string | null;
+  outputMode: "STANDARD" | "PRODUCT_SHOWCASE";
 }) {
   const router = useRouter();
   const [job, setJob] = useState<Job | null>(latestConceptJob);
@@ -426,6 +429,27 @@ export function ConceptTable({
         </div>
       ) : null}
 
+      {outputMode === "PRODUCT_SHOWCASE" ? (
+        <div className="flex gap-3 rounded-2xl border border-primary/20 bg-[radial-gradient(circle_at_top_right,rgba(183,255,60,0.10),transparent_42%),rgba(183,255,60,0.035)] p-4 text-sm">
+          <ShieldCheck
+            className="mt-0.5 size-5 shrink-0 text-primary"
+            aria-hidden="true"
+          />
+          <div>
+            <p className="font-medium">
+              Motion feasibility is planned up front
+            </p>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
+              Each direction declares one hero action, one calm camera behavior,
+              human presence, and a category-aware separation decision. If a
+              person appears, they are the only person in the showcase. Risky
+              electronic, screen, and fabric teardown is blocked before video
+              generation.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       {selectedConceptId && readyToProceed && !showBrandHandoff ? (
         <div className="flex flex-col gap-4 rounded-2xl border border-primary/25 bg-primary/[0.065] p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-3">
@@ -495,6 +519,7 @@ export function ConceptTable({
                 ...concept,
                 selected: concept.id === selectedConceptId,
               }}
+              outputMode={outputMode}
               isBusy={
                 isStarting ||
                 isRunning ||
@@ -505,11 +530,15 @@ export function ConceptTable({
               key={concept.id}
               onRegenerate={regenerateConcept}
               onSelect={selectConcept}
-              requiresRegeneration={isLegacyPreview(
-                concept.previewArtifactId
-                  ? (artifactById.get(concept.previewArtifactId) ?? null)
-                  : null,
-              )}
+              requiresRegeneration={
+                isLegacyPreview(
+                  concept.previewArtifactId
+                    ? (artifactById.get(concept.previewArtifactId) ?? null)
+                    : null,
+                ) ||
+                (outputMode === "PRODUCT_SHOWCASE" &&
+                  !concept.showcaseMotionPlan)
+              }
             />
           ))}
         </div>

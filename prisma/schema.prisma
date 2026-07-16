@@ -120,6 +120,7 @@ model CreativeConcept {
   estimatedDuration Int
   previewPrompt     String
   previewArtifactId String?
+  showcaseMotionPlan Json?
   selected          Boolean  @default(false)
   rationale         String
   createdAt         DateTime @default(now())

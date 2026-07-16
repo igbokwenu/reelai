@@ -9,6 +9,8 @@ import {
   parseCreativeConceptRegenerationOutput,
   parseCreativeConceptsOutput,
   parseStoryboardOutput,
+  productShowcaseCreativeConceptsJsonSchema,
+  productShowcaseStoryboardSchema,
   storyboardJsonSchema,
   storyboardSceneSchema,
   storyboardSchema,
@@ -189,6 +191,66 @@ describe("Phase 4 agent schemas", () => {
     expect(concepts.items.required).toContain("rationale");
     expect(concepts.items.properties.strategy.minLength).toBe(20);
     expect(concepts.items.properties.rationale.minLength).toBe(20);
+  });
+
+  it("requires a structured Product Showcase motion decision", () => {
+    const item =
+      productShowcaseCreativeConceptsJsonSchema.properties.concepts.items;
+    expect(item.required).toContain("motionPlan");
+    expect(item.properties.motionPlan.required).toEqual([
+      "heroAction",
+      "supportingMotion",
+      "cameraBehavior",
+      "humanPresence",
+      "separationTreatment",
+      "safetyRationale",
+    ]);
+    expect(item.properties.motionPlan.properties.humanPresence.enum).toEqual([
+      "NO_PERSON",
+      "ONE_PERSON",
+    ]);
+  });
+
+  it("never permits a multi-person Product Showcase cast", () => {
+    const scene = {
+      index: 1,
+      durationSec: 5,
+      captionText: "See it clearly",
+      voiceoverText: "Made for the moment.",
+      shotPrompt:
+        "Quiet precision: the product rotates through one light sweep while a fixed camera holds its clean silhouette.",
+      continuityNotes:
+        "Keep the product geometry, palette, lighting, and position stable.",
+      continuityMode: "CONTINUOUS" as const,
+      transitionStyle: "CUT" as const,
+    };
+    const result = productShowcaseStoryboardSchema.safeParse({
+      title: "Unsafe group showcase",
+      script: "A concise product narration closes with one clear action.",
+      bgm: {
+        enabled: false,
+        preset: "none",
+        prompt: "Voiceover only; no background music.",
+      },
+      continuityBible: {
+        product: "Keep the exact supplied product geometry and materials.",
+        characters: "Two models remain beside the product.",
+        cast: {
+          mode: "MULTI_PERSON",
+          members: [
+            founderCast.members[0],
+            {
+              ...founderCast.members[0],
+              role: "customer",
+              distinguishingFeature: "square glasses and a rounded jawline",
+            },
+          ],
+        },
+        visualWorld: "Keep the same quiet studio and narrow pearl light.",
+      },
+      scenes: [scene],
+    });
+    expect(result.success).toBe(false);
   });
 
   it("validates and normalizes one concept regeneration", () => {

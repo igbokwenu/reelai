@@ -5,6 +5,7 @@ import type {
   BrandKit,
   BrandSource,
   CreativeConcept,
+  Prisma,
   Project,
   ProjectProduct,
 } from "@prisma/client";
@@ -47,6 +48,11 @@ import {
   type StoryboardOutput,
 } from "@/lib/schemas/agent";
 import { deleteStoredObject, storeObject } from "@/lib/oss";
+import {
+  buildShowcaseMotionGuardrailBrief,
+  findShowcaseConceptViolations,
+  findShowcaseStoryboardViolations,
+} from "@/lib/product-showcase/guardrails";
 import {
   normalizeShowcaseSceneCount,
   storyboardTimingIssue,
@@ -103,6 +109,17 @@ export async function generateConceptsForProject(projectId: string) {
     system: conceptSystemPrompt,
     user: buildConceptPrompt(project),
   });
+  if (project.outputMode === "PRODUCT_SHOWCASE") {
+    const motionViolations = findShowcaseConceptViolations(
+      result.data.concepts,
+      project.products,
+    );
+    if (motionViolations.length > 0) {
+      throw new Error(
+        `Product Showcase motion check failed: ${motionViolations.slice(0, 3).join(" ")} Regenerate the concepts to receive safer directions.`,
+      );
+    }
+  }
   validateConceptTiming(project, result.data.concepts);
   const grounding = getGroundingCapabilities(project.sources, project.brandKit);
   const violations = findConceptGroundingViolations(
@@ -143,6 +160,12 @@ export async function generateConceptsForProject(projectId: string) {
           estimatedDuration: concept.estimatedDurationSec,
           previewPrompt: concept.previewPrompt,
           previewArtifactId: artifacts[index]?.id ?? null,
+          showcaseMotionPlan:
+            project.outputMode === "PRODUCT_SHOWCASE" && "motionPlan" in concept
+              ? concept.motionPlan
+                ? (concept.motionPlan as Prisma.InputJsonValue)
+                : undefined
+              : undefined,
           rationale: concept.rationale,
           selected: false,
         },
@@ -238,6 +261,17 @@ export async function regenerateConceptForProject({
       adjustmentNote,
     }),
   });
+  if (project.outputMode === "PRODUCT_SHOWCASE") {
+    const motionViolations = findShowcaseConceptViolations(
+      [result.data.concept],
+      project.products,
+    );
+    if (motionViolations.length > 0) {
+      throw new Error(
+        `Product Showcase motion check failed: ${motionViolations.slice(0, 3).join(" ")} Regenerate this direction to receive a safer motion plan.`,
+      );
+    }
+  }
   validateConceptTiming(project, [result.data.concept]);
   const grounding = getGroundingCapabilities(project.sources, project.brandKit);
   const violations = findConceptGroundingViolations(
@@ -277,6 +311,13 @@ export async function regenerateConceptForProject({
         estimatedDuration: result.data.concept.estimatedDurationSec,
         previewPrompt: result.data.concept.previewPrompt,
         previewArtifactId: previewArtifact.id,
+        showcaseMotionPlan:
+          project.outputMode === "PRODUCT_SHOWCASE" &&
+          "motionPlan" in result.data.concept
+            ? result.data.concept.motionPlan
+              ? (result.data.concept.motionPlan as Prisma.InputJsonValue)
+              : undefined
+            : undefined,
         rationale: result.data.concept.rationale,
       },
     });
@@ -402,6 +443,14 @@ export async function generateStoryboardForProject(projectId: string) {
       "Select one creative concept before generating a storyboard.",
     );
   }
+  if (
+    project.outputMode === "PRODUCT_SHOWCASE" &&
+    !selectedConcept.showcaseMotionPlan
+  ) {
+    throw new Error(
+      "Regenerate the selected Product Showcase concept to add its motion safety plan before storyboard planning.",
+    );
+  }
 
   const storyboardGrounding = getGroundingCapabilities(
     project.sources,
@@ -439,13 +488,17 @@ export async function generateStoryboardForProject(projectId: string) {
     [output],
     storyboardGrounding,
   );
+  let showcaseMotionViolations =
+    project.outputMode === "PRODUCT_SHOWCASE"
+      ? findShowcaseStoryboardViolations(output, project.products)
+      : [];
   const initialViolations = [
     ...new Set([...preflightViolations, ...storyboardViolations]),
   ];
   let recoveryMethod: GroundingRecoverySummary["method"] =
     preflightViolations.length > 0 ? "PREFLIGHT_ADAPTATION" : null;
 
-  if (storyboardViolations.length > 0) {
+  if (storyboardViolations.length > 0 || showcaseMotionViolations.length > 0) {
     recoveryResult = await generateStructuredWithQwen({
       operation: "storyboard_grounding_recovery",
       schema:
@@ -470,6 +523,7 @@ export async function generateStoryboardForProject(projectId: string) {
         concept: selectedConcept,
         rejected: output,
         violations: storyboardViolations,
+        showcaseMotionViolations,
         grounding: storyboardGrounding,
       }),
     });
@@ -481,6 +535,10 @@ export async function generateStoryboardForProject(projectId: string) {
       [output],
       storyboardGrounding,
     );
+    showcaseMotionViolations =
+      project.outputMode === "PRODUCT_SHOWCASE"
+        ? findShowcaseStoryboardViolations(output, project.products)
+        : [];
   }
 
   if (storyboardViolations.length > 0) {
@@ -489,6 +547,12 @@ export async function generateStoryboardForProject(projectId: string) {
     storyboardViolations = findConceptGroundingViolations(
       [output],
       storyboardGrounding,
+    );
+  }
+
+  if (showcaseMotionViolations.length > 0) {
+    throw new Error(
+      `Product Showcase motion check failed after automatic recovery: ${showcaseMotionViolations.slice(0, 3).join(" ")} Regenerate the storyboard or revise the concept before production.`,
     );
   }
 
@@ -556,9 +620,15 @@ export function getCreativeGenerationError(error: unknown) {
 
   if (
     error instanceof Error &&
-    /^(Creative|Storyboard) grounding check failed(?: after automatic recovery)?:/.test(
+    /^(?:(?:Creative|Storyboard) grounding check failed(?: after automatic recovery)?|Product Showcase motion check failed(?: after automatic recovery)?):/.test(
       error.message,
     )
+  ) {
+    return error.message;
+  }
+  if (
+    error instanceof Error &&
+    error.message.startsWith("Regenerate the selected Product Showcase concept")
   ) {
     return error.message;
   }
@@ -931,6 +1001,8 @@ Visual motifs: ${JSON.stringify(safeVisualMotifs(brandKit?.visualMotifs, groundi
 Verified website evidence:
 ${websiteEvidence || "No clean website text was retained. Do not infer additional service or product details."}
 
+${project.outputMode === "PRODUCT_SHOWCASE" ? buildShowcaseMotionGuardrailBrief(project.products) : ""}
+
 Requirements:
 - Return exactly three concepts.
 - Make them different strategies, not three hook variants.
@@ -941,6 +1013,7 @@ Requirements:
 - Do not leave strategy, narrativeArc, previewPrompt, or rationale blank or generic.
 - ${buildSceneCountInstruction(project, "CONCEPT")}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Every direction must be a premium product-first showcase grounded in the uploaded product images. Make the three routes meaningfully different: for example tactile/material reveal, cinematic hero motion, or an elegant use-context/model presentation when appropriate." : "Keep the product or service strategy grounded in verified evidence."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? 'Every concept must return motionPlan. Name one heroAction; set supportingMotion to "None" or one low-amplitude material behavior; choose one supported cameraBehavior; declare NO_PERSON or ONE_PERSON; choose the evidence-based separationTreatment; and explain why the plan is visually interesting yet reliable in safetyRationale.' : "Keep execution details proportionate to the concept stage."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "First classify the hero product by its real visual behavior, then design for that behavior: food and drink may use verified garnish, condensation, steam, pours, crumbs, or temperature contrast; beauty may use a controlled droplet, texture ribbon, cap reveal, or light sweep; fashion may use fabric response, a silhouette turn, or a clean step; rigid packaged goods and electronics favor precision rotation, parallax, surface light, or a functional reveal; home and craft objects favor material detail and a simple use-result. Do not apply the same spin or floating-parts idea to every category." : "Choose a domain-specific premium visual system: service reels need visible cause-and-effect behavior; places need spatial reveals and atmosphere; software needs verified interface action or a real-world outcome; expertise needs concrete artifacts and decisions. Avoid generic montage logic."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Choose exactly one hero product and one hero action per shot. If multiple products are supplied, treat them as a restrained collection: reveal them sequentially or keep secondary products static; never merge products or choreograph several transformations at once." : "Use a clear brand-relevant visual hook."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Favor identity-safe motion: a short partial hero rotation, controlled separation/reassembly of a few large rigid components, verified ingredient layering, fabric movement, package reveal, light sweep, turntable, or one model/use-context action. One simple supporting material behavior may accompany the hero action—for example an ice-cream makes one stylish partial rotation while toppings already supported by the references fall in a clean arc. Avoid full-speed spins, melting, spawning, tiny-part explosions, fine hand manipulation, and simultaneous camera plus object choreography." : "Build a memorable but readable visual pattern: one defining metaphor or physical motif, one visible cause-and-effect beat per scene, and a purposeful lighting progression. Avoid overloaded choreography and stock-ad montage."}
@@ -1003,6 +1076,8 @@ Visual motifs: ${JSON.stringify(safeVisualMotifs(brandKit?.visualMotifs, groundi
 Verified website evidence:
 ${websiteEvidence || "No clean website text was retained. Do not infer additional service or product details."}
 
+${project.outputMode === "PRODUCT_SHOWCASE" ? buildShowcaseMotionGuardrailBrief(project.products) : ""}
+
 Concept being replaced:
 ${JSON.stringify({
   title: target.title,
@@ -1030,6 +1105,7 @@ Requirements:
 - rationale must explain why this direction can work for this brand and audience.
 - ${buildSceneCountInstruction(project, "CONCEPT")}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Keep the uploaded product as the unmistakable hero. Use one hero product and one hero action per shot; secondary products stay static or appear sequentially. Reject morphing, melting, crowded transformations, and ungrounded product variants." : "Keep the execution grounded and visually legible."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Return a complete motionPlan with one heroAction, optional restrained supportingMotion, one cameraBehavior, NO_PERSON or ONE_PERSON, an evidence-based separationTreatment, and a concise safetyRationale." : "Keep the replacement feasible for the downstream storyboard."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Choose motion from the product's real material and use cues rather than defaulting to a generic spin: use verified garnish/temperature behavior for food, fluid or texture control for beauty, fabric response for fashion, precision parallax/light for rigid goods, and simple use-result motion for home or craft products. One restrained supporting material behavior may accompany the hero action." : "Use domain-specific action, physical metaphor, and lighting rather than a generic montage."}
 - Plan only purposeful scene transitions: clean cut for match cuts; short fade for gentle continuity; slide or wipe for directional movement; iris or clock wipe only when circular geometry or a centered hero reveal motivates it.
 - ${buildCinematicBoostInstruction(project.cinematicBoost)}
@@ -1162,6 +1238,7 @@ Strategy: ${concept.strategy}
 Narrative arc: ${concept.narrativeArc}
 Visual style: ${concept.visualStyle}
 Rationale: ${concept.rationale}
+Product motion plan: ${project.outputMode === "PRODUCT_SHOWCASE" ? JSON.stringify(concept.showcaseMotionPlan) : "Not applicable"}
 
 Brand Kit:
 Tone: ${brandKit?.tone}
@@ -1181,12 +1258,14 @@ ${buildGroundingRecoveryInstructions(preflightViolations, grounding)}
     : ""
 }
 
+${project.outputMode === "PRODUCT_SHOWCASE" ? buildShowcaseMotionGuardrailBrief(project.products) : ""}
+
 Requirements:
 - ${buildSceneCountInstruction(project, "STORYBOARD")}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Total duration must exactly match the requested 5 to 15 seconds, with every scene lasting 5 to 10 seconds." : "Total duration must be 15 to 30 seconds, with every scene lasting 5 to 10 seconds. Prefer 5 to 8 seconds; use 9 to 10 only for exceptionally simple motion."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Treat the actual uploaded product photography as the source of truth for silhouette, materials, colors, proportions, surface details, packaging, and visible ingredients. The generated scene may stylize the world but must not redesign the product." : "Preserve recurring product identity whenever a product is present."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Assign exactly one hero product and one primary action to each shot. For multiple products, use sequential hero shots or a static collection composition; never ask multiple products to assemble, transform, collide, or cross paths together." : "Keep the motion hierarchy deliberately simple."}
-- ${project.outputMode === "PRODUCT_SHOWCASE" ? "A separation/reassembly concept may move only a few large, visually grounded layers or components on one axis, then settle cleanly. Never explode dozens of small pieces, invent internal components, melt materials, or morph one product into another." : "Avoid physically ambiguous transformations."}
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Honor the selected motionPlan's separationTreatment. FOOD_LAYER_SEPARATION is only for clearly layered food with verified visible ingredients. VISIBLE_COMPONENT_SEPARATION is only for a few large, externally visible, reference-backed modular pieces. Electronics, screens, fabrics, garments, and uncertain products must use AVOID—never show internals, exploded views, disassembly, unraveling, or reassembly." : "Avoid physically ambiguous transformations."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Choose a category-native product performance rather than a generic spin: food/drink may use supported garnish, condensation, steam, pouring, crumbs, or temperature contrast; beauty may use one droplet, texture ribbon, cap reveal, or light sweep; fashion may use fabric response, one silhouette turn, or one step; rigid goods/electronics may use a brief precision rotation, parallax, surface light, or functional reveal; home/craft objects may use material detail and one use-result. A simple supporting material behavior may accompany the hero action when it is grounded—for example a brief ice-cream rotation with verified toppings falling in one clean arc." : "Derive each scene's visual device from the offer's real behavior."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "For clothing or wearable products, a model may wear the exact referenced item, but use one simple pose, step, turn, or fabric movement and no outfit transformation. For apps/websites, only depict supplied interface references; otherwise showcase a physical device silhouette with the screen reserved for compositing or show the real-world outcome." : "Match the execution lane to available references."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "The final scene's caption and voiceover must include one concise, brand-appropriate call to action. Keep it source-safe and inside the scene's spoken-word budget; do not add pricing, availability, or guarantees without evidence." : "Keep the final audience action clear and source-safe."}
@@ -1204,9 +1283,9 @@ Requirements:
   - EXPERTISE_B2B_OR_EDUCATION: use a concrete artifact, demonstration, decision, annotation, assembly, or visible workflow progression instead of generic meetings and handshakes.
   - CREATOR_EVENT_OR_ABSTRACT_BRAND: use performance, process, rhythm, materials, practical visual metaphor, or environmental change grounded in the concept.
 - Across every lane, derive visual interest from what the offer actually does. Do not add people to a product/space shot merely to make it feel active, and do not force product spins into human-service stories.
-- continuityBible.cast is mandatory. Use NO_PEOPLE with zero members, SINGLE_PERSON with one member, or MULTI_PERSON with two to four members. Include every visible person who needs stable or distinct identity, including scene-only supporting characters.
+- continuityBible.cast is mandatory. ${project.outputMode === "PRODUCT_SHOWCASE" ? "Use only NO_PEOPLE with zero members or SINGLE_PERSON with one member. If a person appears, the same single person is the only human anywhere in the storyboard and the only person interacting with the product; no extra hands or background people." : "Use NO_PEOPLE with zero members, SINGLE_PERSON with one member, or MULTI_PERSON with two to four members. Include every visible person who needs stable or distinct identity, including scene-only supporting characters."}
 - Every cast member needs a unique role label, age band, reference basis, three to five stable appearance anchors, one wardrobe anchor, and a distinguishing feature. Reuse the exact role label in shotPrompt and continuityNotes.
-- For MULTI_PERSON casts—especially characters with similar age or gender presentation—give each person at least one physical distinction (for example face shape, hair texture/style, facial hair, build, height, freckles, glasses, or mobility aid) plus one silhouette/wardrobe distinction. Do not rely on clothing color alone, and never use near-duplicate faces.
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Do not create a MULTI_PERSON cast, a crowd, a couple, a second model, background people, or detached extra hands." : "For MULTI_PERSON casts—especially characters with similar age or gender presentation—give each person at least one physical distinction (for example face shape, hair texture/style, facial hair, build, height, freckles, glasses, or mobility aid) plus one silhouette/wardrobe distinction. Do not rely on clothing color alone, and never use near-duplicate faces."}
 - complexionOrHeritageAnchor is optional. For FICTIONAL_CAST, it may use a neutral skin-tone or broad ethnic-appearance description when useful for clear, inclusive casting. For REFERENCE_BACKED people, describe visible complexion only and never infer ethnicity from a name, job, website, or location. Never connect ethnicity or physical traits to personality, ability, social status, or stereotyped behavior.
 - Preserve each recurring person's face geometry, complexion, hair, build, age band, wardrobe anchor, and distinguishing feature unchanged across anchors. A scene-only supporting person must remain distinct within that shot but must not silently replace a recurring role later.
 - Set continuityMode on every scene: CONTINUOUS for a seamless handoff, MATCH_CUT when the composition/action intentionally bridges from the prior scene, or INTENTIONAL_CHANGE only when the plot requires a different character, location, time, or visual world.
@@ -1221,7 +1300,7 @@ Requirements:
 - A 5–6 second scene gets one focal action only. A 7–10 second scene may contain one short two-beat progression by the same focal subject, using at most one "then"; good progressions are reaction-to-release, rise-to-exit, reach-to-reveal, or turn-to-look. The two beats must read as one motivated action arc, not separate tasks.
 - Every shot needs one VISUAL INTEREST DEVICE chosen for the story: foreground/background cause-and-effect, a subject entering or leaving frame, a reveal through blocking, a clear emotional reaction, tactile product motion, or a small environmental disruption. Rotate devices across scenes.
 - Do not write passive tableau directions using "shows", "captures", "depicts", "features", or "light illuminates". Describe what visibly changes during the shot. Avoid generic beats such as standing worried, smiling softly, or looking out a window unless another visible cause, reaction, or spatial change gives the moment story value.
-- Use at least two different camera behaviors across the complete storyboard. A fixed camera is valuable when subject blocking supplies the energy; camera movement must not be used as a substitute for story motion.
+- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Use only the selected motion plan's safe camera behavior in a scene. Across multi-scene showcases, vary camera behavior only when it stays simple and makes the editorial progression clearer; a one-scene showcase needs no artificial variety." : "Use at least two different camera behaviors across the complete storyboard. A fixed camera is valuable when subject blocking supplies the energy; camera movement must not be used as a substitute for story motion."}
 - Prefer actions with clean silhouettes and stable physics. Avoid hand-to-hand object transfers, intricate finger work, eating, crowds, mirrors, transparent-object transformations, rapid turns, collisions, and heavy occlusion unless the concept absolutely requires one and it remains the only action.
 - Scene 1 must create a brand-relevant visual pattern interrupt immediately: the emotionally surprising action or reaction begins in the first frame and pays off inside the first 3 seconds, with no establishing preamble.
 - Later scenes must advance one new cause-and-effect story beat each rather than merely changing the room, lighting, or facial expression. continuityNotes and continuityMode are internal planning metadata and must never be repeated inside shotPrompt.
@@ -1249,6 +1328,7 @@ function buildStoryboardRecoveryPrompt({
   concept,
   rejected,
   violations,
+  showcaseMotionViolations,
   grounding,
 }: {
   project: Project & {
@@ -1259,17 +1339,19 @@ function buildStoryboardRecoveryPrompt({
   concept: CreativeConcept;
   rejected: StoryboardOutput;
   violations: string[];
+  showcaseMotionViolations: string[];
   grounding: GroundingCapabilities;
 }) {
   return `${buildStoryboardPrompt(project, concept, violations)}
 
-The previous storyboard candidate below was rejected by deterministic grounding validation. Return a complete replacement storyboard, not commentary and not a patch. Keep all safe story decisions, but rewrite every rejected visual or claim.
+The previous storyboard candidate below was rejected by deterministic grounding or Product Showcase motion validation. Return a complete replacement storyboard, not commentary and not a patch. Keep all safe story decisions, but rewrite every rejected visual, claim, cast choice, teardown, or overloaded screen action.
 
 Rejected candidate:
 ${JSON.stringify(rejected)}
 
 Mandatory recovery plan:
-${buildGroundingRecoveryInstructions(violations, grounding)}`;
+${violations.length > 0 ? buildGroundingRecoveryInstructions(violations, grounding) : "Preserve all verified product and brand evidence."}
+${showcaseMotionViolations.length > 0 ? `\nMandatory Product Showcase motion corrections:\n- ${showcaseMotionViolations.join("\n- ")}\nReplace risky motion with one premium safe device such as slow rotation, gentle orbit, slow push-in, slow pull-back, parallax, light sweep, one package reveal, one simple material response, or one simple one-person use action.` : ""}`;
 }
 
 const conceptSystemPrompt = `You are Reel AI's Creative Director Agent. You pitch divergent, brand-safe ad strategies for business reels. Return strict JSON only.`;

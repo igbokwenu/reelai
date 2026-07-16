@@ -23,6 +23,7 @@ import {
   type VideoJobOutput,
   type VideoSceneTask,
 } from "@/lib/jobs/production-state";
+import { findShowcaseShotViolations } from "@/lib/product-showcase/guardrails";
 import { storyboardTimingIssue } from "@/lib/storyboards/timing";
 
 export const QWEN_KEYFRAME_IMAGE_MODEL = "wan2.7-image-pro";
@@ -810,7 +811,13 @@ async function getProductionScenes(projectId: string) {
   const storyboard = await prisma.storyboard.findUnique({
     where: { projectId },
     include: {
-      project: { select: { outputMode: true, videoLengthSec: true } },
+      project: {
+        select: {
+          outputMode: true,
+          videoLengthSec: true,
+          products: { select: { name: true, details: true } },
+        },
+      },
       scenes: {
         include: { takes: { orderBy: { createdAt: "desc" } } },
         orderBy: { index: "asc" },
@@ -836,6 +843,19 @@ async function getProductionScenes(projectId: string) {
   }
   if (storyboard.scenes.some((scene) => scene.status === "DRAFT")) {
     throw new PublicError("Approve every storyboard scene before generation.");
+  }
+  if (storyboard.project.outputMode === "PRODUCT_SHOWCASE") {
+    const motionViolations = findShowcaseShotViolations(
+      storyboard.scenes,
+      storyboard.characterContinuity,
+      storyboard.project.products,
+    );
+    if (motionViolations.length > 0) {
+      throw new PublicError(
+        `Product Showcase motion needs revision before production: ${motionViolations.slice(0, 3).join(" ")}`,
+        409,
+      );
+    }
   }
 
   return storyboard.scenes.map((scene) => ({
@@ -952,7 +972,7 @@ Scene continuity: ${scene.continuityNotes}
 Cast identity rule: treat every role in the cast ledger as a separate person. Preserve recurring face geometry, visible complexion, hair, build, age band, wardrobe, and distinguishing feature exactly. In multi-person frames, enforce different silhouettes and facial structures; never clone one face onto another body or merge identities. Respect an explicit fictional complexion/heritage anchor, but never infer ethnicity for a reference-backed person or use physical traits as personality shorthand.
 ${previousScene ? `Prior shot context for the handoff: ${previousScene.shotPrompt}` : "This is the story's establishing anchor and immediate hook."}
 ${scene.continuityMode === "INTENTIONAL_CHANGE" ? "Honor only the explicitly planned change; preserve every other locked identity and style attribute." : "Use supplied prior-scene imagery only to preserve identity, lighting, spatial logic, and screen direction; compose a distinct next shot rather than copying it."}
-${scene.storyboard.outputMode === "PRODUCT_SHOWCASE" ? "PRODUCT SHOWCASE LOCK: the uploaded product references outrank all inferred styling. Preserve exact product silhouette, proportions, materials, colors, packaging, surface details, and visible ingredients. Compose one hero product and one clearly readable action only; secondary products remain static or absent. No melting, morphing, spawning, invented parts, crowded assembly, or simultaneous transformations." : ""}
+${scene.storyboard.outputMode === "PRODUCT_SHOWCASE" ? "PRODUCT SHOWCASE LOCK: the uploaded product references outrank all inferred styling. Preserve exact product silhouette, proportions, materials, colors, packaging, surface details, and visible ingredients. Compose one hero product and one clearly readable action only; secondary products remain static or absent. If a human is planned, show that single person only—no crowds, second model, background people, or extra hands. Keep screens to one readable state or one simple interaction. No melting, morphing, spawning, invented internals, exploded views, fabric/electronic teardown, crowded assembly, or simultaneous transformations." : ""}
 Vertical 9:16, clean silhouette, stable anatomy and product geometry, commercial polish, no readable text or logos.`;
 }
 

@@ -2,6 +2,7 @@ import { PublicError } from "@/lib/errors";
 import { handleRoute, notFound, ok } from "@/lib/http/responses";
 import { assertManualControlAvailable } from "@/lib/jobs/manual-control";
 import { prisma } from "@/lib/prisma";
+import { findShowcaseShotViolations } from "@/lib/product-showcase/guardrails";
 import { shotPromptSchema, storyboardPatchSchema } from "@/lib/schemas/agent";
 import { planContinuityInvalidation } from "@/lib/storyboards/continuity-invalidation";
 import { storyboardTimingIssue } from "@/lib/storyboards/timing";
@@ -18,7 +19,13 @@ export async function PATCH(request: Request, context: RouteContext) {
       where: { id: storyboardId },
       include: {
         scenes: true,
-        project: { select: { outputMode: true, videoLengthSec: true } },
+        project: {
+          select: {
+            outputMode: true,
+            videoLengthSec: true,
+            products: { select: { name: true, details: true } },
+          },
+        },
       },
     });
 
@@ -60,6 +67,26 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
     if (timingIssue) {
       throw new PublicError(timingIssue, 409);
+    }
+    if (storyboard.project.outputMode === "PRODUCT_SHOWCASE") {
+      const motionViolations = findShowcaseShotViolations(
+        storyboard.scenes.map((scene) => {
+          const proposed = proposedSceneById.get(scene.id);
+          return {
+            index: scene.index,
+            shotPrompt: proposed?.shotPrompt ?? scene.shotPrompt,
+            continuityNotes: proposed?.continuityNotes ?? scene.continuityNotes,
+          };
+        }),
+        body.characterContinuity ?? storyboard.characterContinuity,
+        storyboard.project.products,
+      );
+      if (motionViolations.length > 0) {
+        throw new PublicError(
+          `Product Showcase motion needs revision: ${motionViolations.slice(0, 3).join(" ")}`,
+          409,
+        );
+      }
     }
     for (const scene of body.scenes ?? []) {
       const existing = existingSceneById.get(scene.id)!;

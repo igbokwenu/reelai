@@ -1,6 +1,6 @@
 # Product Showcase
 
-Updated: July 15, 2026
+Updated: July 16, 2026
 
 Product Showcase is a first-class output mode for short, product-led films. It reuses Reel AI's Brand Kit, three-concept selection, editable storyboard, Auto mode, step-by-step mode, scene generation, narration, and Remotion export. The difference is a stricter input and motion contract designed around product identity.
 
@@ -27,14 +27,17 @@ The three-image total is deliberate. Current reference-aware image generation ca
 ## Creative and motion contract
 
 - Exactly three distinct directions, such as a tactile/material reveal, cinematic hero motion, or an elegant use-context/model presentation when suitable.
+- Every concept persists a structured motion treatment: one hero action, optional low-amplitude supporting motion, one supported camera behavior, `NO_PERSON` or `ONE_PERSON`, an evidence-based separation decision, and a plain-language feasibility rationale. The concept cards expose this plan before selection rather than hiding it in provider prompts.
 - One hero product and one primary action per shot.
+- A Product Showcase may contain no people or one person total. When a person appears, that same single person is the only human in the complete concept/storyboard and the only person who interacts with the product. Couples, crowds, background people, handoffs, second models, and detached extra hands are not allowed.
 - Multiple products appear sequentially or in a static collection composition. They do not assemble, collide, cross paths, or transform together.
-- Separation/reassembly is limited to a few large, visually grounded layers or components moving on one axis before settling. The AI must not invent internal parts.
+- Separation/reassembly is opt-in, not a default visual recipe. Verified layered foods may separate a few large visible ingredient layers on one axis before settling. A non-food product qualifies only when its intake explicitly establishes a few large, externally visible modular pieces. Electronics, screens, fabrics, garments, and uncertain products use `AVOID`; the AI must not expose internals, create exploded views, disassemble electronics, or unravel fabric.
 - Motion is category-native rather than a universal spin: food/drink can use verified garnish, condensation, steam, pouring, crumbs, or temperature contrast; beauty can use a controlled droplet, texture ribbon, cap reveal, or light sweep; fashion can use fabric response, one silhouette turn, or one step; rigid goods/electronics favor precision rotation, parallax, surface light, or a functional reveal; home/craft objects favor material detail and a simple use-result.
 - Stable product-safe devices include a brief partial orbit, turntable, light sweep, package reveal, ingredient layering, controlled fabric motion, and one simple model/use-context action. One grounded supporting material behavior may accompany the hero action, such as a brief ice-cream rotation while verified toppings fall in one clean arc.
 - Avoid melting, spawning, tiny-part explosions, hand manipulation of fine detail, rapid turns, complex occlusion, and simultaneous camera/object choreography.
 - Wearables may use one model with a simple pose, step, turn, or fabric movement. No outfit morph or unreferenced redesign.
 - App/website products require supplied interface evidence for generated screens. Otherwise the concept shows the real-world outcome or reserves the screen for controlled compositing.
+- Even with supplied interface evidence, a generated screen gets one readable state or one simple interaction. Rapid scrolling, typing plus tapping, notification cascades, animated multi-panel dashboards, and interface morphing are rejected as overloaded choreography.
 - Every scene stores the transition into it. Match cuts stay clean; fades serve gentle continuity; slides and wipes need directional or packaging geometry; iris and clock wipes are reserved for centered circular forms or deliberately theatrical hero reveals. A clean cut remains the default when an effect would compete with the product.
 - **Cinematic Boost** is a persisted concept-stage preference. When enabled, both concept and storyboard agents materially heighten scale, lighting contrast, foreground depth, reveal timing, and physically credible motion without relaxing product-reference or single-shot constraints.
 - Source video requests omit driving audio (and force `audio: false` on compatible legacy Wan models). Remotion also mutes every source clip. Product Showcase disables BGM at storyboard save and final-render boundaries, leaving scene narration as the only audio layer.
@@ -45,12 +48,15 @@ Uploaded product images are prioritized ahead of logos, reference ads, and gener
 
 Structured storyboard output is repaired conservatively before it can enter Auto mode. Reel AI converts substantive multi-sentence prose into one safe shot direction, collapses conflicting camera language to one supported behavior, retains the focal product action, and reconciles scene timing plus voiceover length to the project's exact target. If a provider over-segments a five-second showcase, Reel AI produces one continuous hero clip from the opening product visual and final narrated CTA instead of pausing production. A missing caption or narration can recover from its paired copy, omitted continuity notes receive a safe product-identity lock, and a clearly product-only scene receives an explicit no-people cast plan. It still refuses to invent a missing shot direction, product fact, or ambiguous human identity. If the provider omits the redundant top-level script, it is derived from the validated scene narration. Disabled music is normalized to explicit `none` / voiceover-only metadata, and Product Showcase forces `bgm.enabled = false` even when provider JSON says otherwise. Creative-interest vocabulary and camera variety still guide generation, but they do not reject an otherwise safe product shot and trigger repeated paid rerolls. Manual approval, anchor generation, clip generation, and Remotion export all use the same timing validator, so an invalid edit is explained in the storyboard rather than failing later in production.
 
-During an active showcase run, the studio becomes a focused Auto production room. Manual generation/editing panels are hidden and the corresponding APIs reject stale manual requests. The complete editor returns if the run pauses for review or after the final reel is ready; no concept regeneration or replacement project is required to benefit from these safeguards.
+Motion feasibility has the same end-to-end boundary. Deterministic checks review the structured concept, run after storyboard generation, drive one bounded storyboard repair when needed, reject unsafe manual edits, and run again before keyframe or video jobs are created. This keeps Auto mode and step-by-step mode aligned and prevents a legacy or edited storyboard from bypassing the one-person, screen-complexity, or category-aware teardown rules.
+
+During an active showcase run, the studio becomes a focused Auto production room. Manual generation/editing panels are hidden and the corresponding APIs reject stale manual requests. The complete editor returns if the run pauses for review or after the final reel is ready. Newly generated concepts use the safeguards immediately; a legacy Product Showcase concept without `showcaseMotionPlan` must be regenerated once before selection or production, without replacing the project or its uploaded assets.
 
 ## Data and API contract
 
 - `Project.outputMode`: `STANDARD | PRODUCT_SHOWCASE`.
 - `Project.cinematicBoost`: persists balanced versus heightened creative direction.
+- `CreativeConcept.showcaseMotionPlan`: optional JSON for standard reels and required for newly generated Product Showcase concepts; stores the structured motion treatment shown in the concept UI and passed downstream.
 - `Scene.transitionStyle`: `CUT | FADE | SLIDE | WIPE | IRIS | CLOCK_WIPE`.
 - `ProjectProduct`: name, details, website URL, and stable order.
 - `BrandSource.productId`: associates a `PRODUCT_IMAGE` or product-page source with its product.
@@ -60,7 +66,7 @@ During an active showcase run, the studio becomes a focused Auto production room
 
 ## Local update
 
-The current implementation includes a Prisma migration and the official `@remotion/transitions` package. After pulling it into another checkout, run `pnpm install`. In this workspace the dependency is already installed. Stop the current dev process, then run:
+The current implementation includes Prisma migrations for Product Showcase intake, scene transitions, and the concept motion plan, plus the official `@remotion/transitions` package. After pulling it into another checkout, run `pnpm install` only if dependencies are not already installed. Stop the current dev process, then run:
 
 ```bash
 pnpm db:migrate
@@ -69,6 +75,6 @@ pnpm dev
 
 `pnpm dev` regenerates Prisma Client through the existing web pre-step. `pnpm db:generate` is only needed if an already-open editor still shows stale Prisma types. No seed is required. Existing projects keep their media and default to balanced creative intensity plus clean cuts until a storyboard is regenerated or edited.
 
-The storyboard fallback, safe failure diagnostics, and bounded Auto reroll add no database schema or dependency change. On a workspace where the migration and Remotion dependency above are already present, only restart `pnpm dev`; do not rerun migration, seed, or install commands for this fix.
+The new `CreativeConcept.showcaseMotionPlan` field requires `pnpm db:migrate` once. Existing concepts remain valid database records, but existing Product Showcase concepts without a motion plan must be regenerated before they can be selected. No seed is required.
 
 The midpoint closer reveal and its premium visual treatment are also application-only. They use the existing Remotion render path for both Auto and step-by-step mode, require only a `pnpm dev` restart, and do not require a migration, seed, Prisma regeneration, or dependency install.
