@@ -29,6 +29,7 @@ export const REEL_FPS = 30;
 export const NARRATION_MIX_VOLUME = 0.96;
 export const BGM_BASE_VOLUME = 0.18;
 export const BGM_DUCKED_VOLUME = 0.065;
+export const FINAL_CAPTION_START_PROGRESS = 0.5;
 
 const TRANSITION_DURATION_SEC = {
   CUT: 0,
@@ -82,6 +83,31 @@ export function getBrandWatermarkWindow(
   return {
     from: Math.round(scene.startTimeSec * fps),
     durationInFrames: Math.max(1, Math.round(scene.durationSec * fps)),
+  };
+}
+
+/**
+ * Keeps the first half of the closing shot visually clean, then gives the
+ * closer the entire second half. Frames are relative to the scene's content
+ * (not its incoming transition), so this stays exact for both clean cuts and
+ * overlapping Remotion transitions.
+ */
+export function getFinalCaptionWindow(
+  scene: ReelCompositionInput["scenes"][number],
+  fps = REEL_FPS,
+) {
+  const sceneDurationInFrames = Math.max(
+    1,
+    Math.round(scene.durationSec * fps),
+  );
+  const from = Math.min(
+    sceneDurationInFrames - 1,
+    Math.round(sceneDurationInFrames * FINAL_CAPTION_START_PROGRESS),
+  );
+
+  return {
+    from,
+    durationInFrames: Math.max(1, sceneDurationInFrames - from),
   };
 }
 

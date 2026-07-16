@@ -707,7 +707,7 @@ Composition behavior:
 - Concepts can persist **Cinematic Boost** on the project. Both concept and storyboard prompts must read it; grounding and single-shot limits remain unchanged.
 - Every storyboard scene stores the transition into it. Scene 1 and true match cuts use `CUT`. Other effects must be motivated by scene direction, product geometry, or tone.
 - Remotion uses the official transition presentations and compensates sequence lengths for overlap so the final duration remains the sum of storyboard scene durations.
-- Only the last scene renders `captionText`. Earlier captions remain useful editorial labels in the storyboard UI.
+- Only the last scene renders `captionText`. Its first half remains unobstructed except for the verified logo; the closer enters smoothly at the midpoint and remains for the second half. Earlier captions remain useful editorial labels in the storyboard UI.
 - A verified logo is rendered alone at 3× the former mark height. Business-name text is a fallback only when no verified logo exists.
 - Product Showcase source media is silent/muted and BGM is disabled; scene narration is the only final audio layer.
 

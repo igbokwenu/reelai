@@ -5,6 +5,7 @@ import {
   BGM_DUCKED_VOLUME,
   getBgmVolume,
   getBrandWatermarkWindow,
+  getFinalCaptionWindow,
   getReelDurationFrames,
   getSceneNarrationWindow,
   getTransitionDurationFrames,
@@ -73,6 +74,30 @@ describe("brand watermark timing", () => {
       from: 0,
       durationInFrames: 150,
     });
+  });
+});
+
+describe("final closer timing", () => {
+  it("keeps the first half of the final scene free of closure text", () => {
+    expect(getFinalCaptionWindow(baseInput.scenes[1], 30)).toEqual({
+      from: 120,
+      durationInFrames: 120,
+    });
+  });
+
+  it("uses the same second-half reveal for a single five-second showcase", () => {
+    expect(
+      getFinalCaptionWindow(
+        {
+          captionText: "Taste the signature finish",
+          durationSec: 5,
+          startTimeSec: 0,
+          transitionStyle: "CUT",
+          videoUrl: "https://assets.example/hero.mp4",
+        },
+        30,
+      ),
+    ).toEqual({ from: 75, durationInFrames: 75 });
   });
 });
 

@@ -34,7 +34,7 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 - Storyboards persist a deliberate transition into each scene. Remotion uses clean match cuts plus short motivated fade, slide, wipe, iris, or clock-wipe presentations, compensating overlap so the final duration remains exact.
 - Render media is read through Reel AI's same-origin, byte-range-aware artifact endpoint and decoded with Remotion Media. This avoids downloading an entire OSS clip for every frame, tolerates slower remote storage with bounded retries and a 120-second media timeout, and limits render concurrency to keep local exports stable.
 - Qwen TTS narration is generated and stored per scene. Reel AI measures the real WAV duration, gives each line a short lead-in/tail, applies at most a natural 1.20× fit, rejects overlong copy instead of clipping it, and ducks BGM beneath speech. Silent scenes remain silent, while legacy one-track narration stays render-compatible.
-- Final renders keep early scenes text-free and place one closer/CTA on the last scene. The latest uploaded logo, or a directly verified website logo asset—not an AI recreation—is displayed alone at 3× the former mark size; the business name appears only when no logo asset is available.
+- Final renders keep early scenes text-free and reserve the first half of the closing shot for unobstructed video plus the verified logo. The closer/CTA enters smoothly at the midpoint in a restrained glass-and-pearl typographic treatment, including single-clip 5-second showcases. The latest uploaded logo, or a directly verified website logo asset—not an AI recreation—is displayed alone at 3× the former mark size; the business name appears only when no logo asset is available.
 - Remotion final render path for 9:16 MP4 export.
 - Alibaba OSS-compatible artifact storage with a local dev fallback.
 - Dockerfile, Docker Compose, deploy runbook, seed fixture, and Playwright smoke tests.
@@ -86,6 +86,8 @@ Cinematic Boost and scene transitions add `Project.cinematicBoost`, `Scene.trans
 The domain-neutral creative grammar, structured cast planning, richer motion-hierarchy guardrails, recent-anchor identity recovery, and last-scene logo lockup are application-only changes. Existing databases and artifacts remain compatible; restart `pnpm dev` after pulling them, with no additional migration or seed command.
 
 The range-aware render media path is also application-only. Run `pnpm install` to install the Remotion Media dependency, then restart `pnpm dev`; no database migration or seed is required.
+
+The midpoint closer timing and premium CTA treatment are application-only Remotion changes shared by Auto and step-by-step rendering. Restart `pnpm dev` after pulling them. Do not run `pnpm install`, `pnpm db:migrate`, `pnpm db:generate`, or `pnpm db:seed` for this update.
 
 The contextual action guidance layer is application-only and adds no package or database dependency. Next.js hot reload should pick it up during `pnpm dev`; otherwise restart `pnpm dev` once. Do not run `pnpm install`, `pnpm db:migrate`, `pnpm db:generate`, or `pnpm db:seed` for this update. See [docs/contextual-guidance.md](docs/contextual-guidance.md) for interaction behavior and the contributor pattern for future actions.
 

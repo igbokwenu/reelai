@@ -27,6 +27,7 @@ import type { ReelCompositionInput } from "./schema";
 import {
   getBgmVolume,
   getBrandWatermarkWindow,
+  getFinalCaptionWindow,
   getSceneNarrationWindow,
   getTransitionDurationFrames,
   NARRATION_MIX_VOLUME,
@@ -156,11 +157,12 @@ function SceneLayer({
   const currentFrame = useCurrentFrame();
   const frame = Math.max(0, currentFrame - contentStartFrame);
   const { fps } = useVideoConfig();
-  const scale = spring({
-    frame,
-    fps,
-    config: { damping: 80, stiffness: 80 },
-  });
+  const captionWindow = getFinalCaptionWindow(scene, fps);
+  const captionFrame = frame - captionWindow.from;
+  const captionIsVisible =
+    showCaption &&
+    captionFrame >= 0 &&
+    captionFrame < captionWindow.durationInFrames;
 
   return (
     <AbsoluteFill>
@@ -176,21 +178,99 @@ function SceneLayer({
           width: "100%",
         }}
       />
-      {showCaption && currentFrame >= contentStartFrame ? (
+      {captionIsVisible ? (
+        <FinalCaption
+          caption={caption}
+          frame={captionFrame}
+          safeZonePreset={safeZonePreset}
+        />
+      ) : null}
+    </AbsoluteFill>
+  );
+}
+
+function FinalCaption({
+  caption,
+  frame,
+  safeZonePreset,
+}: {
+  caption: string;
+  frame: number;
+  safeZonePreset: ReelCompositionInput["safeZonePreset"];
+}) {
+  const { fps } = useVideoConfig();
+  const entrance = spring({
+    frame,
+    fps,
+    config: { damping: 24, mass: 0.9, stiffness: 120 },
+    durationInFrames: Math.max(1, Math.round(fps * 0.55)),
+  });
+  const fade = interpolate(frame, [0, Math.max(1, fps * 0.32)], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const blur = interpolate(entrance, [0, 1], [10, 0]);
+  const rise = interpolate(entrance, [0, 1], [34, 0]);
+  const accentScale = interpolate(entrance, [0, 1], [0.12, 1]);
+  const fontSize = caption.length > 82 ? 50 : caption.length > 52 ? 57 : 66;
+
+  return (
+    <div style={captionPositionStyle(safeZonePreset)}>
+      <div
+        style={{
+          background:
+            "radial-gradient(circle at 18% 0%, rgba(255,255,255,0.11), transparent 38%), linear-gradient(135deg, rgba(7,10,16,0.84), rgba(12,15,22,0.66))",
+          backdropFilter: "blur(22px) saturate(115%)",
+          border: "1px solid rgba(255,255,255,0.2)",
+          borderRadius: 30,
+          boxShadow:
+            "inset 0 1px 0 rgba(255,255,255,0.14), 0 30px 100px rgba(0,0,0,0.48)",
+          opacity: fade,
+          overflow: "hidden",
+          padding: "30px 34px 32px",
+          position: "relative",
+          transform: `translateY(${rise}px)`,
+          WebkitBackdropFilter: "blur(22px) saturate(115%)",
+        }}
+      >
         <div
           style={{
-            ...captionStyle(safeZonePreset),
-            opacity: interpolate(frame, [0, Math.max(1, fps * 0.24)], [0, 1], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
-            transform: `translateX(-50%) scale(${0.96 + scale * 0.04})`,
+            background:
+              "linear-gradient(90deg, rgba(255,255,255,0.95), rgba(207,216,230,0.52), transparent)",
+            borderRadius: 999,
+            height: 3,
+            marginBottom: 22,
+            opacity: 0.88,
+            transform: `scaleX(${accentScale})`,
+            transformOrigin: "left center",
+            width: 154,
+          }}
+        />
+        <div
+          style={{
+            background:
+              "linear-gradient(180deg, #ffffff 0%, #f8f9fc 58%, #dce2eb 100%)",
+            backgroundClip: "text",
+            color: "white",
+            filter: `blur(${blur}px)`,
+            fontFamily:
+              '"Helvetica Neue", "Inter", "Avenir Next", Arial, sans-serif',
+            fontSize,
+            fontWeight: 760,
+            letterSpacing: -1.8,
+            lineHeight: 1.08,
+            overflowWrap: "anywhere",
+            textAlign: "left",
+            textShadow: "0 4px 30px rgba(0,0,0,0.42)",
+            transform: `translateY(${rise * 0.45}px)`,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
           }}
         >
           {caption}
         </div>
-      ) : null}
-    </AbsoluteFill>
+      </div>
+    </div>
   );
 }
 
@@ -314,7 +394,9 @@ function Disclosure() {
   );
 }
 
-function captionStyle(safeZonePreset: ReelCompositionInput["safeZonePreset"]) {
+function captionPositionStyle(
+  safeZonePreset: ReelCompositionInput["safeZonePreset"],
+) {
   const bottom =
     safeZonePreset === "NONE"
       ? 120
@@ -323,25 +405,11 @@ function captionStyle(safeZonePreset: ReelCompositionInput["safeZonePreset"]) {
         : 360;
 
   return {
-    background:
-      "linear-gradient(180deg, rgba(8,11,16,0.88), rgba(8,11,16,0.70))",
-    border: "1px solid rgba(255,255,255,0.24)",
-    borderRadius: 18,
     bottom,
-    boxShadow: "0 22px 80px rgba(0,0,0,0.42)",
-    color: "white",
-    fontFamily: "Inter, Arial, sans-serif",
-    fontSize: 58,
-    fontWeight: 800,
     left: "50%",
-    letterSpacing: 0,
-    lineHeight: 1.08,
-    maxWidth: 900,
-    padding: "26px 34px",
     position: "absolute" as const,
-    textAlign: "center" as const,
-    textShadow: "0 3px 24px rgba(0,0,0,0.46)",
-    width: "fit-content",
+    transform: "translateX(-50%)",
+    width: 900,
   };
 }
 
