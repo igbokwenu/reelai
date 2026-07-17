@@ -46,13 +46,13 @@ describe("buildVideoSubmissionBody", () => {
     });
   });
 
-  it("uses a provider-compatible 5-second source for a 3-second mini edit", () => {
+  it("keeps a Razzmatazz source at its exact 5-second delivery length", () => {
     const request = buildVideoSubmissionBody({
       model: "wan2.7-i2v",
       prompt:
         "Electric focus: the intact bottle turns while a fixed camera holds.",
       imageUrl: "https://example.test/open.png",
-      durationSec: 3,
+      durationSec: 5,
     });
 
     expect(request.parameters.duration).toBe(5);

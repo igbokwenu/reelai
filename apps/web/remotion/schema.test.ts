@@ -76,13 +76,13 @@ describe("brand watermark timing", () => {
     });
   });
 
-  it("trims a Razzmatazz source to an exact 3-second branded edit", () => {
+  it("keeps a Razzmatazz source as an exact 5-second branded edit", () => {
     const miniInput: ReelCompositionInput = {
       ...baseInput,
       scenes: [
         {
           captionText: "Own the moment",
-          durationSec: 3,
+          durationSec: 5,
           startTimeSec: 0,
           transitionStyle: "CUT",
           videoUrl: "https://assets.example/provider-five-second-source.mp4",
@@ -90,14 +90,14 @@ describe("brand watermark timing", () => {
       ],
     };
 
-    expect(getReelDurationFrames(miniInput)).toBe(90);
+    expect(getReelDurationFrames(miniInput)).toBe(150);
     expect(getBrandWatermarkWindow(miniInput, 30)).toEqual({
       from: 0,
-      durationInFrames: 90,
+      durationInFrames: 150,
     });
     expect(getFinalCaptionWindow(miniInput.scenes[0], 30)).toEqual({
-      from: 45,
-      durationInFrames: 45,
+      from: 75,
+      durationInFrames: 75,
     });
   });
 });

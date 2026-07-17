@@ -36,7 +36,7 @@ export const showcaseMotionPlanSchema = z.object({
 export const productShowcaseCreativeConceptSchema =
   creativeConceptSchema.extend({
     estimatedScenes: z.number().int().min(1).max(3),
-    estimatedDurationSec: z.number().int().min(3).max(15),
+    estimatedDurationSec: z.number().int().min(5).max(15),
     motionPlan: showcaseMotionPlanSchema,
   });
 
@@ -113,7 +113,7 @@ export const productShowcaseCreativeConceptsJsonSchema = {
         properties: {
           ...creativeConceptsJsonSchema.properties.concepts.items.properties,
           estimatedScenes: { type: "integer", minimum: 1, maximum: 3 },
-          estimatedDurationSec: { type: "integer", minimum: 3, maximum: 15 },
+          estimatedDurationSec: { type: "integer", minimum: 5, maximum: 15 },
           motionPlan: {
             type: "object",
             additionalProperties: false,
@@ -334,7 +334,7 @@ export const shotPromptSchema = z
 export const storyboardSceneSchema = z
   .object({
     index: z.number().int().min(1).max(4),
-    durationSec: z.number().int().min(3).max(10),
+    durationSec: z.number().int().min(5).max(10),
     captionText: z.string().min(1).max(140),
     voiceoverText: z.string().min(1).max(600),
     shotPrompt: shotPromptSchema,
@@ -387,7 +387,7 @@ export const storyboardSceneSchema = z
       ctx.addIssue({
         code: "custom",
         message:
-          "A 3-6 second shot must use one continuous focal action; reserve a two-beat progression for 7-10 seconds.",
+          "A 5-6 second shot must use one continuous focal action; reserve a two-beat progression for 7-10 seconds.",
         path: ["shotPrompt"],
       });
     }
@@ -469,24 +469,9 @@ export const productShowcaseStoryboardSchema = storyboardBaseSchema.superRefine(
     validateStoryboardStructure(value, ctx, {
       minScenes: 1,
       maxScenes: 3,
-      minDuration: 3,
+      minDuration: 5,
       maxDuration: 15,
     });
-    const totalDuration = value.scenes.reduce(
-      (sum, scene) => sum + scene.durationSec,
-      0,
-    );
-    if (
-      totalDuration !== 3 &&
-      value.scenes.some((scene) => scene.durationSec < 5)
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          "Product Showcase scenes must last 5 to 10 seconds unless this is the single 3-second Razzmatazz format.",
-        path: ["scenes"],
-      });
-    }
     if (
       value.continuityBible.cast.mode === "MULTI_PERSON" ||
       value.continuityBible.cast.members.length > 1
@@ -649,7 +634,7 @@ export const storyboardJsonSchema = {
         ],
         properties: {
           index: { type: "integer", minimum: 1, maximum: 4 },
-          durationSec: { type: "integer", minimum: 3, maximum: 10 },
+          durationSec: { type: "integer", minimum: 5, maximum: 10 },
           captionText: { type: "string", minLength: 1, maxLength: 140 },
           voiceoverText: { type: "string", minLength: 1, maxLength: 600 },
           shotPrompt: {
@@ -718,7 +703,7 @@ export const storyboardPatchSchema = z.object({
     .array(
       z.object({
         id: z.string().min(1),
-        durationSec: z.number().int().min(3).max(10),
+        durationSec: z.number().int().min(5).max(10),
         captionText: z.string().min(1).max(140),
         voiceoverText: z.string().max(600),
         // Existing projects may carry a legacy motion brief until it is edited
@@ -891,11 +876,9 @@ export function parseStoryboardOutput(
             ctx.addIssue({
               code: "custom",
               message:
-                targetDurationSec === 3
-                  ? "A 3-second Razzmatazz showcase must use exactly one scene and one video clip."
-                  : targetDurationSec === 5
-                    ? "A 5-second Product Showcase must use exactly one scene and one video clip."
-                    : `A ${targetDurationSec}-second Product Showcase needs ${sceneRange.min} to ${sceneRange.max} scenes.`,
+                targetDurationSec === 5
+                  ? "A 5-second Product Showcase must use exactly one scene and one video clip."
+                  : `A ${targetDurationSec}-second Product Showcase needs ${sceneRange.min} to ${sceneRange.max} scenes.`,
               path: ["scenes"],
             });
           }
@@ -910,18 +893,10 @@ export function parseStoryboardOutput(
               path: ["scenes"],
             });
           }
-          const minimumSceneDuration = targetDurationSec === 3 ? 3 : 5;
-          if (
-            storyboard.scenes.some(
-              (scene) => scene.durationSec < minimumSceneDuration,
-            )
-          ) {
+          if (storyboard.scenes.some((scene) => scene.durationSec < 5)) {
             ctx.addIssue({
               code: "custom",
-              message:
-                targetDurationSec === 3
-                  ? "A Razzmatazz storyboard must contain one 3-second scene."
-                  : "Product Showcase scenes must last 5 to 10 seconds.",
+              message: "Product Showcase scenes must last 5 to 10 seconds.",
               path: ["scenes"],
             });
           }
@@ -1131,12 +1106,12 @@ function normalizeConcept(
       parsed.duration ??
       parsed.target_duration_seconds,
     productShowcase
-      ? { fallback: 10, min: 3, max: 15 }
+      ? { fallback: 10, min: 5, max: 15 }
       : { fallback: 24, min: 15, max: 30 },
   );
   const showcaseTarget =
     productShowcase && targetDurationSec !== undefined
-      ? Math.min(15, Math.max(3, Math.round(targetDurationSec)))
+      ? Math.min(15, Math.max(5, Math.round(targetDurationSec)))
       : estimatedDurationSec;
 
   const concept = {

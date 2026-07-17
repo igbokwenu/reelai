@@ -100,6 +100,7 @@ export function StoryboardTimeline({
   latestPolicyJob,
   outputMode,
   targetDurationSec,
+  razzmatazzMode,
 }: {
   projectId: string;
   selectedConcept: Concept | null;
@@ -110,6 +111,7 @@ export function StoryboardTimeline({
   latestPolicyJob: Job | null;
   outputMode: "STANDARD" | "PRODUCT_SHOWCASE";
   targetDurationSec: number;
+  razzmatazzMode: boolean;
 }) {
   const router = useRouter();
   const [job, setJob] = useState<Job | null>(latestStoryboardJob);
@@ -684,19 +686,9 @@ export function StoryboardTimeline({
               }
               isRegeneratingAnchor={regeneratingSceneId === selectedScene?.id}
               onRegenerateAnchor={regenerateSceneAnchor}
-              durationLocked={
-                outputMode === "PRODUCT_SHOWCASE" && targetDurationSec === 3
-              }
-              durationMax={
-                outputMode === "PRODUCT_SHOWCASE" && targetDurationSec === 3
-                  ? 3
-                  : 10
-              }
-              durationMin={
-                outputMode === "PRODUCT_SHOWCASE" && targetDurationSec === 3
-                  ? 3
-                  : 5
-              }
+              durationLocked={razzmatazzMode}
+              durationMax={razzmatazzMode ? 5 : 10}
+              durationMin={5}
               scene={selectedScene}
               onChange={updateScene}
             />

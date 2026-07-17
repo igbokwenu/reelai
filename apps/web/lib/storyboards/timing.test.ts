@@ -48,7 +48,6 @@ describe("storyboard timing", () => {
 
   it("uses duration-aware defaults and honors explicit supported overrides", () => {
     expect(defaultSceneCountForDuration(5)).toBe(1);
-    expect(defaultSceneCountForDuration(3)).toBe(1);
     expect(defaultSceneCountForDuration(10)).toBe(2);
     expect(defaultSceneCountForDuration(15)).toBe(3);
     expect(defaultSceneCountForDuration(30)).toBeNull();
@@ -95,22 +94,22 @@ describe("storyboard timing", () => {
     );
   });
 
-  it("keeps Razzmatazz to one exact 3-second scene", () => {
+  it("keeps the Razzmatazz timing contract to one exact 5-second scene", () => {
     expect(
       storyboardTimingIssue({
         outputMode: "PRODUCT_SHOWCASE",
-        targetDurationSec: 3,
-        durations: [3],
+        targetDurationSec: 5,
+        durations: [5],
       }),
     ).toBeNull();
     expect(
       storyboardTimingIssue({
         outputMode: "PRODUCT_SHOWCASE",
-        targetDurationSec: 3,
-        durations: [5],
+        targetDurationSec: 5,
+        durations: [5, 5],
       }),
-    ).toContain("exactly 3 seconds");
-    expect(normalizeShowcaseDurations([5], 3)).toEqual([3]);
+    ).toContain("exactly one scene");
+    expect(normalizeShowcaseDurations([8], 5)).toEqual([5]);
   });
 
   it("normalizes provider timing to the exact showcase target", () => {

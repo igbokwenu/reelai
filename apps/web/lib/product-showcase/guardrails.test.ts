@@ -17,6 +17,17 @@ const safePlan: ShowcaseMotionPlan = {
     "The motion keeps the silhouette stable while producing a clear premium reveal.",
 };
 
+const razzmatazzPlan: ShowcaseMotionPlan = {
+  ...safePlan,
+  heroAction:
+    "The intact bottle makes one crisp half-turn into a centered hero composition.",
+  supportingMotion:
+    "Ruby light streaks flare into a tight particle halo behind the product.",
+  cameraBehavior: "FIXED",
+  humanPresence: "NO_PERSON",
+  separationTreatment: "AVOID",
+};
+
 describe("Product Showcase motion guardrails", () => {
   it("allows restrained visible ingredient separation for layered food", () => {
     const plan: ShowcaseMotionPlan = {
@@ -124,7 +135,7 @@ describe("Product Showcase motion guardrails", () => {
   it("locks Razzmatazz to an intact product with no people", () => {
     expect(
       findShowcaseConceptViolations(
-        [{ title: "Flash hero", motionPlan: safePlan }],
+        [{ title: "Flash hero", motionPlan: razzmatazzPlan }],
         [{ name: "Studio bottle" }],
         true,
       ),
@@ -146,9 +157,37 @@ describe("Product Showcase motion guardrails", () => {
     );
     expect(violations.join(" ")).toMatch(/sole subject/i);
     expect(violations.join(" ")).toMatch(/intact|separation/i);
-    expect(
-      buildShowcaseMotionGuardrailBrief([{ name: "Studio bottle" }], true),
-    ).toContain("RAZZMATAZZ MODE IS ACTIVE");
+    const brief = buildShowcaseMotionGuardrailBrief(
+      [{ name: "Studio bottle" }],
+      true,
+    );
+    expect(brief).toContain("RAZZMATAZZ MODE IS ACTIVE");
+    expect(brief).toContain("lasting 5 seconds");
+    expect(brief).toContain("RAZZMATAZZ TRIAD");
+  });
+
+  it("rejects a static beauty shot that has no Razzmatazz spectacle", () => {
+    const violations = findShowcaseStoryboardViolations(
+      {
+        continuityBible: {
+          characters: "No people appear.",
+          cast: { mode: "NO_PEOPLE", members: [] },
+        },
+        scenes: [
+          {
+            index: 1,
+            shotPrompt:
+              "Tense pressure: a dreamy soft-focus strawberry ice cream scoop highlights real fruit texture and condensation against a creamy bokeh background while a fixed camera holds the composition.",
+          },
+        ],
+      },
+      [{ name: "Strawberry ice cream" }],
+      true,
+    );
+
+    expect(violations.join(" ")).toMatch(/spin|turn|pivot|glide/i);
+    expect(violations.join(" ")).toMatch(/light|particle|energy effect/i);
+    expect(violations.join(" ")).toMatch(/centered|sole focus|hero/i);
   });
 
   it("rejects people and package changes in a manually edited Razzmatazz shot", () => {

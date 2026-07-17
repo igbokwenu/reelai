@@ -67,7 +67,7 @@ export function ProjectIntakeForm() {
       outputMode,
       razzmatazzMode,
       videoLengthSec: razzmatazzMode
-        ? 3
+        ? 5
         : outputMode === "PRODUCT_SHOWCASE"
           ? basePayload.showcaseLengthSec
           : basePayload.videoLengthSec,
@@ -309,7 +309,7 @@ export function ProjectIntakeForm() {
               <div className="grid gap-1.5 text-sm">
                 <span className="text-muted-foreground">Showcase length</span>
                 <div className="flex h-10 items-center justify-between rounded-md border border-primary/25 bg-primary/[0.07] px-3">
-                  <span className="font-medium text-primary">3 seconds</span>
+                  <span className="font-medium text-primary">5 seconds</span>
                   <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary/75">
                     Locked by Razzmatazz
                   </span>
@@ -381,7 +381,7 @@ function RazzmatazzToggle({
             <span className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold">Razzmatazz mode</span>
               <span className="rounded-full border border-fuchsia-300/25 bg-fuchsia-300/[0.08] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-fuchsia-200">
-                3-second mini ad
+                5-second mini ad
               </span>
             </span>
             <span className="mt-1.5 block max-w-2xl text-xs leading-5 text-muted-foreground">
@@ -392,7 +392,7 @@ function RazzmatazzToggle({
             <span className="mt-3 flex flex-wrap gap-1.5 text-[10px] font-medium text-muted-foreground">
               {[
                 "1 scene",
-                "3 seconds",
+                "5 seconds",
                 "No teardown",
                 "Product-centered",
                 "CTA included",
@@ -428,7 +428,7 @@ function RazzmatazzToggle({
             <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-fuchsia-400 to-primary" />
             <span className="absolute left-1/2 top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-4 ring-white/10" />
           </span>
-          <span className="text-[10px] font-semibold text-primary">0:03</span>
+          <span className="text-[10px] font-semibold text-primary">0:05</span>
         </span>
       ) : null}
     </label>

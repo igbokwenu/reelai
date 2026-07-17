@@ -98,7 +98,11 @@ export async function createAndRunFinalRenderJob({
 }) {
   const projectAudioPolicy = await prisma.project.findUniqueOrThrow({
     where: { id: projectId },
-    select: { outputMode: true, videoLengthSec: true },
+    select: {
+      outputMode: true,
+      videoLengthSec: true,
+      razzmatazzMode: true,
+    },
   });
   const effectiveBgmEnabled = resolveFinalBgmEnabled(
     projectAudioPolicy.outputMode,
@@ -144,12 +148,11 @@ export async function createAndRunFinalRenderJob({
         brandLockupMode: input.brandWatermark?.logoUrl
           ? "LOGO_ONLY"
           : "TEXT_ONLY",
-        showcaseFormat:
-          projectAudioPolicy.outputMode === "PRODUCT_SHOWCASE" &&
-          projectAudioPolicy.videoLengthSec <= 5
-            ? projectAudioPolicy.videoLengthSec === 3
-              ? "RAZZMATAZZ_3S_SINGLE_CLIP_WITH_BRAND_CLOSER"
-              : "SINGLE_CLIP_HERO_WITH_BRAND_CLOSER"
+        showcaseFormat: projectAudioPolicy.razzmatazzMode
+          ? "RAZZMATAZZ_5S_SINGLE_CLIP_WITH_BRAND_CLOSER"
+          : projectAudioPolicy.outputMode === "PRODUCT_SHOWCASE" &&
+              projectAudioPolicy.videoLengthSec === 5
+            ? "SINGLE_CLIP_HERO_WITH_BRAND_CLOSER"
             : null,
         captionOverlaySceneCount: input.scenes.length > 0 ? 1 : 0,
         transitionStyles: input.scenes.map(

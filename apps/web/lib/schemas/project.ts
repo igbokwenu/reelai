@@ -61,7 +61,7 @@ export const createProjectSchema = z
       .preprocess((value) => value === true || value === "true", z.boolean())
       .default(false),
     products: z.array(projectProductSchema).max(1).default([]),
-    videoLengthSec: z.coerce.number().int().min(3).max(60).default(30),
+    videoLengthSec: z.coerce.number().int().min(5).max(60).default(30),
     style: z.enum(["REALISTIC", "THREE_D_ANIMATION"]).default("REALISTIC"),
   })
   .superRefine((input, context) => {
@@ -73,10 +73,10 @@ export const createProjectSchema = z
           path: ["products"],
         });
       }
-      if (input.razzmatazzMode && input.videoLengthSec !== 3) {
+      if (input.razzmatazzMode && input.videoLengthSec !== 5) {
         context.addIssue({
           code: "custom",
-          message: "Razzmatazz mode is a fixed 3-second format.",
+          message: "Razzmatazz mode is a fixed 5-second format.",
           path: ["videoLengthSec"],
         });
       } else if (

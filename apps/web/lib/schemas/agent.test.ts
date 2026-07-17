@@ -709,10 +709,10 @@ describe("Phase 4 agent schemas", () => {
     });
   });
 
-  it("repairs a Razzmatazz storyboard into one exact 3-second hero burst", () => {
+  it("repairs a Razzmatazz storyboard into one exact 5-second hero burst", () => {
     const parsed = parseStoryboardOutput(
       {
-        title: "Three second product spark",
+        title: "Five second product spark",
         script: "Own the moment with one unmistakable product hero beat.",
         bgm: {
           enabled: true,
@@ -744,15 +744,15 @@ describe("Phase 4 agent schemas", () => {
         ],
       },
       "PRODUCT_SHOWCASE",
-      3,
+      5,
       1,
     );
 
     expect(parsed.scenes).toHaveLength(1);
-    expect(parsed.scenes[0]?.durationSec).toBe(3);
+    expect(parsed.scenes[0]?.durationSec).toBe(5);
     expect(
       parsed.scenes[0]?.voiceoverText.split(/\s+/).filter(Boolean).length,
-    ).toBeLessThanOrEqual(7);
+    ).toBeLessThanOrEqual(10);
   });
 
   it.each([

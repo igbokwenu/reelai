@@ -201,5 +201,5 @@ test("creates a Razzmatazz product showcase with a required product image", asyn
     page.getByText("Midnight Burger", { exact: true }),
   ).toBeVisible();
   await expect(page.getByText("Razzmatazz", { exact: true })).toBeVisible();
-  await expect(page.getByText("1 scene · 3 seconds")).toBeVisible();
+  await expect(page.getByText("1 scene · 5 seconds")).toBeVisible();
 });

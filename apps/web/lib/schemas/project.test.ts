@@ -72,21 +72,21 @@ describe("URL-first project intake", () => {
     });
   });
 
-  it("accepts Razzmatazz only as a fixed 3-second Product Showcase", () => {
+  it("accepts Razzmatazz only as a fixed 5-second Product Showcase", () => {
     const input = createProjectSchema.parse({
       outputMode: "PRODUCT_SHOWCASE",
       razzmatazzMode: true,
-      videoLengthSec: 3,
+      videoLengthSec: 5,
       products: [{ name: "Studio Lamp", imageCount: 1 }],
     });
 
     expect(input.razzmatazzMode).toBe(true);
-    expect(input.videoLengthSec).toBe(3);
+    expect(input.videoLengthSec).toBe(5);
     expect(
       createProjectSchema.safeParse({
         outputMode: "PRODUCT_SHOWCASE",
         razzmatazzMode: true,
-        videoLengthSec: 5,
+        videoLengthSec: 10,
         products: [{ name: "Studio Lamp", imageCount: 1 }],
       }).success,
     ).toBe(false);
@@ -95,7 +95,7 @@ describe("URL-first project intake", () => {
         websiteUrl: "https://example.com",
         outputMode: "STANDARD",
         razzmatazzMode: true,
-        videoLengthSec: 3,
+        videoLengthSec: 5,
       }).success,
     ).toBe(false);
   });

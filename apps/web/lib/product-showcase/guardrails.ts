@@ -67,6 +67,12 @@ const anyPersonPattern =
   /\b(?:person|people|human|model|customer|user|shopper|founder|wearer|woman|man|hands?|face)\b/i;
 const razzmatazzProductAlterationPattern =
   /\b(?:(?:product|package|bottle|box|case) opens?|unfolds?|unboxes?|unwraps?|uncaps?|(?:cap|lid) (?:lifts?|rises?|opens?)|(?:lifts?|raises?|removes?) (?:the )?(?:cap|lid)|peels? (?:away|open)|transforms?|multiplies?|duplicates?)\b/i;
+const razzmatazzProductMotionPattern =
+  /\b(?:spin(?:s|ning)?|rotat(?:e|es|ing|ion)|turns?|half[ -]?turn|quarter[ -]?turn|pivots?|glides?|rises?|surges? (?:forward|toward)|moves? (?:forward|toward)|zooms? (?:forward|toward|in)|scales? (?:forward|up)|snaps? into (?:place|position)|sweeps? into (?:frame|view))\b/i;
+const razzmatazzEnergyEffectPattern =
+  /\b(?:(?:lights?|colors?|shadows?|reflections?|energy) (?:streaks?|trails?|pulses?|bursts?|flares?|blooms?|sweeps?|ignites?|ripples?)|(?:particle|spark|prismatic|neon|volumetric|luminous) (?:halo|burst|ring|trail|field|flare|bloom|streaks?|particles?)|rim[ -]?light (?:pulses?|flares?|blooms?|ignites?)|halo (?:pulses?|flares?|blooms?|ignites?)|sparks? (?:arc|burst|flare|bloom)|caustics? (?:race|ripple|flare|bloom))\b/i;
+const razzmatazzHeroFocusPattern =
+  /\b(?:hero(?:ic)? (?:product|frame|hold|composition|focus|moment)|center(?:ed)? (?:as (?:the )?)?(?:hero|focus|composition|frame|product)|centre(?:d)? (?:as (?:the )?)?(?:hero|focus|composition|frame|product)|centered (?:in|within) (?:the )?frame|centred (?:in|within) (?:the )?frame|product (?:is|remains|lands) centered|center of attention|sole (?:visual )?(?:focus|subject)|undisputed (?:hero|focus)|dominates? the frame|spotlight(?:ed)? product|focal point)\b/i;
 const overloadedScreenPattern =
   /\b(?:rapid(?:ly)? (?:scroll|swipe|tap|type|screen|interface)|multiple (?:screens|windows|apps|panels|notifications)|cascading notifications|dashboard (?:animates|transforms|changes)|interface (?:morphs|transforms|cycles)|screen (?:cycles|flashes|fills with)|scrolls?[^.]{0,48}(?:tap|swipe|type)|(?:tap|swipe|type)[^.]{0,48}scrolls?)\b/i;
 
@@ -75,10 +81,9 @@ export function buildShowcaseMotionGuardrailBrief(
   razzmatazzMode = false,
 ) {
   const profile = classifyProductMotion(products);
-  const separationRule =
-    razzmatazzMode
-      ? "Set separationTreatment to AVOID. Razzmatazz never opens, separates, disassembles, or reassembles the product, regardless of category."
-      : profile === "LAYERED_FOOD"
+  const separationRule = razzmatazzMode
+    ? "Set separationTreatment to AVOID. Razzmatazz never opens, separates, disassembles, or reassembles the product, regardless of category."
+    : profile === "LAYERED_FOOD"
       ? "A restrained ingredient-layer separation is eligible only when every layer is visible or verified: move a few large layers on one axis, hold their order and proportions, then settle once. It is one optional route, not the default for all three concepts."
       : profile === "VISIBLE_MODULAR_GOOD"
         ? "A restrained visible-component separation is eligible only for large, externally visible, reference-backed modular pieces: move them on one axis and settle once. Never expose or invent internal construction."
@@ -86,12 +91,13 @@ export function buildShowcaseMotionGuardrailBrief(
 
   const razzmatazzRule = razzmatazzMode
     ? `RAZZMATAZZ MODE IS ACTIVE:
-- Produce exactly one intact-product scene lasting 3 seconds.
+- Produce exactly one intact-product scene lasting 5 seconds.
 - The product is the sole center of attention: use NO_PERSON and separationTreatment AVOID.
-- Use one identity-safe hero motion such as a brief precision turn, controlled spin, scale-forward move, or fast-feeling push-in. Do not combine object spin with an orbiting camera.
-- Background energy must surround rather than alter the product: light streaks, restrained particles, color bloom, shadow pulses, reflections, or atmospheric bursts may provide one low-amplitude supporting effect.
+- RAZZMATAZZ TRIAD — all three are mandatory and must be stated explicitly, not implied: (1) visible intact-product motion such as a brief precision spin, partial turn, pivot, rise, or forward glide; (2) one animated surrounding energy effect such as light streaks, a rim-light pulse, a particle halo, reflection burst, color bloom, or shadow pulse; and (3) hero framing that calls the product centered, the sole focus, or the undisputed hero.
+- The product motion starts immediately and remains the primary action. The background energy peaks around it without touching, hiding, recoloring, or reshaping it. Use a fixed camera or a single simple camera behavior; never combine a spinning product with an orbiting camera.
 - Never separate, unfold, open, disassemble, reassemble, melt, morph, multiply, or expose any product part. Keep silhouette, label, materials, proportions, and packaging exact throughout.
-- Land on a clean hero hold with negative space for one short tagline or call to action composed by Reel AI.`
+- Land on a clean hero hold with negative space for one short tagline or call to action composed by Reel AI.
+- A compliant directed-shot pattern is: "Electric appetite: the intact strawberry ice cream makes one crisp half-turn while ruby light streaks flare into a tight halo behind it as a fixed camera locks the scoop in a luminous centered hero composition." Adapt the product and effect; do not copy the flavor or colors when they are unsupported.`
     : "";
 
   const separationDecision = razzmatazzMode
@@ -164,6 +170,24 @@ export function findShowcaseConceptViolations(
     if (razzmatazzMode && razzmatazzProductAlterationPattern.test(copy)) {
       violations.push(
         `${label} opens or transforms the product in Razzmatazz mode; keep it intact.`,
+      );
+    }
+    if (
+      razzmatazzMode &&
+      !razzmatazzProductMotionPattern.test(plan.heroAction)
+    ) {
+      violations.push(
+        `${label} must name visible product motion such as a spin, partial turn, pivot, rise, or forward glide in its hero action.`,
+      );
+    }
+    if (razzmatazzMode && !razzmatazzEnergyEffectPattern.test(copy)) {
+      violations.push(
+        `${label} must name one animated surrounding light, particle, reflection, color, or shadow energy effect.`,
+      );
+    }
+    if (razzmatazzMode && !razzmatazzHeroFocusPattern.test(copy)) {
+      violations.push(
+        `${label} must explicitly frame the product as centered, the sole focus, or the hero.`,
       );
     }
     validateSeparationDecision(label, copy, plan, profile, violations);
@@ -256,6 +280,21 @@ export function findShowcaseStoryboardViolations(
     if (razzmatazzMode && razzmatazzProductAlterationPattern.test(copy)) {
       violations.push(
         `${label} opens or transforms the product in Razzmatazz mode; keep it intact.`,
+      );
+    }
+    if (razzmatazzMode && !razzmatazzProductMotionPattern.test(copy)) {
+      violations.push(
+        `${label} must explicitly animate the intact product with a spin, partial turn, pivot, rise, or forward glide.`,
+      );
+    }
+    if (razzmatazzMode && !razzmatazzEnergyEffectPattern.test(copy)) {
+      violations.push(
+        `${label} must explicitly animate one surrounding light, particle, reflection, color, or shadow energy effect.`,
+      );
+    }
+    if (razzmatazzMode && !razzmatazzHeroFocusPattern.test(copy)) {
+      violations.push(
+        `${label} must explicitly keep the product centered, the sole focus, or the hero.`,
       );
     }
   }

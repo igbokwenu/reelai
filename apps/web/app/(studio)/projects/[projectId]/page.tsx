@@ -195,7 +195,7 @@ export default async function ProjectPage({ params }: PageProps) {
                     </p>
                     <h2 className="mt-1 text-lg font-semibold">
                       {project.razzmatazzMode
-                        ? "Three seconds. One unforgettable hero moment."
+                        ? "Five seconds. One unforgettable hero moment."
                         : "Identity-locked product direction"}
                     </h2>
                     <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
@@ -230,7 +230,7 @@ export default async function ProjectPage({ params }: PageProps) {
                     className={`w-fit rounded-full border px-3 py-1.5 text-xs font-medium ${project.razzmatazzMode ? "border-fuchsia-300/25 bg-fuchsia-300/[0.08] text-fuchsia-200" : "border-primary/20 bg-primary/[0.07] text-primary"}`}
                   >
                     {project.razzmatazzMode
-                      ? "1 scene · 3 seconds"
+                      ? "1 scene · 5 seconds"
                       : `${project.products.length} product${project.products.length === 1 ? "" : "s"}`}
                   </span>
                 </div>
@@ -424,6 +424,7 @@ export default async function ProjectPage({ params }: PageProps) {
                   latestStoryboardJob={latestStoryboardJob}
                   outputMode={project.outputMode}
                   projectId={project.id}
+                  razzmatazzMode={project.razzmatazzMode}
                   selectedConcept={selectedConcept}
                   storyboard={project.storyboard}
                   targetDurationSec={project.videoLengthSec}
