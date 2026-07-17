@@ -11,6 +11,7 @@ import {
   REEL_WIDTH,
   type ReelCompositionInput,
 } from "./schema";
+import { withStagedRenderMedia } from "./media-staging";
 
 export type RenderedReel = {
   mp4: Buffer;
@@ -22,6 +23,12 @@ const RENDER_MEDIA_TIMEOUT_MS = 120_000;
 const RENDER_CONCURRENCY = 2;
 
 export async function renderReel(
+  input: ReelCompositionInput,
+): Promise<RenderedReel> {
+  return withStagedRenderMedia(input, renderStagedReel);
+}
+
+async function renderStagedReel(
   input: ReelCompositionInput,
 ): Promise<RenderedReel> {
   const [{ bundle }, { renderMedia, renderStill, selectComposition }] =

@@ -140,6 +140,7 @@ export async function createAndRunFinalRenderJob({
             ? getBgmTrack(input.bgmTrackId).name
             : null,
         sourceClipAudio: "MUTED",
+        mediaDelivery: "PRESTAGED_LOCAL_RANGE_SERVER",
         audioPolicy: "NARRATION_WITH_OPTIONAL_BGM",
         logoIncluded: Boolean(input.brandWatermark?.logoUrl),
         logoLoadPolicy: input.brandWatermark?.logoUrl
@@ -384,6 +385,7 @@ async function runFinalRenderJob(
       metadata: {
         operation: "final_render",
         renderer: "remotion",
+        mediaDelivery: "PRESTAGED_LOCAL_RANGE_SERVER",
         aiDisclosureEnabled: input.aiDisclosureEnabled,
         bgmIncluded: Boolean(input.bgmUrl),
         bgmDuckedUnderNarration: Boolean(
@@ -763,6 +765,9 @@ function asRecord(value: unknown) {
 }
 
 function artifactUrl(artifact: Artifact, artifactBaseUrl: string) {
+  if (artifact.publicUrl?.startsWith("http")) {
+    return artifact.publicUrl;
+  }
   return `${artifactBaseUrl.replace(/\/$/, "")}/api/artifacts/${artifact.id}/file`;
 }
 
