@@ -57,4 +57,29 @@ describe("AutoGenerationPanel", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     view.unmount();
   });
+
+  it("opens the final stage as soon as Auto mode completes", async () => {
+    const onReviewStage = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          run: { ...initialRun, status: "COMPLETE", phase: "COMPLETE" },
+        }),
+      }),
+    );
+
+    const view = render(
+      <AutoGenerationPanel
+        initialRun={initialRun}
+        onReviewStage={onReviewStage}
+        projectId="project-1"
+      />,
+    );
+
+    await waitFor(() => expect(onReviewStage).toHaveBeenCalledWith("final"));
+    expect(refresh).toHaveBeenCalled();
+    view.unmount();
+  });
 });

@@ -104,4 +104,45 @@ describe("ProjectWorkflow", () => {
     expect(screen.queryByText("Production console")).toBeNull();
     expect(screen.queryByRole("button", { name: "Review details" })).toBeNull();
   });
+
+  it("locks downstream stages until their prerequisite is complete", () => {
+    render(
+      <ProjectWorkflow
+        assets={<p>Asset library</p>}
+        brand={<p>Brand kit</p>}
+        concepts={<p>Creative concepts</p>}
+        final={<p>Final render</p>}
+        finalComplete={false}
+        hasBrandKit={false}
+        hasSelectedConcept={false}
+        latestAutoRun={null}
+        production={<p>Production console</p>}
+        productionComplete={false}
+        projectId="project-1"
+        storyboard={<p>Storyboard editor</p>}
+        storyboardStatus={null}
+      />,
+    );
+
+    expect(
+      (screen.getByRole("tab", { name: /Concepts/ }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole("tab", { name: /Storyboard/ }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole("tab", { name: /Production/ }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole("tab", { name: /Final/ }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole("tab", { name: /Assets/ }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+  });
 });

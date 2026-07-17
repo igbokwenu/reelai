@@ -274,6 +274,13 @@ export default async function ProjectPage({ params }: PageProps) {
                         name,
                       }))}
                       projectId={project.id}
+                      sources={project.sources.map(
+                        ({ type, url, artifactId }) => ({
+                          type,
+                          url,
+                          artifactId,
+                        }),
+                      )}
                     />
                     <div className="mt-5 grid gap-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">

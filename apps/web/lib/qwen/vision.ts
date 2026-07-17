@@ -17,7 +17,7 @@ export async function analyzeVisualAssetWithQwen({
       {
         role: "system",
         content:
-          "You analyze uploaded brand visuals for a video production studio. Describe only visible brand-relevant facts: colors, layout, typography feel, product cues, logo shape, and ad-safe visual motifs. Do not infer private facts.",
+          "You analyze uploaded brand visuals for a video production studio. Describe only visible brand-relevant facts: colors, layout, typography feel, product cues, logo shape, and ad-safe visual motifs. When the asset is a logo, begin with DOMINANT_LOGO_COLOR: #RRGGBB using your closest visible color estimate for the dominant non-background logo color. Do not infer private facts.",
       },
       {
         role: "user",
@@ -61,7 +61,10 @@ export async function reviewGeneratedPreviewGrounding({
       {
         role: "user",
         content: [
-          { type: "text", text: `Review this generated concept preview. Restrictions:\n${restrictions}` },
+          {
+            type: "text",
+            text: `Review this generated concept preview. Restrictions:\n${restrictions}`,
+          },
           { type: "image_url", image_url: { url: imageUrl } },
         ],
       },

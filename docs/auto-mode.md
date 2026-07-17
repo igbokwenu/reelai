@@ -10,7 +10,7 @@ Auto mode is Reel AI's default concept-to-reel path. It removes the need to visi
 2. Before the first production spend, Reel AI shows a Brand Kit handoff with the project website, uploaded logos, product images, documents, and reference material. The handoff explains that these assets ground scene generation and the final brand lockup.
 3. The user can add brand material or proceed. Auto mode is on by default and can be turned off to continue with the existing step-by-step workflow.
 4. Auto mode displays a focused production room with the current phase, completed phases, overall progress, and retry status. Manual tabs and generation controls are hidden while the coordinator owns an active run, preventing conflicting edits and duplicate provider spend.
-5. If Auto mode exhausts recovery and pauses, the relevant editor returns with **Review** and **Resume auto mode** actions. When rendering completes, the complete manual workflow returns and the surface links directly to the final reel.
+5. If Auto mode exhausts recovery and pauses, the relevant editor returns with **Review** and **Resume auto mode** actions. When rendering completes, the complete manual workflow returns with the **Final** stage already selected and scrolled into view.
 
 After the first Brand Kit confirmation, selecting a new concept uses a compact proceed panel instead of repeating the full asset handoff. The Auto mode preference is stored on the project.
 

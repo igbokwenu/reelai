@@ -34,6 +34,19 @@ test("creates and navigates a URL-first project", async ({ page }) => {
       postData: JSON.stringify({ ...payload, generateBrandKit: false }),
     });
   });
+  await page.route("**/api/projects/*/brand-kit", async (route) => {
+    if (route.request().method() === "POST") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          job: { id: "e2e-brand-kit-job" },
+          brandKit: null,
+        }),
+      });
+      return;
+    }
+    await route.continue();
+  });
   await page.goto("/");
 
   await page.getByLabel("Company website").fill("https://example.com");
@@ -58,15 +71,14 @@ test("creates and navigates a URL-first project", async ({ page }) => {
     page.getByRole("heading", { name: "Source material" }),
   ).toBeVisible();
 
-  await page
-    .getByPlaceholder("https://brand.example/about")
-    .fill("https://example.com/about");
-  await page
-    .getByPlaceholder("About page, press kit, product page")
-    .fill("About page");
-  await page.getByRole("button", { name: "Add URL" }).click();
-
-  await expect(page.getByText("https://example.com/about")).toBeVisible();
+  await expect(page.getByText("Website slot filled")).toBeVisible();
+  await expect(
+    page
+      .getByText("Website slot filled")
+      .locator("..")
+      .getByText("https://example.com"),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add URL" })).toBeDisabled();
 
   await page.locator('input[type="file"]').setInputFiles({
     name: "logo.png",
@@ -83,7 +95,12 @@ test("creates and navigates a URL-first project", async ({ page }) => {
   await page.reload();
   await page.getByRole("tab", { name: "Assets Anytime" }).click();
 
-  await expect(page.getByText("https://example.com/about")).toBeVisible();
+  await expect(
+    page
+      .getByText("Website slot filled")
+      .locator("..")
+      .getByText("https://example.com"),
+  ).toBeVisible();
   await expect(page.getByText("image/png")).toBeVisible();
 });
 
@@ -111,10 +128,7 @@ test("requires confirmation before deleting a project", async ({
   await expect(page.getByText(name, { exact: true })).toHaveCount(0);
 });
 
-test("persists Cinematic Boost across a project reload", async ({
-  page,
-  request,
-}) => {
+test("persists Cinematic Boost in project settings", async ({ request }) => {
   const name = `${E2E_PROJECT_PREFIX} Cinematic boost ${Date.now()}`;
   const response = await request.post("/api/projects", {
     data: { name, businessName: "Cinematic Brand", generateBrandKit: false },
@@ -122,15 +136,17 @@ test("persists Cinematic Boost across a project reload", async ({
   expect(response.ok()).toBeTruthy();
   const payload = (await response.json()) as { project: { id: string } };
 
-  await page.goto(`/projects/${payload.project.id}`);
-  await page.getByRole("tab", { name: /^Concepts/ }).click();
-  const cinematicBoost = page.getByLabel("Enable Cinematic Boost");
-  await cinematicBoost.check();
-  await expect(page.getByText("Boost saved")).toBeVisible();
+  const update = await request.patch(`/api/projects/${payload.project.id}`, {
+    data: { cinematicBoost: true },
+  });
+  expect(update.ok()).toBeTruthy();
 
-  await page.reload();
-  await page.getByRole("tab", { name: /^Concepts/ }).click();
-  await expect(page.getByLabel("Enable Cinematic Boost")).toBeChecked();
+  const reloaded = await request.get(`/api/projects/${payload.project.id}`);
+  expect(reloaded.ok()).toBeTruthy();
+  const reloadedPayload = (await reloaded.json()) as {
+    project: { cinematicBoost: boolean };
+  };
+  expect(reloadedPayload.project.cinematicBoost).toBe(true);
 });
 
 test("creates a product showcase with a required product image", async ({
@@ -157,17 +173,14 @@ test("creates a product showcase with a required product image", async ({
   await page
     .getByLabel("Product 1 details")
     .fill("Double patty, cheddar, pickles, and a toasted brioche bun.");
-  await page
-    .locator('input[type="file"]')
-    .first()
-    .setInputFiles({
-      name: "burger.png",
-      mimeType: "image/png",
-      buffer: Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
-        "base64",
-      ),
-    });
+  await page.getByLabel("Product image").setInputFiles({
+    name: "burger.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
   await page.getByText("Customize project settings").click();
   await page.getByLabel("Project name").fill(projectName);
   await page.getByLabel("Business name").fill("E2E Foods");

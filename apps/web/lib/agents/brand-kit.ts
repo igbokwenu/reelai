@@ -9,7 +9,9 @@ import type {
 import { ZodError } from "zod";
 
 import { prisma } from "@/lib/prisma";
+import { applyLogoDominantColor } from "@/lib/brand/logo-palette";
 import { researchWebsite } from "@/lib/brand/website-research";
+import { readLocalObject } from "@/lib/oss";
 import { QWEN_STRUCTURED_MODEL, sanitizeQwenError } from "@/lib/qwen/client";
 import { generateStructuredWithQwen } from "@/lib/qwen/structured";
 import { analyzeVisualAssetWithQwen } from "@/lib/qwen/vision";
@@ -239,8 +241,8 @@ async function collectBrandContexts(project: ProjectWithContext) {
       continue;
     }
 
-    if (artifact.mimeType.startsWith("image/") && artifact.publicUrl) {
-      const imageUrl = absoluteUrl(artifact.publicUrl);
+    if (artifact.mimeType.startsWith("image/")) {
+      const imageUrl = await artifactImageUrl(artifact);
 
       if (!imageUrl) {
         continue;
@@ -346,6 +348,22 @@ function absoluteUrl(publicUrl: string) {
   return new URL(publicUrl, appUrl).toString();
 }
 
+async function artifactImageUrl(artifact: Artifact) {
+  if (
+    artifact.publicUrl?.startsWith("http://") ||
+    artifact.publicUrl?.startsWith("https://")
+  ) {
+    return artifact.publicUrl;
+  }
+
+  try {
+    const body = await readLocalObject(artifact.ossKey);
+    return `data:${artifact.mimeType};base64,${body.toString("base64")}`;
+  } catch {
+    return artifact.publicUrl ? absoluteUrl(artifact.publicUrl) : null;
+  }
+}
+
 async function saveBrandKit(projectId: string, brandKit: BrandKitOutput) {
   return prisma.brandKit.upsert({
     where: { projectId },
@@ -405,6 +423,7 @@ Rules:
 - Keep claims conservative. If support is weak, mark confidence "low" and add a policy risk.
 - If no offer is supplied, do not invent one. Describe brand positioning from website/source context.
 - Prefer colors evidenced by CSS/HTML candidates or visual analysis. Use neutral fallback colors only when neither source establishes a palette.
+- When a LOGO_VISION source includes DOMINANT_LOGO_COLOR, treat it as the primary Working palette color and build supporting colors around it.
 - Treat WEBSITE_VISION sources as direct evidence for logos, product appearance, typography, and visual language.
 - lockedStyle must be concise style language later agents can reuse for concepts, keyframes, and video prompts.
 - Return only JSON that matches the schema.`;
@@ -488,6 +507,7 @@ function enrichBrandKitFromProject(
       contexts,
     ),
     policyRisks: policyRisks.slice(0, 8),
+    palette: applyLogoDominantColor(brandKit.palette, contexts),
     visualMotifs: sanitizeVisualMotifs(
       brandKit.visualMotifs,
       hasUploadedVisualEvidence,

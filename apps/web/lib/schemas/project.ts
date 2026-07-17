@@ -18,7 +18,7 @@ const projectProductSchema = z.object({
     )
     .optional()
     .or(z.literal("").transform(() => undefined)),
-  imageCount: z.coerce.number().int().min(1).max(3),
+  imageCount: z.coerce.number().int().min(1).max(1),
 });
 
 export const createProjectSchema = z
@@ -57,7 +57,7 @@ export const createProjectSchema = z
       .preprocess((value) => value === true || value === "true", z.boolean())
       .default(false),
     outputMode: z.enum(["STANDARD", "PRODUCT_SHOWCASE"]).default("STANDARD"),
-    products: z.array(projectProductSchema).max(3).default([]),
+    products: z.array(projectProductSchema).max(1).default([]),
     videoLengthSec: z.coerce.number().int().min(5).max(60).default(30),
     style: z.enum(["REALISTIC", "THREE_D_ANIMATION"]).default("REALISTIC"),
   })
@@ -67,16 +67,6 @@ export const createProjectSchema = z
         context.addIssue({
           code: "custom",
           message: "Add at least one product with a product image.",
-          path: ["products"],
-        });
-      }
-      if (
-        input.products.reduce((sum, product) => sum + product.imageCount, 0) > 3
-      ) {
-        context.addIssue({
-          code: "custom",
-          message:
-            "Product Showcase supports up to three product images total.",
           path: ["products"],
         });
       }
@@ -92,6 +82,18 @@ export const createProjectSchema = z
         code: "custom",
         message: "Standard reels must be 15 to 60 seconds.",
         path: ["videoLengthSec"],
+      });
+    }
+
+    const urls = [
+      input.websiteUrl,
+      ...input.products.map((product) => product.websiteUrl),
+    ].filter((value): value is string => Boolean(value));
+    if (new Set(urls).size > 1) {
+      context.addIssue({
+        code: "custom",
+        message: "Use one website source per project.",
+        path: ["websiteUrl"],
       });
     }
 

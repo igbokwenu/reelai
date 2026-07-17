@@ -36,13 +36,12 @@ export async function POST(request: Request, context: RouteContext) {
         project.sources.map((source) => source.productId).filter(Boolean),
       );
       if (
-        project.products.length < 1 ||
-        project.sources.length < 1 ||
-        project.sources.length > 3 ||
-        project.products.some((product) => !coveredProducts.has(product.id))
+        project.products.length !== 1 ||
+        project.sources.length !== 1 ||
+        !coveredProducts.has(project.products[0]!.id)
       ) {
         return badRequest(
-          "Product Showcase requires one product image per product and supports three images total.",
+          "Product Showcase requires exactly one product with one product image.",
         );
       }
     }
@@ -55,7 +54,7 @@ export async function POST(request: Request, context: RouteContext) {
         } | null
       )?.background === true;
     const job = background
-      ? await createQueuedBrandKitJob(projectId, "product_showcase_intake")
+      ? await createQueuedBrandKitJob(projectId, "initial_project_setup")
       : await createAndRunBrandKitJob(projectId);
     if (background) {
       after(async () => {

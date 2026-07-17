@@ -17,7 +17,7 @@ Build only this before stretch work:
 - No committed secrets. `.env` must stay ignored.
 - QwenCloud client code visibly includes `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`.
 - User can create a project from a website URL plus optional uploads.
-- User can choose Product Showcase, which requires product photography and creates a 5–15 second realistic or 3D showcase from three proposed creative directions. It supports up to three products and three product images total, with at least one image linked to each product.
+- User can choose Product Showcase, which requires exactly one product and one product image and creates a 5–15 second realistic or 3D showcase from three proposed creative directions. Both output modes support one optional logo and one project website; Brand Reel also keeps its one product-image slot optional.
 - Each Product Showcase direction stores a structured `showcaseMotionPlan` and presents it in the concept UI: one hero action, optional supporting motion, one safe camera behavior, no person or one person total, an evidence-based separation treatment, and a feasibility rationale. Storyboard generation, manual saves, and production enforce the same one-person, simple-screen, and category-aware teardown rules so Auto mode and step-by-step mode cannot diverge.
 - App generates a Brand Kit.
 - App generates exactly three creative concepts with one preview frame each.

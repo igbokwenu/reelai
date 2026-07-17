@@ -5,12 +5,13 @@ import {
   Check,
   ChevronDown,
   Clapperboard,
+  FileImage,
   ImagePlus,
   Loader2,
   PackageOpen,
-  Plus,
   Sparkles,
-  Trash2,
+  UploadCloud,
+  type LucideIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore, type FormEvent } from "react";
@@ -19,30 +20,28 @@ import { Button } from "@/components/ui/button";
 
 type OutputMode = "STANDARD" | "PRODUCT_SHOWCASE";
 type ProductDraft = {
-  key: number;
   name: string;
   details: string;
-  websiteUrl: string;
-  files: File[];
+  file: File | null;
 };
 
 export function ProjectIntakeForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [outputMode, setOutputMode] = useState<OutputMode>("STANDARD");
-  const [products, setProducts] = useState<ProductDraft[]>([
-    { key: 1, name: "", details: "", websiteUrl: "", files: [] },
-  ]);
+  const [product, setProduct] = useState<ProductDraft>({
+    name: "",
+    details: "",
+    file: null,
+  });
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [reelProductFile, setReelProductFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   const isHydrated = useHydrationStatus();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const showcaseReady =
     outputMode !== "PRODUCT_SHOWCASE" ||
-    (products.every(
-      (product) => product.name.trim() && product.files.length > 0,
-    ) &&
-      products.reduce((total, product) => total + product.files.length, 0) <=
-        3);
+    Boolean(product.name.trim() && product.file);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -52,20 +51,11 @@ export function ProjectIntakeForm() {
       new FormData(event.currentTarget).entries(),
     );
 
-    const imageCount = products.reduce(
-      (total, product) => total + product.files.length,
-      0,
-    );
     if (
       outputMode === "PRODUCT_SHOWCASE" &&
-      (products.some(
-        (product) => !product.name.trim() || product.files.length < 1,
-      ) ||
-        imageCount > 3)
+      (!product.name.trim() || !product.file)
     ) {
-      setError(
-        "Add a name and at least one image for every product. Use no more than three images total.",
-      );
+      setError("Add a product name and its one hero image to continue.");
       setIsSubmitting(false);
       return;
     }
@@ -79,14 +69,15 @@ export function ProjectIntakeForm() {
           : basePayload.videoLengthSec,
       products:
         outputMode === "PRODUCT_SHOWCASE"
-          ? products.map((product) => ({
-              name: product.name,
-              details: product.details,
-              websiteUrl: product.websiteUrl,
-              imageCount: product.files.length,
-            }))
+          ? [
+              {
+                name: product.name,
+                details: product.details,
+                imageCount: 1,
+              },
+            ]
           : [],
-      generateBrandKit: outputMode === "STANDARD",
+      generateBrandKit: false,
     };
 
     try {
@@ -106,49 +97,54 @@ export function ProjectIntakeForm() {
         return;
       }
 
-      if (outputMode === "PRODUCT_SHOWCASE") {
-        const createdProducts = body.project.products ?? [];
-        setProgress("Uploading product references…");
-        try {
-          for (const [productIndex, product] of products.entries()) {
-            const createdProduct = createdProducts[productIndex];
-            if (!createdProduct)
-              throw new Error("Product setup was incomplete.");
-            for (const file of product.files) {
-              const upload = new FormData();
-              upload.set("file", file);
-              upload.set("type", "PRODUCT_IMAGE");
-              upload.set("productId", createdProduct.id);
-              upload.set("label", product.name);
-              const uploadResponse = await fetch(
-                `/api/projects/${body.project.id}/sources`,
-                { method: "POST", body: upload },
-              );
-              if (!uploadResponse.ok)
-                throw new Error("Product image upload failed.");
-            }
-          }
-          setProgress("Starting product analysis…");
-          const brandKitResponse = await fetch(
-            `/api/projects/${body.project.id}/brand-kit`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ background: true }),
-            },
-          );
-          if (!brandKitResponse.ok)
-            throw new Error("Product analysis could not start.");
-        } catch {
-          await fetch(`/api/projects/${body.project.id}`, {
-            method: "DELETE",
-          }).catch(() => undefined);
-          setError(
-            "We couldn't securely store the product images. The incomplete project was removed; please try again.",
-          );
-          return;
+      const createdProduct = body.project.products?.[0];
+      const productFile =
+        outputMode === "PRODUCT_SHOWCASE" ? product.file : reelProductFile;
+      setProgress("Securing your identity assets…");
+      try {
+        if (logoFile) {
+          await uploadInitialAsset({
+            projectId: body.project.id,
+            file: logoFile,
+            type: "LOGO",
+            label: "Primary logo",
+          });
         }
+        if (productFile) {
+          if (outputMode === "PRODUCT_SHOWCASE" && !createdProduct) {
+            throw new Error("Product setup was incomplete.");
+          }
+          await uploadInitialAsset({
+            projectId: body.project.id,
+            file: productFile,
+            type: "PRODUCT_IMAGE",
+            label:
+              outputMode === "PRODUCT_SHOWCASE"
+                ? product.name
+                : "Primary product",
+            productId: createdProduct?.id,
+          });
+        }
+      } catch {
+        await fetch(`/api/projects/${body.project.id}`, {
+          method: "DELETE",
+        }).catch(() => undefined);
+        setError(
+          "We couldn't securely store the identity assets. The incomplete project was removed; please try again.",
+        );
+        return;
       }
+
+      setProgress(
+        logoFile
+          ? "Reading your logo and building the palette…"
+          : "Building your Brand Kit…",
+      );
+      await fetch(`/api/projects/${body.project.id}/brand-kit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ background: true }),
+      }).catch(() => undefined);
 
       router.push(`/projects/${body.project.id}`);
       router.refresh();
@@ -209,8 +205,22 @@ export function ProjectIntakeForm() {
         </label>
       </div>
 
+      <IdentityAssetFields
+        logoFile={logoFile}
+        onLogoChange={setLogoFile}
+        onProductChange={
+          outputMode === "PRODUCT_SHOWCASE"
+            ? (file) => setProduct((current) => ({ ...current, file }))
+            : setReelProductFile
+        }
+        outputMode={outputMode}
+        productFile={
+          outputMode === "PRODUCT_SHOWCASE" ? product.file : reelProductFile
+        }
+      />
+
       {outputMode === "PRODUCT_SHOWCASE" ? (
-        <ProductShowcaseFields products={products} setProducts={setProducts} />
+        <ProductShowcaseFields product={product} setProduct={setProduct} />
       ) : null}
 
       <details className="group rounded-lg border border-border bg-background/40">
@@ -369,166 +379,156 @@ function ModeCard({
   );
 }
 
-function ProductShowcaseFields({
-  products,
-  setProducts,
+function IdentityAssetFields({
+  logoFile,
+  onLogoChange,
+  productFile,
+  onProductChange,
+  outputMode,
 }: {
-  products: ProductDraft[];
-  setProducts: (products: ProductDraft[]) => void;
+  logoFile: File | null;
+  onLogoChange: (file: File | null) => void;
+  productFile: File | null;
+  onProductChange: (file: File | null) => void;
+  outputMode: OutputMode;
 }) {
-  const totalImages = products.reduce(
-    (sum, product) => sum + product.files.length,
-    0,
-  );
   return (
     <section className="overflow-hidden rounded-2xl border border-primary/20 bg-[radial-gradient(circle_at_top_right,rgba(183,255,60,0.09),transparent_35%),rgba(13,16,14,0.7)]">
       <div className="flex flex-col gap-3 border-b border-white/[0.06] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold">
-            <Box className="size-4 text-primary" aria-hidden="true" />
-            Product references
+            <UploadCloud className="size-4 text-primary" aria-hidden="true" />
+            Identity assets
           </div>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Up to 3 products and 3 images total. Clean angles and consistent
-            lighting give the strongest identity lock.
+            {outputMode === "PRODUCT_SHOWCASE"
+              ? "Add one required hero product image and an optional logo for a clean, consistent identity lock."
+              : "One optional logo and one optional hero product image keep every generation visually consistent."}
           </p>
         </div>
         <span className="w-fit rounded-full border border-border bg-background/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          {totalImages}/3 images
+          One per slot
         </span>
       </div>
-      <div className="grid gap-3 p-3 sm:p-4">
-        {products.map((product, index) => (
-          <div
-            className="rounded-xl border border-border/80 bg-background/55 p-3 sm:p-4"
-            key={product.key}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Product {index + 1}
-                {index === 0 ? " · Hero" : ""}
-              </p>
-              {products.length > 1 ? (
-                <button
-                  aria-label={`Remove product ${index + 1}`}
-                  className="text-muted-foreground transition hover:text-destructive"
-                  onClick={() =>
-                    setProducts(
-                      products.filter((item) => item.key !== product.key),
-                    )
-                  }
-                  type="button"
-                >
-                  <Trash2 className="size-4" aria-hidden="true" />
-                </button>
-              ) : null}
-            </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <input
-                aria-label={`Product ${index + 1} name`}
-                className="h-11 rounded-lg border border-input bg-background/80 px-3 text-sm outline-none focus:border-primary/60"
-                maxLength={80}
-                onChange={(event) =>
-                  setProducts(
-                    products.map((item) =>
-                      item.key === product.key
-                        ? { ...item, name: event.target.value }
-                        : item,
-                    ),
-                  )
-                }
-                placeholder="Product name"
-                required
-                value={product.name}
-              />
-              <input
-                aria-label={`Product ${index + 1} website`}
-                className="h-11 rounded-lg border border-input bg-background/80 px-3 text-sm outline-none focus:border-primary/60"
-                onChange={(event) =>
-                  setProducts(
-                    products.map((item) =>
-                      item.key === product.key
-                        ? { ...item, websiteUrl: event.target.value }
-                        : item,
-                    ),
-                  )
-                }
-                placeholder="Product page (optional)"
-                type="url"
-                value={product.websiteUrl}
-              />
-            </div>
-            <textarea
-              aria-label={`Product ${index + 1} details`}
-              className="mt-3 min-h-20 w-full resize-y rounded-lg border border-input bg-background/80 px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/60"
-              maxLength={600}
-              onChange={(event) =>
-                setProducts(
-                  products.map((item) =>
-                    item.key === product.key
-                      ? { ...item, details: event.target.value }
-                      : item,
-                  ),
-                )
-              }
-              placeholder="Materials, ingredients, standout features, use case, or details the AI should preserve (optional)"
-              value={product.details}
-            />
-            <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-primary/30 bg-primary/[0.035] px-3 py-3 text-xs font-medium text-primary transition hover:bg-primary/[0.07]">
-              <ImagePlus className="size-4" aria-hidden="true" />
-              {product.files.length
-                ? `${product.files.length} image${product.files.length === 1 ? "" : "s"} selected`
-                : "Add product image"}
-              <input
-                accept="image/png,image/jpeg,image/webp"
-                className="sr-only"
-                multiple
-                onChange={(event) => {
-                  const files = Array.from(event.target.files ?? []);
-                  const otherCount = totalImages - product.files.length;
-                  setProducts(
-                    products.map((item) =>
-                      item.key === product.key
-                        ? {
-                            ...item,
-                            files: files.slice(0, Math.max(0, 3 - otherCount)),
-                          }
-                        : item,
-                    ),
-                  );
-                }}
-                required={product.files.length === 0}
-                type="file"
-              />
-            </label>
-            {product.files.length > 0 ? (
-              <p className="mt-2 truncate text-[11px] text-muted-foreground">
-                {product.files.map((file) => file.name).join(" · ")}
-              </p>
-            ) : null}
-          </div>
-        ))}
-        {products.length < 3 && totalImages < 3 ? (
-          <button
-            className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-border px-3 py-3 text-xs font-medium text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
-            onClick={() =>
-              setProducts([
-                ...products,
-                {
-                  key: Date.now(),
-                  name: "",
-                  details: "",
-                  websiteUrl: "",
-                  files: [],
-                },
-              ])
-            }
-            type="button"
-          >
-            <Plus className="size-4" aria-hidden="true" /> Add another product
-          </button>
-        ) : null}
+      <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4">
+        <AssetPicker
+          accept="image/png,image/jpeg,image/webp"
+          description="Shapes the working palette and final brand lock."
+          file={logoFile}
+          icon={FileImage}
+          label="Logo"
+          onChange={onLogoChange}
+        />
+        <AssetPicker
+          accept="image/png,image/jpeg,image/webp"
+          description={
+            outputMode === "PRODUCT_SHOWCASE"
+              ? "Required · the visual source of truth for the showcase."
+              : "Optional · grounds product details when your reel features one."
+          }
+          file={productFile}
+          icon={Box}
+          label="Product image"
+          onChange={onProductChange}
+          required={outputMode === "PRODUCT_SHOWCASE"}
+        />
       </div>
+    </section>
+  );
+}
+
+function AssetPicker({
+  accept,
+  description,
+  file,
+  icon: Icon,
+  label,
+  onChange,
+  required = false,
+}: {
+  accept: string;
+  description: string;
+  file: File | null;
+  icon: LucideIcon;
+  label: string;
+  onChange: (file: File | null) => void;
+  required?: boolean;
+}) {
+  return (
+    <label className="group cursor-pointer rounded-xl border border-border/80 bg-background/55 p-4 transition hover:border-primary/30 hover:bg-primary/[0.035]">
+      <span className="flex items-start justify-between gap-3">
+        <span className="flex size-9 items-center justify-center rounded-lg bg-primary/[0.09] text-primary">
+          <Icon className="size-4" aria-hidden="true" />
+        </span>
+        <span className="rounded-full border border-border bg-background/70 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          {required ? "Required" : "Optional"}
+        </span>
+      </span>
+      <span className="mt-3 block text-sm font-semibold">{label}</span>
+      <span className="mt-1 block min-h-10 text-xs leading-5 text-muted-foreground">
+        {description}
+      </span>
+      <span className="mt-3 flex items-center gap-2 rounded-lg border border-dashed border-primary/25 bg-primary/[0.03] px-3 py-2.5 text-xs font-medium text-primary">
+        <ImagePlus className="size-4 shrink-0" aria-hidden="true" />
+        <span className="truncate">
+          {file ? file.name : `Choose ${label.toLowerCase()}`}
+        </span>
+      </span>
+      <input
+        accept={accept}
+        aria-label={label}
+        className="sr-only"
+        onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+        required={required && !file}
+        type="file"
+      />
+    </label>
+  );
+}
+
+function ProductShowcaseFields({
+  product,
+  setProduct,
+}: {
+  product: ProductDraft;
+  setProduct: (product: ProductDraft) => void;
+}) {
+  return (
+    <section className="rounded-2xl border border-border/80 bg-background/45 p-4">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <Box className="size-4 text-primary" aria-hidden="true" />
+        Hero product details
+      </div>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        One product, one unmistakable visual identity, and fewer opportunities
+        for generation drift.
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <input
+          aria-label="Product 1 name"
+          className="h-11 rounded-lg border border-input bg-background/80 px-3 text-sm outline-none focus:border-primary/60"
+          maxLength={80}
+          onChange={(event) =>
+            setProduct({ ...product, name: event.target.value })
+          }
+          placeholder="Product name"
+          required
+          value={product.name}
+        />
+        <div className="flex h-11 items-center rounded-lg border border-border/70 bg-muted/25 px-3 text-xs text-muted-foreground">
+          Uses the single project website above as URL context
+        </div>
+      </div>
+      <textarea
+        aria-label="Product 1 details"
+        className="mt-3 min-h-20 w-full resize-y rounded-lg border border-input bg-background/80 px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/60"
+        maxLength={600}
+        onChange={(event) =>
+          setProduct({ ...product, details: event.target.value })
+        }
+        placeholder="Materials, ingredients, standout features, use case, or details the AI should preserve (optional)"
+        value={product.details}
+      />
     </section>
   );
 }
@@ -539,6 +539,31 @@ function useHydrationStatus() {
     () => true,
     () => false,
   );
+}
+
+async function uploadInitialAsset({
+  projectId,
+  file,
+  type,
+  label,
+  productId,
+}: {
+  projectId: string;
+  file: File;
+  type: "LOGO" | "PRODUCT_IMAGE";
+  label: string;
+  productId?: string;
+}) {
+  const upload = new FormData();
+  upload.set("file", file);
+  upload.set("type", type);
+  upload.set("label", label);
+  if (productId) upload.set("productId", productId);
+  const response = await fetch(`/api/projects/${projectId}/sources`, {
+    method: "POST",
+    body: upload,
+  });
+  if (!response.ok) throw new Error(`${label} upload failed.`);
 }
 
 function Field({

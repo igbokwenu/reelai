@@ -141,10 +141,18 @@ export function ProjectWorkflow({
     stages.find((stage) => stage.state === "current")?.id ??
     (finalComplete ? "final" : "brand");
   const [activeId, setActiveId] = useState<StageId>(suggestedStage);
-  const activeIndex = stages.findIndex((stage) => stage.id === activeId);
-  const activeStage = stages[activeIndex] ?? stages[0];
+  const isStageAccessible = (stage: Stage) =>
+    finalComplete || stage.state !== "upcoming";
+  const requestedStage = stages.find((stage) => stage.id === activeId);
+  const activeStage =
+    requestedStage && isStageAccessible(requestedStage)
+      ? requestedStage
+      : (stages.find((stage) => stage.id === suggestedStage) ?? stages[0]);
+  const activeIndex = stages.findIndex((stage) => stage.id === activeStage.id);
 
   function selectStage(id: StageId) {
+    const target = stages.find((stage) => stage.id === id);
+    if (!target || !isStageAccessible(target)) return;
     setActiveId(id);
     window.requestAnimationFrame(() => {
       document.getElementById("project-workspace")?.scrollIntoView({
@@ -207,22 +215,31 @@ export function ProjectWorkflow({
               {stages.map((stage) => {
                 const Icon = stage.icon;
                 const isActive = stage.id === activeStage.id;
+                const isAccessible = isStageAccessible(stage);
                 return (
                   <GuideTooltip
                     className="min-w-0"
-                    content={`Opens ${stage.label}. ${stage.description}`}
+                    content={
+                      isAccessible
+                        ? `Opens ${stage.label}. ${stage.description}`
+                        : `Complete the preceding stage to unlock ${stage.label}.`
+                    }
                     key={stage.id}
                     side="bottom"
                   >
                     <button
                       aria-controls={`workflow-panel-${stage.id}`}
                       aria-current={isActive ? "step" : undefined}
+                      aria-disabled={!isAccessible}
                       aria-selected={isActive}
                       className={`group relative w-full min-w-0 rounded-xl px-3 py-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                         isActive
                           ? "bg-primary text-primary-foreground shadow-lg shadow-primary/10"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          : !isAccessible
+                            ? "cursor-not-allowed text-muted-foreground/45"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       }`}
+                      disabled={!isAccessible}
                       id={`workflow-tab-${stage.id}`}
                       onClick={() => selectStage(stage.id)}
                       role="tab"
@@ -240,6 +257,11 @@ export function ProjectWorkflow({
                         >
                           {stage.state === "complete" && !isActive ? (
                             <Check className="size-3.5" aria-hidden="true" />
+                          ) : !isAccessible ? (
+                            <LockKeyhole
+                              className="size-3.5"
+                              aria-hidden="true"
+                            />
                           ) : (
                             <Icon className="size-3.5" aria-hidden="true" />
                           )}
@@ -257,11 +279,13 @@ export function ProjectWorkflow({
                       >
                         {stage.state === "complete"
                           ? "Complete"
-                          : stage.state === "current"
-                            ? "Ready now"
-                            : stage.state === "available"
-                              ? "Anytime"
-                              : "Up next"}
+                          : !isAccessible
+                            ? "Locked"
+                            : stage.state === "current"
+                              ? "Ready now"
+                              : stage.state === "available"
+                                ? "Anytime"
+                                : "Up next"}
                       </span>
                     </button>
                   </GuideTooltip>
@@ -306,13 +330,18 @@ export function ProjectWorkflow({
 
             <footer className="flex items-center justify-between gap-3 border-t border-border bg-background/30 px-4 py-3 sm:px-7">
               <Button
-                disabled={activeIndex === 0}
+                disabled={
+                  activeIndex === 0 ||
+                  !isStageAccessible(stages[activeIndex - 1] ?? stages[0])
+                }
                 onClick={() => selectStage(stages[activeIndex - 1].id)}
                 size="sm"
                 tooltip={
                   activeIndex === 0
                     ? "You are already at the first stage."
-                    : `Moves to ${stages[activeIndex - 1].label}. Your edits stay preserved.`
+                    : !isStageAccessible(stages[activeIndex - 1])
+                      ? `Complete the earlier workflow before opening ${stages[activeIndex - 1].label}.`
+                      : `Moves to ${stages[activeIndex - 1].label}. Your edits stay preserved.`
                 }
                 tooltipSide="bottom"
                 variant="outline"
@@ -324,13 +353,18 @@ export function ProjectWorkflow({
                 Your work is preserved as you move between stages.
               </p>
               <Button
-                disabled={activeIndex === stages.length - 1}
+                disabled={
+                  activeIndex === stages.length - 1 ||
+                  !isStageAccessible(stages[activeIndex + 1] ?? stages[0])
+                }
                 onClick={() => selectStage(stages[activeIndex + 1].id)}
                 size="sm"
                 tooltip={
                   activeIndex === stages.length - 1
                     ? "You are already at the last stage."
-                    : `Moves to ${stages[activeIndex + 1].label}. Your edits stay preserved.`
+                    : !isStageAccessible(stages[activeIndex + 1])
+                      ? `Complete ${activeStage.label} to unlock ${stages[activeIndex + 1].label}.`
+                      : `Moves to ${stages[activeIndex + 1].label}. Your edits stay preserved.`
                 }
                 tooltipSide="bottom"
               >

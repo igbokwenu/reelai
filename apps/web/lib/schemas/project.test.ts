@@ -50,7 +50,7 @@ describe("URL-first project intake", () => {
         {
           name: "Field jacket",
           details: "Olive waxed cotton with brass hardware",
-          imageCount: 2,
+          imageCount: 1,
         },
       ],
     });
@@ -72,7 +72,7 @@ describe("URL-first project intake", () => {
     });
   });
 
-  it("requires an image per product and caps showcase references at three", () => {
+  it("requires exactly one product with exactly one image", () => {
     const base = {
       name: "Collection",
       businessName: "Northstar",
@@ -90,8 +90,33 @@ describe("URL-first project intake", () => {
       createProjectSchema.safeParse({
         ...base,
         products: [
-          { name: "Jacket", imageCount: 2 },
-          { name: "Boots", imageCount: 2 },
+          { name: "Jacket", imageCount: 1 },
+          { name: "Boots", imageCount: 1 },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      createProjectSchema.safeParse({
+        ...base,
+        products: [{ name: "Jacket", imageCount: 2 }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("allows only one distinct URL source at intake", () => {
+    expect(
+      createProjectSchema.safeParse({
+        name: "Launch",
+        businessName: "Northstar",
+        websiteUrl: "https://northstar.example",
+        outputMode: "PRODUCT_SHOWCASE",
+        videoLengthSec: 10,
+        products: [
+          {
+            name: "Jacket",
+            imageCount: 1,
+            websiteUrl: "https://shop.example/jacket",
+          },
         ],
       }).success,
     ).toBe(false);

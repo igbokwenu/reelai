@@ -123,6 +123,12 @@ export function AutoGenerationPanel({
               previous.status !== data.run.status);
           runRef.current = data.run;
           setRun(data.run);
+          if (
+            data.run.status === "COMPLETE" &&
+            previous?.status !== "COMPLETE"
+          ) {
+            onReviewStage("final");
+          }
           if (changed) router.refresh();
         }
         setRequestError(null);
@@ -144,7 +150,7 @@ export function AutoGenerationPanel({
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [isActive, projectId, router]);
+  }, [isActive, onReviewStage, projectId, router]);
 
   const phase = (run?.phase ?? "STORYBOARD") as AutoPhase;
   const status = (run?.status ?? "RUNNING") as AutoRunStatus;
@@ -317,7 +323,9 @@ export function AutoGenerationPanel({
               aria-hidden="true"
             />
             <div>
-              <p className="font-medium text-foreground">What needs attention</p>
+              <p className="font-medium text-foreground">
+                What needs attention
+              </p>
               <p className="mt-1 leading-5">{displayError}</p>
             </div>
           </div>
