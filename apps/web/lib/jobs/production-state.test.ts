@@ -5,6 +5,7 @@ import {
   hasExactSceneCoverage,
   parseVideoJobOutput,
   selectRequestedScenes,
+  selectKeyframeGenerationTargets,
   selectVideoGenerationTargets,
   stableSceneStatus,
   summarizeVideoTasks,
@@ -91,6 +92,18 @@ describe("production state", () => {
     ]);
     expect(selectVideoGenerationTargets([complete])).toEqual([complete]);
   });
+
+  it("reuses the selected concept preview for Scene 1 and generates Scene 2 onward", () => {
+    const opening = keyframeScene(1, "opening-artifact");
+    const second = keyframeScene(2, "old-second-frame");
+
+    expect(
+      selectKeyframeGenerationTargets([opening, second], "opening-artifact"),
+    ).toEqual([second]);
+    expect(
+      selectKeyframeGenerationTargets([opening], "different-artifact"),
+    ).toEqual([opening]);
+  });
 });
 
 function videoScene(id: string, complete: boolean) {
@@ -108,5 +121,21 @@ function videoScene(id: string, complete: boolean) {
           },
         ]
       : [],
+  };
+}
+
+function keyframeScene(index: number, artifactId: string) {
+  const takeId = `scene-${index}-keyframe`;
+  return {
+    index,
+    selectedKeyframeTakeId: takeId,
+    takes: [
+      {
+        id: takeId,
+        kind: "KEYFRAME_START",
+        status: "COMPLETE",
+        artifactId,
+      },
+    ],
   };
 }

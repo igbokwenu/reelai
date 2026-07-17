@@ -1,7 +1,18 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Captions, Clock3, Film, Shuffle, type LucideIcon } from "lucide-react";
+import {
+  Captions,
+  Clock3,
+  Film,
+  ImagePlus,
+  Loader2,
+  RefreshCw,
+  Shuffle,
+  type LucideIcon,
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 
 export type ContinuityMode = "CONTINUOUS" | "MATCH_CUT" | "INTENTIONAL_CHANGE";
 export type TransitionStyle =
@@ -24,6 +35,7 @@ export type EditableScene = {
     kind: "KEYFRAME_START" | "KEYFRAME_END" | "VIDEO";
     artifactId: string | null;
     status: string;
+    notes?: string | null;
     createdAt: Date | string;
   }>;
 };
@@ -32,10 +44,16 @@ export function SceneInspector({
   scene,
   isLastScene,
   onChange,
+  onRegenerateAnchor,
+  isRegeneratingAnchor,
+  canRegenerateAnchor,
 }: {
   scene: EditableScene | null;
   isLastScene: boolean;
   onChange: (scene: EditableScene) => void;
+  onRegenerateAnchor: (sceneId: string) => Promise<void>;
+  isRegeneratingAnchor: boolean;
+  canRegenerateAnchor: boolean;
 }) {
   if (!scene) {
     return (
@@ -55,24 +73,53 @@ export function SceneInspector({
             </p>
             <h3 className="mt-1 text-base font-semibold">Edit the shot</h3>
           </div>
-          <label className="flex items-center gap-2 rounded-lg border border-border bg-background/70 px-2.5 py-2">
-            <Clock3
-              className="size-4 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <input
-              aria-label="Scene duration in seconds"
-              className="w-10 bg-transparent text-right text-sm font-semibold outline-none"
-              max={10}
-              min={5}
-              type="number"
-              value={scene.durationSec}
-              onChange={(event) =>
-                onChange({ ...scene, durationSec: Number(event.target.value) })
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              disabled={!canRegenerateAnchor || isRegeneratingAnchor}
+              onClick={() => onRegenerateAnchor(scene.id)}
+              size="sm"
+              tooltip={
+                canRegenerateAnchor
+                  ? `Regenerates only Scene ${scene.index}'s ${scene.index === 1 ? "opening frame" : "anchor"}; other scene images and clips stay preserved.`
+                  : "Save and approve storyboard edits before generating this frame."
               }
-            />
-            <span className="text-xs text-muted-foreground">sec</span>
-          </label>
+              tooltipSide="bottom"
+              type="button"
+              variant="outline"
+            >
+              {isRegeneratingAnchor ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : scene.selectedKeyframeTakeId ? (
+                <RefreshCw className="size-3.5" />
+              ) : (
+                <ImagePlus className="size-3.5" />
+              )}
+              {scene.selectedKeyframeTakeId
+                ? `Regenerate ${scene.index === 1 ? "opening frame" : "frame"}`
+                : `Generate ${scene.index === 1 ? "opening frame" : "frame"}`}
+            </Button>
+            <label className="flex items-center gap-2 rounded-lg border border-border bg-background/70 px-2.5 py-2">
+              <Clock3
+                className="size-4 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <input
+                aria-label="Scene duration in seconds"
+                className="w-10 bg-transparent text-right text-sm font-semibold outline-none"
+                max={10}
+                min={5}
+                type="number"
+                value={scene.durationSec}
+                onChange={(event) =>
+                  onChange({
+                    ...scene,
+                    durationSec: Number(event.target.value),
+                  })
+                }
+              />
+              <span className="text-xs text-muted-foreground">sec</span>
+            </label>
+          </div>
         </div>
       </div>
 

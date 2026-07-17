@@ -35,16 +35,24 @@ export function KeyframeStoryFlow({
   savingSceneId,
   retryingSceneId,
   isProductionBusy,
+  regeneratingFrameSceneId,
   onSaveScene,
+  onRegenerateSceneFrame,
   onRetrySceneVideo,
+  onSelectTake,
+  selectingTakeId,
 }: {
   scenes: ProductionScene[];
   artifacts: TakeArtifact[];
   savingSceneId: string | null;
   retryingSceneId: string | null;
+  regeneratingFrameSceneId: string | null;
+  selectingTakeId: string | null;
   isProductionBusy: boolean;
   onSaveScene: (scene: ProductionScene) => Promise<boolean>;
+  onRegenerateSceneFrame: (sceneId: string) => Promise<void>;
   onRetrySceneVideo: (sceneId: string) => Promise<void>;
+  onSelectTake: (takeId: string) => Promise<void>;
 }) {
   const artifactById = new Map(
     artifacts.map((artifact) => [artifact.id, artifact]),
@@ -127,6 +135,47 @@ export function KeyframeStoryFlow({
                     take={anchorTake}
                   />
                 </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-primary/15 bg-primary/[0.045] p-2">
+                  <Button
+                    disabled={isProductionBusy}
+                    onClick={() => onRegenerateSceneFrame(scene.id)}
+                    size="sm"
+                    tooltip={`Regenerates only Scene ${scene.index}'s ${scene.index === 1 ? "opening frame" : "anchor"}. Its current versions stay available in history.`}
+                    tooltipSide="bottom"
+                    type="button"
+                    variant="outline"
+                  >
+                    {regeneratingFrameSceneId === scene.id ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : isReady ? (
+                      <RefreshCw className="size-3.5" />
+                    ) : (
+                      <ImageIcon className="size-3.5" />
+                    )}
+                    {isReady ? "New frame" : "Create frame"}
+                  </Button>
+                  <Button
+                    disabled={!isReady || isProductionBusy}
+                    onClick={() => onRetrySceneVideo(scene.id)}
+                    size="sm"
+                    tooltip={`${selectedVideo ? "Regenerates" : "Creates"} only Scene ${scene.index}'s video clip from its selected frame.`}
+                    tooltipSide="bottom"
+                    type="button"
+                  >
+                    {retryingSceneId === scene.id ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : selectedVideo ? (
+                      <RefreshCw className="size-3.5" />
+                    ) : (
+                      <Film className="size-3.5" />
+                    )}
+                    {selectedVideo
+                      ? "New clip"
+                      : failedVideo
+                        ? "Retry clip"
+                        : "Create clip"}
+                  </Button>
+                </div>
                 <p className="mt-3 rounded-lg border border-border bg-background/55 p-2.5 text-[11px] leading-5 text-muted-foreground">
                   {scene.shotPrompt}
                 </p>
@@ -176,27 +225,6 @@ export function KeyframeStoryFlow({
                           "Generate only this scene while preserving completed clips."}
                       </p>
                     </div>
-                    <Button
-                      className="shrink-0"
-                      disabled={isProductionBusy}
-                      onClick={() => onRetrySceneVideo(scene.id)}
-                      size="sm"
-                      tooltip={
-                        failedVideo
-                          ? `Regenerates only scene ${scene.index}'s failed clip and keeps completed scenes unchanged.`
-                          : `Generates only scene ${scene.index}'s missing clip and keeps completed scenes unchanged.`
-                      }
-                      tooltipSide="bottom"
-                      type="button"
-                      variant="outline"
-                    >
-                      {retryingSceneId === scene.id ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <RefreshCw className="size-3.5" />
-                      )}
-                      {failedVideo ? "Retry clip" : "Create clip"}
-                    </Button>
                   </div>
                 ) : null}
 
@@ -215,6 +243,8 @@ export function KeyframeStoryFlow({
                       ),
                     )
                   }
+                  onSelectTake={onSelectTake}
+                  selectingTakeId={selectingTakeId}
                   takes={scene.takes}
                 />
               </article>
@@ -352,10 +382,14 @@ function GenerationHistory({
   takes,
   currentIds,
   artifactById,
+  onSelectTake,
+  selectingTakeId,
 }: {
   takes: SceneTake[];
   currentIds: Set<string>;
   artifactById: Map<string, TakeArtifact>;
+  onSelectTake: (takeId: string) => Promise<void>;
+  selectingTakeId: string | null;
 }) {
   const previous = takes.filter(
     (take) => take.artifactId && !currentIds.has(take.id),
@@ -369,28 +403,54 @@ function GenerationHistory({
         <span>{previous.length} previous generation(s) preserved</span>
         <ChevronDown className="size-3 transition-transform group-open:rotate-180" />
       </summary>
-      <div className="grid grid-cols-4 gap-1.5 pb-1">
+      <div className="grid gap-2 pb-1">
         {previous.slice(0, 8).map((take) => {
           const artifact = take.artifactId
             ? artifactById.get(take.artifactId)
             : null;
           if (!artifact) return null;
 
-          return artifact.mimeType.startsWith("image/") ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              alt={`${formatEnum(take.kind)} attempt ${take.attempt}`}
-              className="aspect-[9/16] w-full rounded-md border border-border object-cover opacity-70"
-              key={take.id}
-              src={`/api/artifacts/${artifact.id}/file`}
-            />
-          ) : (
+          return (
             <div
-              className="flex aspect-[9/16] items-center justify-center rounded-md border border-border bg-background text-muted-foreground"
+              className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border bg-background/70 p-1.5"
               key={take.id}
-              title={`Video attempt ${take.attempt}`}
             >
-              <Film className="size-4" aria-hidden="true" />
+              {artifact.mimeType.startsWith("image/") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  alt={`${formatEnum(take.kind)} attempt ${take.attempt}`}
+                  className="aspect-[9/16] w-11 rounded-md object-cover"
+                  src={`/api/artifacts/${artifact.id}/file`}
+                />
+              ) : (
+                <span className="flex aspect-[9/16] w-11 items-center justify-center rounded-md bg-black text-primary">
+                  <Film className="size-4" aria-hidden="true" />
+                </span>
+              )}
+              <span className="min-w-0 text-[10px]">
+                <span className="block font-medium">
+                  {formatEnum(take.kind)} · take {take.attempt}
+                </span>
+                <span className="mt-0.5 block truncate text-muted-foreground">
+                  Preserved version
+                </span>
+              </span>
+              <Button
+                disabled={selectingTakeId !== null}
+                onClick={() => onSelectTake(take.id)}
+                size="sm"
+                tooltip="Restores this version as the selected scene output."
+                tooltipSide="bottom"
+                type="button"
+                variant="ghost"
+              >
+                {selectingTakeId === take.id ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-3.5" />
+                )}
+                Restore
+              </Button>
             </div>
           );
         })}

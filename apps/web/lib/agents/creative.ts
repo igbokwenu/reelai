@@ -28,6 +28,7 @@ import {
 import { QWEN_STRUCTURED_MODEL, sanitizeQwenError } from "@/lib/qwen/client";
 import { generateImageWithQwen } from "@/lib/qwen/image";
 import { generateStructuredWithQwen } from "@/lib/qwen/structured";
+import { resolveArtifactForQwen } from "@/lib/qwen/uploads";
 import { reviewGeneratedPreviewGrounding } from "@/lib/qwen/vision";
 import {
   creativeConceptRegenerationJsonSchema,
@@ -133,6 +134,7 @@ export async function generateConceptsForProject(projectId: string) {
       `Creative grounding check failed: ${violations.slice(0, 3).join(" ")} Regenerate with grounded directions or upload the referenced brand materials.`,
     );
   }
+  const previewReferences = await getPreviewReferences(project);
   const artifacts = await Promise.all(
     result.data.concepts.map((concept, index) =>
       createPreviewFrameArtifact({
@@ -141,6 +143,7 @@ export async function generateConceptsForProject(projectId: string) {
         prompt: concept.previewPrompt,
         grounding,
         index,
+        references: previewReferences,
       }),
     ),
   );
@@ -187,7 +190,26 @@ export async function generateConceptsForProject(projectId: string) {
       }),
       prisma.scene.updateMany({
         where: { storyboardId: storyboard.id },
-        data: { status: "DRAFT" },
+        data: {
+          status: "DRAFT",
+          selectedKeyframeTakeId: null,
+          selectedVideoTakeId: null,
+        },
+      }),
+      prisma.take.updateMany({
+        where: { scene: { storyboardId: storyboard.id } },
+        data: { selected: false },
+      }),
+      prisma.generationJob.updateMany({
+        where: { projectId, type: "RENDER", status: "COMPLETE" },
+        data: {
+          status: "CANCELLED",
+          error: "Concept set changed; create a fresh final export.",
+        },
+      }),
+      prisma.render.updateMany({
+        where: { projectId, status: "COMPLETE" },
+        data: { status: "FAILED" },
       }),
     ]);
   }
@@ -293,11 +315,16 @@ export async function regenerateConceptForProject({
     prompt: result.data.concept.previewPrompt,
     grounding,
     index: targetIndex,
+    references: await getPreviewReferences(project),
   });
   const storyboard = target.selected
     ? await prisma.storyboard.findUnique({
         where: { projectId },
-        select: { id: true, conceptId: true },
+        select: {
+          id: true,
+          conceptId: true,
+          scenes: { orderBy: { index: "asc" }, select: { id: true } },
+        },
       })
     : null;
   const invalidatesStoryboard = storyboard?.conceptId === target.id;
@@ -332,8 +359,44 @@ export async function regenerateConceptForProject({
       });
       await tx.scene.updateMany({
         where: { storyboardId: storyboard.id },
-        data: { status: "DRAFT" },
+        data: {
+          status: "DRAFT",
+          selectedKeyframeTakeId: null,
+          selectedVideoTakeId: null,
+        },
       });
+      await tx.take.updateMany({
+        where: { scene: { storyboardId: storyboard.id } },
+        data: { selected: false },
+      });
+      if (
+        storyboard.scenes[0] &&
+        previewArtifact.mimeType !== "image/svg+xml"
+      ) {
+        const openingTake = await tx.take.create({
+          data: {
+            sceneId: storyboard.scenes[0].id,
+            kind: "KEYFRAME_START",
+            attempt:
+              (await tx.take.count({
+                where: {
+                  sceneId: storyboard.scenes[0].id,
+                  kind: "KEYFRAME_START",
+                },
+              })) + 1,
+            prompt: result.data.concept.previewPrompt,
+            artifactId: previewArtifact.id,
+            status: "COMPLETE",
+            selected: true,
+            notes: "Refined concept opening frame reused as Scene 1 anchor.",
+          },
+        });
+        await tx.scene.update({
+          where: { id: storyboard.scenes[0].id },
+          data: { selectedKeyframeTakeId: openingTake.id },
+        });
+      }
+      await invalidateCompletedRenders(tx, projectId, "Concept changed");
     }
 
     return updated;
@@ -351,14 +414,43 @@ export async function regenerateConceptForProject({
   };
 }
 
+async function invalidateCompletedRenders(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  reason: string,
+) {
+  await tx.generationJob.updateMany({
+    where: { projectId, type: "RENDER", status: "COMPLETE" },
+    data: {
+      status: "CANCELLED",
+      error: `${reason}; create a fresh final export.`,
+    },
+  });
+  await tx.render.updateMany({
+    where: { projectId, status: "COMPLETE" },
+    data: { status: "FAILED" },
+  });
+}
+
 async function cleanupReplacedConceptPreviews(project: BrandProject) {
   const previewIds = project.concepts
     .map((concept) => concept.previewArtifactId)
     .filter((id): id is string => Boolean(id));
   if (previewIds.length === 0) return;
 
+  const referencedPreviewIds = new Set(
+    (
+      await prisma.take.findMany({
+        where: { artifactId: { in: previewIds } },
+        select: { artifactId: true },
+      })
+    )
+      .map((take) => take.artifactId)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const removableIds = previewIds.filter((id) => !referencedPreviewIds.has(id));
   const previews = project.artifacts.filter((artifact) =>
-    previewIds.includes(artifact.id),
+    removableIds.includes(artifact.id),
   );
   const cleanup = await Promise.allSettled(
     previews.map((artifact) => deleteStoredObject(artifact.ossKey)),
@@ -372,7 +464,7 @@ async function cleanupReplacedConceptPreviews(project: BrandProject) {
       failed,
     });
   }
-  await prisma.artifact.deleteMany({ where: { id: { in: previewIds } } });
+  await prisma.artifact.deleteMany({ where: { id: { in: removableIds } } });
 }
 
 async function cleanupPreviewArtifact(
@@ -385,6 +477,11 @@ async function cleanupPreviewArtifact(
     (candidate) => candidate.id === previewArtifactId,
   );
   if (!artifact) return;
+  const isOpeningFrameHistory = await prisma.take.findFirst({
+    where: { artifactId: artifact.id },
+    select: { id: true },
+  });
+  if (isOpeningFrameHistory) return;
 
   try {
     await deleteStoredObject(artifact.ossKey);
@@ -445,6 +542,29 @@ export async function generateStoryboardForProject(projectId: string) {
     throw new Error(
       "Select one creative concept before generating a storyboard.",
     );
+  }
+  const hasProductReference = project.sources.some(
+    (source) => source.type === "PRODUCT_IMAGE" && source.artifactId,
+  );
+  if (hasProductReference) {
+    const openingFrame = selectedConcept.previewArtifactId
+      ? await prisma.artifact.findFirst({
+          where: { id: selectedConcept.previewArtifactId, projectId },
+          select: { metadata: true },
+        })
+      : null;
+    const metadata = openingFrame?.metadata as {
+      groundingMode?: unknown;
+      providerFallback?: unknown;
+    } | null;
+    if (
+      metadata?.groundingMode !== "product-reference-locked" ||
+      typeof metadata.providerFallback === "string"
+    ) {
+      throw new Error(
+        "Regenerate the selected concept to create its product-locked opening frame before storyboard planning.",
+      );
+    }
   }
   if (
     project.outputMode === "PRODUCT_SHOWCASE" &&
@@ -576,7 +696,7 @@ export async function generateStoryboardForProject(projectId: string) {
   };
   const storyboard = await saveStoryboard({
     projectId,
-    conceptId: selectedConcept.id,
+    concept: selectedConcept,
     brandKit: project.brandKit,
     output,
   });
@@ -630,7 +750,12 @@ export function getCreativeGenerationError(error: unknown) {
   }
   if (
     error instanceof Error &&
-    error.message.startsWith("Regenerate the selected Product Showcase concept")
+    (error.message.startsWith(
+      "Regenerate the selected Product Showcase concept",
+    ) ||
+      error.message.startsWith(
+        "Regenerate the selected concept to create its product-locked opening frame",
+      ))
   ) {
     return error.message;
   }
@@ -656,12 +781,12 @@ function formatZodIssues(error: ZodError) {
 
 async function saveStoryboard({
   projectId,
-  conceptId,
+  concept,
   brandKit,
   output,
 }: {
   projectId: string;
-  conceptId: string;
+  concept: CreativeConcept;
   brandKit: BrandKit;
   output: StoryboardOutput;
 }) {
@@ -670,9 +795,6 @@ async function saveStoryboard({
     select: { id: true },
   });
 
-  if (existing) {
-    await prisma.scene.deleteMany({ where: { storyboardId: existing.id } });
-  }
   const characterContinuity = formatCharacterContinuity(
     output.continuityBible.characters,
     output.continuityBible.cast,
@@ -684,63 +806,104 @@ async function saveStoryboard({
         creativeText: `${output.title} ${output.bgm.preset} ${output.bgm.prompt}`,
       });
 
-  const storyboard = await prisma.storyboard.upsert({
-    where: { projectId },
-    update: {
-      conceptId,
-      title: output.title,
-      script: output.script,
-      bgmEnabled: output.bgm.enabled,
-      bgmPrompt: `${output.bgm.preset}: ${output.bgm.prompt}`,
-      bgmTrackId: bgmTrack?.id ?? null,
-      productContinuity: output.continuityBible.product,
-      characterContinuity,
-      visualContinuity: output.continuityBible.visualWorld,
-      status: "DRAFT",
-      scenes: {
-        create: output.scenes.map((scene, index) => ({
-          index: index + 1,
-          durationSec: scene.durationSec,
-          captionText: scene.captionText,
-          voiceoverText: scene.voiceoverText,
-          shotPrompt: scene.shotPrompt,
-          continuityNotes: scene.continuityNotes,
-          continuityMode: scene.continuityMode,
-          transitionStyle: scene.transitionStyle,
-          lockedStyleLanguage: brandKit.lockedStyle,
-        })),
-      },
-    },
-    create: {
-      projectId,
-      conceptId,
-      title: output.title,
-      script: output.script,
-      bgmEnabled: output.bgm.enabled,
-      bgmPrompt: `${output.bgm.preset}: ${output.bgm.prompt}`,
-      bgmTrackId: bgmTrack?.id ?? null,
-      productContinuity: output.continuityBible.product,
-      characterContinuity,
-      visualContinuity: output.continuityBible.visualWorld,
-      status: "DRAFT",
-      scenes: {
-        create: output.scenes.map((scene, index) => ({
-          index: index + 1,
-          durationSec: scene.durationSec,
-          captionText: scene.captionText,
-          voiceoverText: scene.voiceoverText,
-          shotPrompt: scene.shotPrompt,
-          continuityNotes: scene.continuityNotes,
-          continuityMode: scene.continuityMode,
-          transitionStyle: scene.transitionStyle,
-          lockedStyleLanguage: brandKit.lockedStyle,
-        })),
-      },
-    },
-    include: { scenes: { orderBy: { index: "asc" } } },
-  });
+  return prisma.$transaction(async (tx) => {
+    if (existing) {
+      await tx.scene.deleteMany({ where: { storyboardId: existing.id } });
+    }
 
-  return storyboard;
+    const storyboard = await tx.storyboard.upsert({
+      where: { projectId },
+      update: {
+        conceptId: concept.id,
+        title: output.title,
+        script: output.script,
+        bgmEnabled: output.bgm.enabled,
+        bgmPrompt: `${output.bgm.preset}: ${output.bgm.prompt}`,
+        bgmTrackId: bgmTrack?.id ?? null,
+        productContinuity: output.continuityBible.product,
+        characterContinuity,
+        visualContinuity: output.continuityBible.visualWorld,
+        status: "DRAFT",
+        scenes: {
+          create: output.scenes.map((scene, index) => ({
+            index: index + 1,
+            durationSec: scene.durationSec,
+            captionText: scene.captionText,
+            voiceoverText: scene.voiceoverText,
+            shotPrompt: scene.shotPrompt,
+            continuityNotes: scene.continuityNotes,
+            continuityMode: scene.continuityMode,
+            transitionStyle: scene.transitionStyle,
+            lockedStyleLanguage: brandKit.lockedStyle,
+          })),
+        },
+      },
+      create: {
+        projectId,
+        conceptId: concept.id,
+        title: output.title,
+        script: output.script,
+        bgmEnabled: output.bgm.enabled,
+        bgmPrompt: `${output.bgm.preset}: ${output.bgm.prompt}`,
+        bgmTrackId: bgmTrack?.id ?? null,
+        productContinuity: output.continuityBible.product,
+        characterContinuity,
+        visualContinuity: output.continuityBible.visualWorld,
+        status: "DRAFT",
+        scenes: {
+          create: output.scenes.map((scene, index) => ({
+            index: index + 1,
+            durationSec: scene.durationSec,
+            captionText: scene.captionText,
+            voiceoverText: scene.voiceoverText,
+            shotPrompt: scene.shotPrompt,
+            continuityNotes: scene.continuityNotes,
+            continuityMode: scene.continuityMode,
+            transitionStyle: scene.transitionStyle,
+            lockedStyleLanguage: brandKit.lockedStyle,
+          })),
+        },
+      },
+      include: { scenes: { orderBy: { index: "asc" } } },
+    });
+
+    const openingScene = storyboard.scenes[0];
+    if (openingScene && concept.previewArtifactId) {
+      const openingArtifact = await tx.artifact.findFirst({
+        where: {
+          id: concept.previewArtifactId,
+          projectId,
+          mimeType: { startsWith: "image/" },
+          NOT: { mimeType: "image/svg+xml" },
+        },
+        select: { id: true },
+      });
+      if (openingArtifact) {
+        const openingTake = await tx.take.create({
+          data: {
+            sceneId: openingScene.id,
+            kind: "KEYFRAME_START",
+            attempt: 1,
+            prompt: concept.previewPrompt,
+            artifactId: openingArtifact.id,
+            status: "COMPLETE",
+            selected: true,
+            notes:
+              "Concept opening frame reused as Scene 1 anchor; no duplicate image generation.",
+          },
+        });
+        await tx.scene.update({
+          where: { id: openingScene.id },
+          data: { selectedKeyframeTakeId: openingTake.id },
+        });
+      }
+    }
+
+    return tx.storyboard.findUniqueOrThrow({
+      where: { id: storyboard.id },
+      include: { scenes: { orderBy: { index: "asc" } } },
+    });
+  });
 }
 
 function formatCharacterContinuity(
@@ -767,19 +930,33 @@ async function createPreviewFrameArtifact({
   prompt,
   index,
   grounding,
+  references,
 }: {
   project: BrandProject;
   conceptTitle: string;
   prompt: string;
   index: number;
   grounding: GroundingCapabilities;
+  references: PreviewReference[];
 }) {
-  const groundedPrompt = hardenImagePrompt(prompt, grounding, project.style);
-  const generated = await tryGenerateProviderPreview(
-    groundedPrompt,
-    grounding,
-    getPreviewReferenceUrls(project),
+  const productReferences = references.filter(
+    (reference) => reference.sourceType === "PRODUCT_IMAGE",
   );
+  const groundedPrompt = `${hardenImagePrompt(prompt, grounding, project.style)}
+
+OPENING-FRAME CONTRACT:
+- This is not a mood-board thumbnail. It is the exact Scene 1 opening frame that will be sent to image-to-video if this concept is selected.
+- Compose the immediate visual hook at the onset of the planned first shot, with enough stable negative space and clean geometry for motion.
+${productReferences.length > 0 ? "- PRODUCT IDENTITY LOCK: treat the supplied product photograph(s) as the non-negotiable source of truth. Preserve the exact silhouette, proportions, materials, colors, packaging, label placement, surface details, and visible ingredients. Recompose that same product into the concept; never substitute a generic or look-alike product." : "- No product photograph is available. Do not invent or depict a manufactured product representation."}`;
+  const generated =
+    grounding.hasProductReference && productReferences.length === 0
+      ? null
+      : await tryGenerateProviderPreview(
+          groundedPrompt,
+          grounding,
+          references.map((reference) => reference.url),
+          productReferences.map((reference) => reference.url),
+        );
   const stored = generated
     ? await storeObject({
         projectId: project.id,
@@ -812,11 +989,20 @@ async function createPreviewFrameArtifact({
       height: 1280,
       metadata: {
         operation: "concept_preview_frame",
+        role: "storyboard_opening_frame",
+        sceneIndex: 1,
         model: QWEN_PREVIEW_IMAGE_MODEL,
         prompt: groundedPrompt,
-        groundingMode: grounding.hasUploadedVisuals
-          ? "reference-limited"
-          : "website-only-restricted",
+        groundingMode:
+          productReferences.length > 0
+            ? "product-reference-locked"
+            : grounding.hasUploadedVisuals
+              ? "reference-limited"
+              : "website-only-restricted",
+        referenceArtifactIds: references.map(
+          (reference) => reference.artifactId,
+        ),
+        productReferenceCount: productReferences.length,
         groundingReview:
           generated?.groundingReview ??
           "Provider preview unavailable or rejected by visual grounding review.",
@@ -825,7 +1011,9 @@ async function createPreviewFrameArtifact({
         providerRequestId: generated?.providerRequestId ?? null,
         providerFallback: generated
           ? null
-          : "Local durable preview used when live image generation is not configured.",
+          : grounding.hasProductReference && productReferences.length === 0
+            ? "Product reference could not be resolved; generic product generation was intentionally blocked."
+            : "Local durable preview used when live image generation is unavailable or rejected.",
       },
     },
   });
@@ -835,6 +1023,7 @@ async function tryGenerateProviderPreview(
   prompt: string,
   grounding: GroundingCapabilities,
   imageUrls: string[],
+  productReferenceUrls: string[],
 ) {
   try {
     const generated = await generateImageWithQwen({
@@ -846,6 +1035,7 @@ async function tryGenerateProviderPreview(
     const review = await reviewGeneratedPreviewGrounding({
       imageUrl: generated.imageUrl,
       restrictions: buildGroundingInstructions(grounding),
+      referenceImageUrls: productReferenceUrls,
     });
     if (!review.passed) {
       return null;
@@ -870,7 +1060,15 @@ async function tryGenerateProviderPreview(
   }
 }
 
-function getPreviewReferenceUrls(project: BrandProject) {
+type PreviewReference = {
+  artifactId: string;
+  sourceType: string;
+  url: string;
+};
+
+async function getPreviewReferences(
+  project: BrandProject,
+): Promise<PreviewReference[]> {
   const artifactById = new Map(
     project.artifacts.map((artifact) => [artifact.id, artifact]),
   );
@@ -880,7 +1078,7 @@ function getPreviewReferenceUrls(project: BrandProject) {
     ["REFERENCE_AD", 2],
     ["UPLOAD", 3],
   ]);
-  return [...project.sources]
+  const candidates = [...project.sources]
     .filter((source) => source.artifactId && typeOrder.has(source.type))
     .sort(
       (left, right) =>
@@ -890,14 +1088,22 @@ function getPreviewReferenceUrls(project: BrandProject) {
       const artifact = source.artifactId
         ? artifactById.get(source.artifactId)
         : null;
-      if (!artifact?.publicUrl) return [];
-      if (/^https?:\/\//i.test(artifact.publicUrl)) return [artifact.publicUrl];
-      const publicAppUrl = process.env.PUBLIC_APP_URL?.replace(/\/$/, "");
-      return publicAppUrl && !publicAppUrl.toLowerCase().includes("placeholder")
-        ? [`${publicAppUrl}/api/artifacts/${artifact.id}/file`]
+      return artifact?.mimeType.startsWith("image/")
+        ? [{ artifact, sourceType: source.type }]
         : [];
     })
     .slice(0, 3);
+
+  const resolved = await Promise.allSettled(
+    candidates.map(async ({ artifact, sourceType }) => ({
+      artifactId: artifact.id,
+      sourceType,
+      url: await resolveArtifactForQwen(artifact, QWEN_PREVIEW_IMAGE_MODEL),
+    })),
+  );
+  return resolved.flatMap((result) =>
+    result.status === "fulfilled" ? [result.value] : [],
+  );
 }
 
 function reviewStoryboardClaims(
@@ -1026,7 +1232,8 @@ Requirements:
 - Plan transitions as editorial punctuation, never decoration. A true compositional match uses a clean cut; gentle continuity may use a short fade; directional movement or packaging reveals may use a slide or wipe; circular hero forms, food plating, lenses, cosmetics, and centered reveals may justify an iris or clock wipe. Use no effect when the cut is stronger.
 - ${buildCinematicBoostInstruction(project.cinematicBoost)}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "End with a concise, source-safe caption and spoken call to action that fits naturally inside the requested duration." : "Resolve with a clear, source-safe audience action."}
-- Preview prompts must be 9:16 frame prompts suitable for ${QWEN_PREVIEW_IMAGE_MODEL}.
+- Preview prompts must describe the exact 9:16 opening frame of Scene 1, suitable for ${QWEN_PREVIEW_IMAGE_MODEL}; this frame is a production input, not a mood-board thumbnail.
+- When a product image is supplied, the opening frame must visibly preserve that exact product identity and must never request a generic substitute.
 - Use the brand palette colors and visual motifs in your visual direction.
 - Avoid unsupported claims and regulated-category promises.
 - ${buildGroundingInstructions(grounding)}
@@ -1115,7 +1322,8 @@ Requirements:
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Choose motion from the product's real material and use cues rather than defaulting to a generic spin: use verified garnish/temperature behavior for food, fluid or texture control for beauty, fabric response for fashion, precision parallax/light for rigid goods, and simple use-result motion for home or craft products. One restrained supporting material behavior may accompany the hero action." : "Use domain-specific action, physical metaphor, and lighting rather than a generic montage."}
 - Plan only purposeful scene transitions: clean cut for match cuts; short fade for gentle continuity; slide or wipe for directional movement; iris or clock wipe only when circular geometry or a centered hero reveal motivates it.
 - ${buildCinematicBoostInstruction(project.cinematicBoost)}
-- The preview prompt must be a 9:16 frame prompt suitable for ${QWEN_PREVIEW_IMAGE_MODEL}.
+- The preview prompt must describe the exact 9:16 opening frame of Scene 1, suitable for ${QWEN_PREVIEW_IMAGE_MODEL}; this frame is a production input, not a mood-board thumbnail.
+- When a product image is supplied, the opening frame must visibly preserve that exact product identity and must never request a generic substitute.
 - Use the brand palette colors and supported visual motifs.
 - Avoid unsupported claims and regulated-category promises.
 - ${buildGroundingInstructions(grounding)}
@@ -1244,6 +1452,7 @@ Strategy: ${concept.strategy}
 Narrative arc: ${concept.narrativeArc}
 Visual style: ${concept.visualStyle}
 Rationale: ${concept.rationale}
+Locked Scene 1 opening frame brief: ${concept.previewPrompt}
 Product motion plan: ${project.outputMode === "PRODUCT_SHOWCASE" ? JSON.stringify(concept.showcaseMotionPlan) : "Not applicable"}
 
 Brand Kit:
@@ -1254,6 +1463,10 @@ Claims: ${JSON.stringify(brandKit?.claims)}
 Policy risks: ${JSON.stringify(brandKit?.policyRisks)}
 Palette: ${JSON.stringify(brandKit?.palette)}
 Visual motifs: ${JSON.stringify(safeVisualMotifs(brandKit?.visualMotifs, grounding))}
+
+Opening-frame continuity:
+- Scene 1 must begin from the selected concept's already-generated opening frame. Write Scene 1 shotPrompt as the motion that grows naturally out of that exact still; do not plan a different establishing image.
+- Do not request a new Scene 1 image. Reel AI reuses the selected concept frame as the Scene 1 image-to-video input and generates anchors only for Scene 2 onward.
 
 ${
   preflightViolations.length > 0

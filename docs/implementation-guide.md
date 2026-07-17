@@ -384,23 +384,25 @@ All route handlers must:
 
 Required endpoints:
 
-| Endpoint                                                    | Method  | Purpose                                                 | Sync/async                                    |
-| ----------------------------------------------------------- | ------- | ------------------------------------------------------- | --------------------------------------------- |
-| `/api/projects`                                             | `POST`  | Create project                                          | sync                                          |
-| `/api/projects/[projectId]`                                 | `GET`   | Fetch full project graph                                | sync                                          |
-| `/api/projects/[projectId]/sources`                         | `POST`  | Upload/register sources                                 | sync for metadata, async extraction if needed |
-| `/api/projects/[projectId]/brand-kit`                       | `POST`  | Generate Brand Kit                                      | async                                         |
-| `/api/projects/[projectId]/concepts`                        | `POST`  | Generate three concepts and preview frames              | async                                         |
-| `/api/projects/[projectId]/concepts/[conceptId]/regenerate` | `POST`  | Regenerate one concept with an optional adjustment note | async                                         |
-| `/api/projects/[projectId]/concepts/[conceptId]/select`     | `POST`  | Select concept                                          | sync                                          |
-| `/api/projects/[projectId]/storyboard`                      | `POST`  | Generate storyboard from selected concept               | async                                         |
-| `/api/storyboards/[storyboardId]`                           | `PATCH` | Edit storyboard/scenes                                  | sync                                          |
-| `/api/projects/[projectId]/keyframes`                       | `POST`  | Generate scene keyframes                                | async                                         |
-| `/api/projects/[projectId]/videos`                          | `POST`  | Generate scene videos                                   | async                                         |
-| `/api/projects/[projectId]/tts`                             | `POST`  | Generate narration                                      | async                                         |
-| `/api/projects/[projectId]/render`                          | `POST`  | Render final MP4                                        | async                                         |
-| `/api/jobs/[jobId]`                                         | `GET`   | Poll job status                                         | sync                                          |
-| `/api/artifacts/[artifactId]`                               | `GET`   | Resolve artifact metadata/download URL                  | sync                                          |
+| Endpoint                                                    | Method  | Purpose                                                                       | Sync/async                                    |
+| ----------------------------------------------------------- | ------- | ----------------------------------------------------------------------------- | --------------------------------------------- |
+| `/api/projects`                                             | `POST`  | Create project                                                                | sync                                          |
+| `/api/projects/[projectId]`                                 | `GET`   | Fetch full project graph                                                      | sync                                          |
+| `/api/projects/[projectId]/sources`                         | `POST`  | Upload/register sources                                                       | sync for metadata, async extraction if needed |
+| `/api/projects/[projectId]/brand-kit`                       | `POST`  | Generate Brand Kit                                                            | async                                         |
+| `/api/projects/[projectId]/concepts`                        | `POST`  | Generate three concepts and preview frames                                    | async                                         |
+| `/api/projects/[projectId]/concepts/[conceptId]/regenerate` | `POST`  | Regenerate one concept with an optional adjustment note                       | async                                         |
+| `/api/projects/[projectId]/scenes/[sceneId]/keyframe`       | `POST`  | Generate or regenerate one scene frame while preserving all other scene takes | synchronous provider image job                |
+| `/api/projects/[projectId]/scenes/[sceneId]/video`          | `POST`  | Generate or regenerate one scene clip while preserving all other clips        | asynchronous provider video job               |
+| `/api/projects/[projectId]/concepts/[conceptId]/select`     | `POST`  | Select concept                                                                | sync                                          |
+| `/api/projects/[projectId]/storyboard`                      | `POST`  | Generate storyboard from selected concept                                     | async                                         |
+| `/api/storyboards/[storyboardId]`                           | `PATCH` | Edit storyboard/scenes                                                        | sync                                          |
+| `/api/projects/[projectId]/keyframes`                       | `POST`  | Generate scene keyframes                                                      | async                                         |
+| `/api/projects/[projectId]/videos`                          | `POST`  | Generate scene videos                                                         | async                                         |
+| `/api/projects/[projectId]/tts`                             | `POST`  | Generate narration                                                            | async                                         |
+| `/api/projects/[projectId]/render`                          | `POST`  | Render final MP4                                                              | async                                         |
+| `/api/jobs/[jobId]`                                         | `GET`   | Poll job status                                                               | sync                                          |
+| `/api/artifacts/[artifactId]`                               | `GET`   | Resolve artifact metadata/download URL                                        | sync                                          |
 
 Use typed response helpers in `apps/web/lib/http/responses.ts`.
 
@@ -898,6 +900,10 @@ Exit checklist:
 - [ ] User can generate exactly three concepts from a Brand Kit.
 - [ ] Each concept has title, hook, strategy, narrative arc, preview prompt, rationale, and preview frame.
 - [ ] User can regenerate one concept, optionally describe the adjustment in 500 characters or less, and retain the other two concepts.
+- [ ] Every concept card identifies its image as the exact Scene 1 opening frame and indicates when a supplied product reference is identity-locked.
+- [ ] Selecting a concept reuses its raster preview artifact as Scene 1's selected keyframe take; batch anchor generation starts at Scene 2.
+- [ ] Storyboard can regenerate one approved scene frame without regenerating the rest of the storyboard.
+- [ ] Production can independently regenerate one scene frame or one completed/missing scene clip, preserve earlier takes, and restore a prior completed take.
 - [ ] Regenerating a selected concept preserves its identity and selection but returns its storyboard and scenes to draft review.
 - [ ] User can select exactly one concept.
 - [ ] Storyboard generation requires a selected concept.

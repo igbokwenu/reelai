@@ -59,3 +59,5 @@ The Product Showcase motion-plan guardrail adds nullable `CreativeConcept.showca
 Curated soundtrack selection adds nullable `Storyboard.bgmTrackId`. Apply it with the same stop → `pnpm db:migrate` → `pnpm dev` sequence. Existing projects need no backfill or seed; see [background-music.md](background-music.md).
 
 The storyboard resilience and retry-policy hardening described above is application-only. If the existing project migrations are already current, restart `pnpm dev`; do not run a new migration, seed, or package install for this change. Prisma generation still runs automatically before development and typechecking.
+
+Concept opening-frame reuse and granular scene controls are application-only as well. Auto mode reuses the selected concept's raster preview as Scene 1 and generates only missing Scene 2+ anchors. Manual scene actions remain locked while Auto mode owns the run and return afterward. Restart `pnpm dev`; no migration, seed, or dependency install is required.

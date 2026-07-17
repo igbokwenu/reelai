@@ -3,6 +3,7 @@ import "server-only";
 import { performance } from "node:perf_hooks";
 
 import { qwenEndpoint } from "@/lib/qwen/endpoints";
+import { hasQwenManagedUrl } from "@/lib/qwen/uploads";
 
 export const QWEN_IMAGE_BASE_URL = qwenEndpoint(
   process.env.QWEN_IMAGE_BASE_URL,
@@ -31,6 +32,26 @@ export async function generateImageWithQwen({
 }): Promise<QwenImageResult> {
   const apiKey = getQwenApiKey();
   const startedAt = performance.now();
+  const requestBody = {
+    model,
+    input: {
+      messages: [
+        {
+          role: "user",
+          content: [
+            { text: prompt },
+            ...imageUrls.slice(0, 3).map((image) => ({ image })),
+          ],
+        },
+      ],
+    },
+    parameters: {
+      size,
+      n: 1,
+      ...(imageUrls.length === 0 ? { thinking_mode: true } : {}),
+      watermark: false,
+    },
+  };
   const response = await fetch(
     `${QWEN_IMAGE_BASE_URL}/services/aigc/multimodal-generation/generation`,
     {
@@ -38,27 +59,11 @@ export async function generateImageWithQwen({
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        ...(hasQwenManagedUrl(requestBody)
+          ? { "X-DashScope-OssResourceResolve": "enable" }
+          : {}),
       },
-      body: JSON.stringify({
-        model,
-        input: {
-          messages: [
-            {
-              role: "user",
-              content: [
-                ...imageUrls.slice(0, 3).map((image) => ({ image })),
-                { text: prompt },
-              ],
-            },
-          ],
-        },
-        parameters: {
-          size,
-          n: 1,
-          thinking_mode: true,
-          watermark: false,
-        },
-      }),
+      body: JSON.stringify(requestBody),
     },
   );
   const elapsedMs = Math.round(performance.now() - startedAt);

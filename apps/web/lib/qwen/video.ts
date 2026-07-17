@@ -5,6 +5,7 @@ import { performance } from "node:perf_hooks";
 import { qwenEndpoint } from "@/lib/qwen/endpoints";
 import { isRetryableVideoSubmissionError } from "@/lib/qwen/video-retry";
 import { buildVideoSubmissionBody } from "@/lib/qwen/video-request";
+import { hasQwenManagedUrl } from "@/lib/qwen/uploads";
 
 export const QWEN_VIDEO_BASE_URL = qwenEndpoint(
   process.env.QWEN_VIDEO_BASE_URL,
@@ -68,6 +69,14 @@ async function submitImageToVideoTaskOnce({
 }: VideoSubmissionInput): Promise<VideoTaskSubmission> {
   const apiKey = getQwenApiKey();
   const startedAt = performance.now();
+  const requestBody = buildVideoSubmissionBody({
+    model,
+    prompt,
+    negativePrompt,
+    imageUrl,
+    resolution: QWEN_VIDEO_RESOLUTION,
+    durationSec,
+  });
   const response = await fetch(
     `${QWEN_VIDEO_BASE_URL}/services/aigc/video-generation/video-synthesis`,
     {
@@ -76,17 +85,11 @@ async function submitImageToVideoTaskOnce({
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
         "X-DashScope-Async": "enable",
+        ...(hasQwenManagedUrl(requestBody)
+          ? { "X-DashScope-OssResourceResolve": "enable" }
+          : {}),
       },
-      body: JSON.stringify(
-        buildVideoSubmissionBody({
-          model,
-          prompt,
-          negativePrompt,
-          imageUrl,
-          resolution: QWEN_VIDEO_RESOLUTION,
-          durationSec,
-        }),
-      ),
+      body: JSON.stringify(requestBody),
     },
   );
   const elapsedMs = Math.round(performance.now() - startedAt);

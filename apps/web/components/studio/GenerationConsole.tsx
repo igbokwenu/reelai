@@ -25,6 +25,7 @@ import {
 import type { TakeArtifact } from "@/components/studio/TakeCompare";
 import { Button } from "@/components/ui/button";
 import { isStoryboardTimingValid } from "@/lib/storyboards/timing";
+import { selectKeyframeGenerationTargets } from "@/lib/jobs/production-state";
 
 type Storyboard = {
   id: string;
@@ -49,6 +50,7 @@ type Job = {
 export function GenerationConsole({
   projectId,
   conceptTitle,
+  conceptPreviewArtifactId,
   storyboard,
   artifacts,
   latestKeyframeJob,
@@ -58,6 +60,7 @@ export function GenerationConsole({
 }: {
   projectId: string;
   conceptTitle: string | null;
+  conceptPreviewArtifactId: string | null;
   storyboard: Storyboard | null;
   artifacts: TakeArtifact[];
   latestKeyframeJob: Job | null;
@@ -70,6 +73,10 @@ export function GenerationConsole({
   const [videoJob, setVideoJob] = useState<Job | null>(latestVideoJob);
   const [starting, setStarting] = useState<"keyframes" | "videos" | null>(null);
   const [retryingSceneId, setRetryingSceneId] = useState<string | null>(null);
+  const [regeneratingFrameSceneId, setRegeneratingFrameSceneId] = useState<
+    string | null
+  >(null);
+  const [selectingTakeId, setSelectingTakeId] = useState<string | null>(null);
   const [savingSceneId, setSavingSceneId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(
     latestKeyframeJob?.error ?? latestVideoJob?.error ?? null,
@@ -78,7 +85,11 @@ export function GenerationConsole({
     ["QUEUED", "RUNNING", "WAITING_PROVIDER"].includes(job?.status ?? ""),
   );
   const productionBusy =
-    starting !== null || retryingSceneId !== null || Boolean(activeJob);
+    starting !== null ||
+    retryingSceneId !== null ||
+    regeneratingFrameSceneId !== null ||
+    selectingTakeId !== null ||
+    Boolean(activeJob);
   const scenes = storyboard?.scenes ?? [];
   const productionScenes = scenes;
   const hasApprovedStory =
@@ -98,6 +109,10 @@ export function GenerationConsole({
         isUsableFrame(selectedAnchor),
       );
     });
+  const regeneratableAnchorCount = selectKeyframeGenerationTargets(
+    productionScenes,
+    conceptPreviewArtifactId,
+  ).length;
   const completedClips = productionScenes.filter(
     (scene) =>
       scene.status === "COMPLETE" &&
@@ -247,6 +262,56 @@ export function GenerationConsole({
     }
   }
 
+  async function regenerateSceneFrame(sceneId: string) {
+    setRegeneratingFrameSceneId(sceneId);
+    setError(null);
+    try {
+      const response = await fetch(
+        `/api/projects/${projectId}/scenes/${sceneId}/keyframe`,
+        { method: "POST" },
+      );
+      const data = (await response.json().catch(() => ({}))) as {
+        job?: Job;
+        error?: string;
+      };
+      if (!response.ok || !data.job) {
+        setError(data.error ?? "This scene frame could not be regenerated.");
+        return;
+      }
+      setKeyframeJob(data.job);
+      if (data.job.status === "FAILED") {
+        setError(data.job.error ?? "This scene frame generation failed.");
+      }
+      router.refresh();
+    } catch {
+      setError(
+        "Could not reach the generation service. Check the dev server and try again.",
+      );
+    } finally {
+      setRegeneratingFrameSceneId(null);
+    }
+  }
+
+  async function selectTake(takeId: string) {
+    setSelectingTakeId(takeId);
+    setError(null);
+    try {
+      const response = await fetch(`/api/takes/${takeId}/select`, {
+        method: "POST",
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!response.ok) {
+        setError(data.error ?? "This version could not be restored.");
+        return;
+      }
+      router.refresh();
+    } finally {
+      setSelectingTakeId(null);
+    }
+  }
+
   if (!storyboard) {
     return (
       <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
@@ -280,14 +345,17 @@ export function GenerationConsole({
               disabled={
                 !["APPROVED", "COMPLETE"].includes(storyboard.status) ||
                 !hasApprovedStory ||
-                productionBusy
+                productionBusy ||
+                (hasRecommendedAnchors && regeneratableAnchorCount === 0)
               }
               onClick={() => startGeneration("keyframes")}
               size="sm"
               tooltip={
                 hasRecommendedAnchors
-                  ? "Regenerates every scene anchor and replaces the recommended visual sequence."
-                  : "Generates one continuity-aware anchor image for every approved scene."
+                  ? regeneratableAnchorCount === 0
+                    ? "Scene 1 already uses the selected concept opening frame. Use its scene control to regenerate it."
+                    : "Regenerates Scene 2 onward while preserving the selected concept as Scene 1's opening frame."
+                  : "Uses the selected concept as Scene 1 and generates only the remaining continuity-aware scene anchors."
               }
               tooltipSide="bottom"
               variant={hasRecommendedAnchors ? "outline" : "default"}
@@ -300,8 +368,10 @@ export function GenerationConsole({
                 <ImagePlus className="size-4" aria-hidden="true" />
               )}
               {hasRecommendedAnchors
-                ? "Refresh scene anchors"
-                : "Create scene anchors"}
+                ? regeneratableAnchorCount === 0
+                  ? "Opening frame ready"
+                  : "Refresh scenes 2+"
+                : "Create missing frames"}
             </Button>
             <Button
               disabled={!hasRecommendedAnchors || productionBusy}
@@ -382,10 +452,14 @@ export function GenerationConsole({
       <KeyframeStoryFlow
         artifacts={artifacts}
         isProductionBusy={productionBusy}
+        onRegenerateSceneFrame={regenerateSceneFrame}
         onSaveScene={saveScene}
+        onSelectTake={selectTake}
         onRetrySceneVideo={retrySceneVideo}
+        regeneratingFrameSceneId={regeneratingFrameSceneId}
         retryingSceneId={retryingSceneId}
         savingSceneId={savingSceneId}
+        selectingTakeId={selectingTakeId}
         scenes={scenes}
       />
 

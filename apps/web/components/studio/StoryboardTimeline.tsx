@@ -115,6 +115,9 @@ export function StoryboardTimeline({
   const [job, setJob] = useState<Job | null>(latestStoryboardJob);
   const [isStarting, setIsStarting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [regeneratingSceneId, setRegeneratingSceneId] = useState<string | null>(
+    null,
+  );
   const [isDirty, setIsDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(
@@ -307,6 +310,36 @@ export function StoryboardTimeline({
     );
     setIsDirty(true);
     setSaved(false);
+  }
+
+  async function regenerateSceneAnchor(sceneId: string) {
+    setRegeneratingSceneId(sceneId);
+    setError(null);
+    try {
+      const response = await fetch(
+        `/api/projects/${projectId}/scenes/${sceneId}/keyframe`,
+        { method: "POST" },
+      );
+      const data = (await response.json().catch(() => ({}))) as {
+        job?: Job;
+        error?: string;
+      };
+      if (!response.ok || !data.job) {
+        setError(data.error ?? "This scene frame could not be regenerated.");
+        return;
+      }
+      if (data.job.status === "FAILED") {
+        setError(data.job.error ?? "This scene frame generation failed.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError(
+        "Could not reach the generation service. Check the dev server and try again.",
+      );
+    } finally {
+      setRegeneratingSceneId(null);
+    }
   }
 
   return (
@@ -642,10 +675,15 @@ export function StoryboardTimeline({
           <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(420px,1.15fr)]">
             <SelectedSceneSummary scene={selectedScene} />
             <SceneInspector
+              canRegenerateAnchor={
+                draft.status === "APPROVED" && !isDirty && !isRunning
+              }
               isLastScene={
                 Boolean(selectedScene) &&
                 selectedScene?.id === draft.scenes.at(-1)?.id
               }
+              isRegeneratingAnchor={regeneratingSceneId === selectedScene?.id}
+              onRegenerateAnchor={regenerateSceneAnchor}
               scene={selectedScene}
               onChange={updateScene}
             />
@@ -890,9 +928,12 @@ function FramePreview({
       </span>
       <span className="absolute bottom-2 right-2 rounded-md bg-black/65 px-1.5 py-1 text-[8px] text-white/70 backdrop-blur">
         {take
-          ? scene.selectedKeyframeTakeId
-            ? "Generated"
-            : "Previous take"
+          ? take.notes?.includes("Concept opening frame") ||
+            take.notes?.includes("concept opening frame")
+            ? "From selected concept"
+            : scene.selectedKeyframeTakeId
+              ? "Generated"
+              : "Previous take"
           : "Frame brief"}
       </span>
     </div>

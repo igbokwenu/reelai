@@ -1,10 +1,11 @@
 import "server-only";
 
-import type { Artifact, Prisma, Scene, Storyboard, Take } from "@prisma/client";
+import type { Prisma, Scene, Storyboard, Take } from "@prisma/client";
 
 import { PublicError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { generateImageWithQwen } from "@/lib/qwen/image";
+import { resolveArtifactForQwen } from "@/lib/qwen/uploads";
 import {
   QWEN_I2V_MODEL,
   pollVideoTask,
@@ -17,6 +18,7 @@ import {
   isStalePollClaim,
   parseVideoJobOutput,
   selectRequestedScenes,
+  selectKeyframeGenerationTargets,
   selectVideoGenerationTargets,
   stableSceneStatus,
   summarizeVideoTasks,
@@ -35,6 +37,7 @@ type ProductionScene = Scene & {
   storyboard: Pick<
     Storyboard,
     | "projectId"
+    | "conceptId"
     | "productContinuity"
     | "characterContinuity"
     | "visualContinuity"
@@ -50,14 +53,55 @@ const STALE_PRODUCTION_JOB_MS = 30 * 60 * 1000;
 
 export async function createAndRunKeyframeJob(projectId: string) {
   const scenes = await getProductionScenes(projectId);
+  const concept = await prisma.creativeConcept.findFirst({
+    where: { id: scenes[0]?.storyboard.conceptId, projectId },
+    select: { previewArtifactId: true },
+  });
+  const targets = selectKeyframeGenerationTargets(
+    scenes,
+    concept?.previewArtifactId ?? null,
+  );
+  if (targets.length === 0) {
+    return prisma.generationJob.create({
+      data: {
+        projectId,
+        type: "KEYFRAME",
+        status: "COMPLETE",
+        model: QWEN_KEYFRAME_IMAGE_MODEL,
+        input: { operation: "scene_keyframes", sceneIds: [] },
+        output: { takeIds: [], sceneCount: 0, reusedOpeningFrame: true },
+        startedAt: new Date(),
+        completedAt: new Date(),
+      },
+    });
+  }
   const job = await createProductionJob({
     projectId,
     type: "KEYFRAME",
     model: QWEN_KEYFRAME_IMAGE_MODEL,
     operation: "scene_keyframes",
-    sceneIds: scenes.map((scene) => scene.id),
+    sceneIds: targets.map((scene) => scene.id),
   });
 
+  return runKeyframeJob(job.id);
+}
+
+export async function createAndRunSceneKeyframeJob(
+  projectId: string,
+  sceneId: string,
+) {
+  const scenes = await getProductionScenes(projectId);
+  const scene = scenes.find((candidate) => candidate.id === sceneId);
+  if (!scene) {
+    throw new PublicError("Scene not found in this project's storyboard.", 404);
+  }
+  const job = await createProductionJob({
+    projectId,
+    type: "KEYFRAME",
+    model: QWEN_KEYFRAME_IMAGE_MODEL,
+    operation: "scene_keyframe_regeneration",
+    sceneIds: [scene.id],
+  });
   return runKeyframeJob(job.id);
 }
 
@@ -107,7 +151,13 @@ export async function createAndRunSceneVideoJob(
 export async function selectTake(takeId: string) {
   const take = await prisma.take.findUnique({
     where: { id: takeId },
-    include: { scene: true },
+    include: {
+      scene: {
+        include: {
+          storyboard: { select: { projectId: true, conceptId: true } },
+        },
+      },
+    },
   });
 
   if (!take) {
@@ -160,6 +210,35 @@ export async function selectTake(takeId: string) {
             data: { selected: false },
           }),
         ]),
+    ...(take.kind === "KEYFRAME_START" && take.scene.index === 1
+      ? [
+          prisma.creativeConcept.updateMany({
+            where: {
+              id: take.scene.storyboard.conceptId,
+              projectId: take.scene.storyboard.projectId,
+            },
+            data: { previewArtifactId: take.artifactId },
+          }),
+        ]
+      : []),
+    prisma.generationJob.updateMany({
+      where: {
+        projectId: take.scene.storyboard.projectId,
+        type: "RENDER",
+        status: "COMPLETE",
+      },
+      data: {
+        status: "CANCELLED",
+        error: "A different scene take was selected; create a fresh export.",
+      },
+    }),
+    prisma.render.updateMany({
+      where: {
+        projectId: take.scene.storyboard.projectId,
+        status: "COMPLETE",
+      },
+      data: { status: "FAILED" },
+    }),
   ]);
 
   return prisma.take.findUniqueOrThrow({ where: { id: take.id } });
@@ -346,6 +425,21 @@ export async function advanceVideoJob(jobId: string) {
             selectedVideoTakeId: sceneTask.takeId,
           },
         }),
+        prisma.generationJob.updateMany({
+          where: {
+            projectId: job.projectId,
+            type: "RENDER",
+            status: "COMPLETE",
+          },
+          data: {
+            status: "CANCELLED",
+            error: "A scene clip changed; create a fresh export.",
+          },
+        }),
+        prisma.render.updateMany({
+          where: { projectId: job.projectId, status: "COMPLETE" },
+          data: { status: "FAILED" },
+        }),
       ]);
 
       nextScenes.push({
@@ -443,7 +537,16 @@ async function runKeyframeJob(jobId: string) {
   });
 
   try {
-    const scenes = await getProductionScenes(job.projectId);
+    const productionScenes = await getProductionScenes(job.projectId);
+    const scenes = selectRequestedScenes(
+      productionScenes,
+      getExpectedSceneIds(job.input),
+    );
+    if (!scenes) {
+      throw new Error(
+        "Keyframe job references an invalid storyboard scene set.",
+      );
+    }
     await prisma.$transaction([
       prisma.project.update({
         where: { id: job.projectId },
@@ -455,27 +558,47 @@ async function runKeyframeJob(jobId: string) {
       }),
     ]);
 
-    const groundingReferenceUrls = await getGroundingReferenceUrls(
-      job.projectId,
-    );
+    const groundingReferences = await getGroundingReferenceUrls(job.projectId);
+    if (
+      groundingReferences.expectedProductReferenceCount > 0 &&
+      groundingReferences.productReferenceCount === 0
+    ) {
+      throw new Error(
+        "QwenCloud could not resolve the uploaded product reference. No generic scene frame was generated; retry this frame.",
+      );
+    }
+    const groundingReferenceUrls = groundingReferences.urls;
     const created: Array<{ scene: ProductionScene; anchorTake: Take }> = [];
     const recentAnchorReferenceUrls: string[] = [];
 
-    for (const [index, scene] of scenes.entries()) {
-      const previousScene = index > 0 ? scenes[index - 1]! : null;
+    for (const scene of scenes) {
+      const previousScene =
+        productionScenes.find(
+          (candidate) => candidate.index === scene.index - 1,
+        ) ?? null;
+      const previousAnchor = previousScene
+        ? await getSelectedKeyframeArtifact(previousScene)
+        : null;
+      const previousAnchorUrl = previousAnchor
+        ? await resolveArtifactForQwen(
+            previousAnchor,
+            QWEN_KEYFRAME_IMAGE_MODEL,
+          )
+        : null;
       const anchorTake = await createKeyframeTake({
         projectId: job.projectId,
         scene,
         kind: "KEYFRAME_START",
         prompt: buildKeyframePrompt(scene, previousScene),
         referenceImageUrls:
-          recentAnchorReferenceUrls.length > 0 &&
           scene.continuityMode !== "INTENTIONAL_CHANGE"
             ? [
                 ...recentAnchorReferenceUrls.slice(-2).reverse(),
+                ...(previousAnchorUrl ? [previousAnchorUrl] : []),
                 ...groundingReferenceUrls,
               ].slice(0, 3)
             : groundingReferenceUrls,
+        productReferenceCount: groundingReferences.productReferenceCount,
       });
       recentAnchorReferenceUrls.push(anchorTake.providerImageUrl);
       created.push({ scene, anchorTake: anchorTake.take });
@@ -534,7 +657,31 @@ async function runKeyframeJob(jobId: string) {
             selectedVideoTakeId: null,
           },
         });
+        if (item.scene.index === 1 && item.anchorTake.artifactId) {
+          await tx.creativeConcept.updateMany({
+            where: {
+              id: item.scene.storyboard.conceptId,
+              projectId: job.projectId,
+            },
+            data: { previewArtifactId: item.anchorTake.artifactId },
+          });
+        }
       }
+      await tx.generationJob.updateMany({
+        where: {
+          projectId: job.projectId,
+          type: "RENDER",
+          status: "COMPLETE",
+        },
+        data: {
+          status: "CANCELLED",
+          error: "A scene opening frame changed; create a fresh export.",
+        },
+      });
+      await tx.render.updateMany({
+        where: { projectId: job.projectId, status: "COMPLETE" },
+        data: { status: "FAILED" },
+      });
       await tx.project.update({
         where: { id: job.projectId },
         data: { status: "DRAFT" },
@@ -584,7 +731,10 @@ async function runVideoSubmissionJob(jobId: string) {
 
       preflight.push({
         scene,
-        imageUrl: artifactUrl(selectedAnchor),
+        imageUrl: await resolveArtifactForQwen(
+          selectedAnchor,
+          job.model ?? QWEN_I2V_MODEL,
+        ),
       });
     }
 
@@ -729,12 +879,14 @@ async function createKeyframeTake({
   kind,
   prompt,
   referenceImageUrls,
+  productReferenceCount,
 }: {
   projectId: string;
   scene: ProductionScene;
   kind: "KEYFRAME_START" | "KEYFRAME_END";
   prompt: string;
   referenceImageUrls: string[];
+  productReferenceCount: number;
 }) {
   const queued = await createQueuedTake({ sceneId: scene.id, kind, prompt });
 
@@ -753,11 +905,21 @@ async function createKeyframeTake({
       url: generated.imageUrl,
       metadata: {
         operation: "scene_keyframe",
+        role:
+          scene.index === 1
+            ? "storyboard_opening_frame"
+            : "storyboard_scene_anchor",
+        sceneIndex: scene.index,
         model: generated.model,
         providerImageUrl: generated.imageUrl,
         providerRequestId: generated.providerRequestId,
         prompt,
         referenceImageCount: referenceImageUrls.length,
+        productReferenceCount,
+        groundingMode:
+          productReferenceCount > 0
+            ? "product-reference-locked"
+            : "scene-reference-grounded",
         sceneId: scene.id,
         takeId: queued.id,
       },
@@ -862,6 +1024,7 @@ async function getProductionScenes(projectId: string) {
     ...scene,
     storyboard: {
       projectId: storyboard.projectId,
+      conceptId: storyboard.conceptId,
       productContinuity: storyboard.productContinuity,
       characterContinuity: storyboard.characterContinuity,
       visualContinuity: storyboard.visualContinuity,
@@ -871,10 +1034,6 @@ async function getProductionScenes(projectId: string) {
 }
 
 async function getGroundingReferenceUrls(projectId: string) {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { outputMode: true },
-  });
   const sources = await prisma.brandSource.findMany({
     where: {
       projectId,
@@ -892,7 +1051,13 @@ async function getGroundingReferenceUrls(projectId: string) {
     .map((source) => source.artifactId)
     .filter((id): id is string => Boolean(id));
 
-  if (artifactIds.length === 0) return [];
+  if (artifactIds.length === 0) {
+    return {
+      urls: [],
+      productReferenceCount: 0,
+      expectedProductReferenceCount: 0,
+    };
+  }
 
   const artifacts = await prisma.artifact.findMany({
     where: {
@@ -905,21 +1070,32 @@ async function getGroundingReferenceUrls(projectId: string) {
     artifacts.map((artifact) => [artifact.id, artifact]),
   );
 
-  return sources
-    .map((source) =>
-      source.artifactId ? artifactById.get(source.artifactId) : null,
-    )
-    .filter((artifact): artifact is Artifact => Boolean(artifact))
-    .map((artifact) => {
-      if (artifact.publicUrl?.startsWith("http")) return artifact.publicUrl;
-      if (project?.outputMode === "PRODUCT_SHOWCASE")
-        return artifactUrl(artifact);
-      return null;
+  const orderedArtifacts = sources
+    .flatMap((source) => {
+      const artifact = source.artifactId
+        ? artifactById.get(source.artifactId)
+        : null;
+      return artifact ? [{ artifact, sourceType: source.type }] : [];
     })
-    .filter((url): url is string =>
-      Boolean(url?.startsWith("https://") || url?.startsWith("http://")),
-    )
     .slice(0, 3);
+  const resolved = await Promise.allSettled(
+    orderedArtifacts.map(async ({ artifact, sourceType }) => ({
+      sourceType,
+      url: await resolveArtifactForQwen(artifact, QWEN_KEYFRAME_IMAGE_MODEL),
+    })),
+  );
+  const references = resolved.flatMap((result) =>
+    result.status === "fulfilled" ? [result.value] : [],
+  );
+  return {
+    urls: references.map((reference) => reference.url),
+    productReferenceCount: references.filter(
+      (reference) => reference.sourceType === "PRODUCT_IMAGE",
+    ).length,
+    expectedProductReferenceCount: sources.filter(
+      (source) => source.type === "PRODUCT_IMAGE",
+    ).length,
+  };
 }
 
 async function getSelectedKeyframeArtifact(scene: ProductionScene) {
@@ -939,22 +1115,6 @@ async function getSelectedKeyframeArtifact(scene: ProductionScene) {
       mimeType: { startsWith: "image/" },
     },
   });
-}
-
-function artifactUrl(artifact: Artifact) {
-  if (artifact.publicUrl?.startsWith("http")) {
-    return artifact.publicUrl;
-  }
-
-  const publicAppUrl = process.env.PUBLIC_APP_URL;
-
-  if (publicAppUrl && !publicAppUrl.toLowerCase().includes("placeholder")) {
-    return `${publicAppUrl.replace(/\/$/, "")}/api/artifacts/${artifact.id}/file`;
-  }
-
-  throw new Error(
-    "PUBLIC_APP_URL must be configured so QwenCloud can read selected keyframes.",
-  );
 }
 
 function buildKeyframePrompt(

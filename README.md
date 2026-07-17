@@ -89,6 +89,8 @@ Cinematic Boost and scene transitions add `Project.cinematicBoost`, `Scene.trans
 
 The domain-neutral creative grammar, structured cast planning, richer motion-hierarchy guardrails, recent-anchor identity recovery, and last-scene logo lockup are application-only changes. Existing databases and artifacts remain compatible; restart `pnpm dev` after pulling them, with no additional migration or seed command.
 
+Granular concept/scene regeneration and concept-opening-frame reuse are application-only. Restart `pnpm dev`; do not run `pnpm db:migrate`, `pnpm db:seed`, or `pnpm install`. New concepts use product references in provider editing mode, their selected preview becomes Scene 1's image-to-video frame, and batch anchor generation starts at Scene 2. Existing projects remain compatible; regenerate one legacy concept (or its storyboard) to opt into the new opening-frame link.
+
 The range-aware render media path is also application-only. Run `pnpm install` to install the Remotion Media dependency, then restart `pnpm dev`; no database migration or seed is required.
 
 The midpoint closer timing and premium CTA treatment are application-only Remotion changes shared by Auto and step-by-step rendering. Restart `pnpm dev` after pulling them. Do not run `pnpm install`, `pnpm db:migrate`, `pnpm db:generate`, or `pnpm db:seed` for this update.

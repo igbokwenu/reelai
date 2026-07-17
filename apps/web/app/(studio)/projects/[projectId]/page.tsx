@@ -365,6 +365,9 @@ export default async function ProjectPage({ params }: PageProps) {
               production={
                 <GenerationConsole
                   artifacts={project.artifacts}
+                  conceptPreviewArtifactId={
+                    selectedConcept?.previewArtifactId ?? null
+                  }
                   conceptTitle={selectedConcept?.title ?? null}
                   latestKeyframeJob={latestKeyframeJob}
                   latestVideoJob={latestVideoJob}
@@ -382,7 +385,12 @@ export default async function ProjectPage({ params }: PageProps) {
                   groundingCapabilities={storyboardGrounding}
                   key={
                     project.storyboard
-                      ? `${project.storyboard.id}-${project.storyboard.updatedAt.toISOString()}`
+                      ? `${project.storyboard.id}-${project.storyboard.updatedAt.toISOString()}-${project.storyboard.scenes
+                          .map(
+                            (scene) =>
+                              `${scene.selectedKeyframeTakeId ?? "none"}:${scene.takes[0]?.id ?? "none"}`,
+                          )
+                          .join("|")}`
                       : (selectedConcept?.id ?? "no-storyboard")
                   }
                   latestPolicyJob={latestPolicyJob}

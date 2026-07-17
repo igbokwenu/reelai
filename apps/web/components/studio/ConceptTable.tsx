@@ -115,12 +115,14 @@ export function ConceptTable({
   const hasUploadedBrandVisuals = sources.some((source) =>
     Boolean(source.artifactId),
   );
+  const hasProductReference = sources.some(
+    (source) => source.type === "PRODUCT_IMAGE" && source.artifactId,
+  );
   const hasLegacyPreviews = concepts.some((concept) => {
     const artifact = concept.previewArtifactId
       ? artifactById.get(concept.previewArtifactId)
       : null;
-    const metadata = artifact?.metadata as { groundingMode?: unknown } | null;
-    return artifact && typeof metadata?.groundingMode !== "string";
+    return artifact && isLegacyPreview(artifact, hasProductReference);
   });
 
   useEffect(() => {
@@ -292,8 +294,9 @@ export function ConceptTable({
         <div>
           <p className="text-sm font-medium">Creative Director</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Generate exactly three divergent directions, then pick one before
-            storyboard spend.
+            Compare three divergent directions through their real Scene 1
+            opening frames. Edit or regenerate any one without disturbing the
+            other two.
           </p>
         </div>
         <Button
@@ -312,15 +315,14 @@ export function ConceptTable({
               : "Creates three distinct creative directions from the current Brand Kit."
           }
           tooltipSide="bottom"
+          variant={concepts.length === 3 ? "outline" : "default"}
         >
           {isStarting || isRunning ? (
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
           ) : (
             <Sparkles className="size-4" aria-hidden="true" />
           )}
-          {concepts.length === 3
-            ? "Regenerate 3 Concepts"
-            : "Generate 3 Concepts"}
+          {concepts.length === 3 ? "Replace all 3" : "Generate 3 Concepts"}
         </Button>
       </div>
 
@@ -416,8 +418,9 @@ export function ConceptTable({
         <div className="flex gap-3 rounded-md border border-amber-400/25 bg-amber-400/5 p-3 text-sm text-amber-100">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
-            These previews were created before visual grounding metadata was
-            recorded. Regenerate the concepts to apply the current safeguards.
+            One or more directions do not yet have a production-ready,
+            product-grounded opening frame. Regenerate only the affected card to
+            apply the current safeguards.
           </span>
         </div>
       ) : null}
@@ -535,6 +538,7 @@ export function ConceptTable({
                   concept.previewArtifactId
                     ? (artifactById.get(concept.previewArtifactId) ?? null)
                     : null,
+                  hasProductReference,
                 ) ||
                 (outputMode === "PRODUCT_SHOWCASE" &&
                   !concept.showcaseMotionPlan)
@@ -806,10 +810,21 @@ function navigateTo(stage: "storyboard" | "assets") {
   );
 }
 
-function isLegacyPreview(artifact: Artifact | null) {
+function isLegacyPreview(
+  artifact: Artifact | null,
+  requireLiveProductFrame = false,
+) {
   if (!artifact) return true;
-  const metadata = artifact.metadata as { groundingMode?: unknown } | null;
-  return typeof metadata?.groundingMode !== "string";
+  const metadata = artifact.metadata as {
+    groundingMode?: unknown;
+    providerFallback?: unknown;
+  } | null;
+  return (
+    typeof metadata?.groundingMode !== "string" ||
+    (requireLiveProductFrame &&
+      (metadata.groundingMode !== "product-reference-locked" ||
+        typeof metadata?.providerFallback === "string"))
+  );
 }
 
 function formatEnum(value: string) {

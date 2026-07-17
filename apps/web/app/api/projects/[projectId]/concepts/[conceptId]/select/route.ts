@@ -12,7 +12,15 @@ export async function POST(_request: Request, context: RouteContext) {
     const { projectId, conceptId } = await context.params;
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true, outputMode: true },
+      select: {
+        id: true,
+        outputMode: true,
+        sources: {
+          where: { type: "PRODUCT_IMAGE", artifactId: { not: null } },
+          select: { id: true },
+          take: 1,
+        },
+      },
     });
 
     if (!project) {
@@ -31,12 +39,28 @@ export async function POST(_request: Request, context: RouteContext) {
           select: { metadata: true },
         })
       : null;
-    const metadata = preview?.metadata as { groundingMode?: unknown } | null;
+    const metadata = preview?.metadata as {
+      groundingMode?: unknown;
+      providerFallback?: unknown;
+    } | null;
     if (typeof metadata?.groundingMode !== "string") {
       return ok(
         {
           error:
             "Regenerate this concept with the current visual grounding safeguards before selecting it.",
+        },
+        { status: 409 },
+      );
+    }
+    if (
+      project.sources.length > 0 &&
+      (metadata?.groundingMode !== "product-reference-locked" ||
+        typeof metadata?.providerFallback === "string")
+    ) {
+      return ok(
+        {
+          error:
+            "Regenerate this concept so Reel AI can create a product-locked opening frame before selection.",
         },
         { status: 409 },
       );

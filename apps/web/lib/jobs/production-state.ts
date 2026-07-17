@@ -21,6 +21,17 @@ type SceneWithVideoTakes = {
   }>;
 };
 
+type SceneWithKeyframeTakes = {
+  index: number;
+  selectedKeyframeTakeId: string | null;
+  takes: Array<{
+    id: string;
+    kind: string;
+    status: string;
+    artifactId: string | null;
+  }>;
+};
+
 export function parseVideoJobOutput(value: unknown): VideoJobOutput | null {
   if (!isRecord(value) || !Array.isArray(value.scenes)) return null;
 
@@ -114,6 +125,24 @@ export function selectVideoGenerationTargets<T extends SceneWithVideoTakes>(
   // Once every clip is complete, the global action intentionally means
   // "recreate all". While partial, it spends only on missing scenes.
   return missing.length > 0 ? missing : scenes;
+}
+
+/** Scene 1 is already paid for at concept time and is reused verbatim. */
+export function selectKeyframeGenerationTargets<
+  T extends SceneWithKeyframeTakes,
+>(scenes: T[], conceptPreviewArtifactId: string | null) {
+  return scenes.filter((scene) => {
+    if (scene.index !== 1) return true;
+    const selected = scene.takes.find(
+      (take) => take.id === scene.selectedKeyframeTakeId,
+    );
+    return !(
+      selected?.kind === "KEYFRAME_START" &&
+      selected.status === "COMPLETE" &&
+      Boolean(selected.artifactId) &&
+      selected.artifactId === conceptPreviewArtifactId
+    );
+  });
 }
 
 export function stableSceneStatus(selectedVideoTakeId: string | null) {

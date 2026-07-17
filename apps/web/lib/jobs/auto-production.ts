@@ -55,7 +55,16 @@ export async function startAutoGeneration({
         brandKit: { select: { id: true } },
         concepts: {
           where: { selected: true },
-          select: { id: true, showcaseMotionPlan: true },
+          select: {
+            id: true,
+            showcaseMotionPlan: true,
+            previewArtifactId: true,
+          },
+        },
+        sources: {
+          where: { type: "PRODUCT_IMAGE", artifactId: { not: null } },
+          select: { id: true },
+          take: 1,
         },
       },
     });
@@ -67,6 +76,30 @@ export async function startAutoGeneration({
         "Select exactly one creative concept before proceeding.",
         409,
       );
+    }
+    if (project.sources.length > 0) {
+      const openingFrame = project.concepts[0]?.previewArtifactId
+        ? await tx.artifact.findFirst({
+            where: {
+              id: project.concepts[0].previewArtifactId,
+              projectId,
+            },
+            select: { metadata: true },
+          })
+        : null;
+      const metadata = openingFrame?.metadata as {
+        groundingMode?: unknown;
+        providerFallback?: unknown;
+      } | null;
+      if (
+        metadata?.groundingMode !== "product-reference-locked" ||
+        typeof metadata.providerFallback === "string"
+      ) {
+        throw new PublicError(
+          "Regenerate the selected concept to create its product-locked opening frame before proceeding.",
+          409,
+        );
+      }
     }
     if (
       project.outputMode === "PRODUCT_SHOWCASE" &&

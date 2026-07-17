@@ -5,7 +5,9 @@ import {
   CheckCircle2,
   ImageIcon,
   Loader2,
+  LockKeyhole,
   MousePointer2,
+  PencilLine,
   RefreshCw,
   ShieldCheck,
   UserRound,
@@ -33,6 +35,7 @@ type Concept = {
 type Artifact = {
   id: string;
   mimeType: string;
+  metadata?: unknown;
 };
 
 export function ConceptCard({
@@ -58,10 +61,11 @@ export function ConceptCard({
   const [adjustmentNote, setAdjustmentNote] = useState("");
   const previewHref = artifact ? `/api/artifacts/${artifact.id}/file` : null;
   const motionPlan = parseMotionPlan(concept.showcaseMotionPlan);
+  const frameMetadata = parseOpeningFrameMetadata(artifact?.metadata);
 
   return (
     <article className="grid min-h-full gap-3 rounded-md border border-border bg-background/50 p-3">
-      <div className="overflow-hidden rounded-md border border-border bg-card">
+      <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-xl shadow-black/20">
         {previewHref ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -74,6 +78,22 @@ export function ConceptCard({
             <ImageIcon className="size-7" aria-hidden="true" />
           </div>
         )}
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 bg-gradient-to-b from-black/75 via-black/25 to-transparent p-3">
+          <span className="rounded-full border border-white/15 bg-black/45 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur">
+            Scene 01 · Opening frame
+          </span>
+          {frameMetadata.productReferenceCount > 0 ? (
+            <span className="flex items-center gap-1 rounded-full border border-primary/30 bg-primary/90 px-2 py-1 text-[9px] font-semibold text-primary-foreground">
+              <LockKeyhole className="size-3" aria-hidden="true" />
+              Product locked
+            </span>
+          ) : null}
+        </div>
+        <div className="absolute inset-x-3 bottom-3 rounded-lg border border-white/10 bg-black/65 px-3 py-2 text-[10px] leading-4 text-white/80 backdrop-blur-md">
+          {frameMetadata.providerFallback
+            ? "Preview fallback · regenerate before production for a live opening frame"
+            : "This exact image becomes the first frame of the selected reel."}
+        </div>
       </div>
 
       <div>
@@ -266,21 +286,35 @@ export function ConceptCard({
             disabled={isBusy || isAdjusting}
             onClick={() => setIsAdjusting(true)}
             size="sm"
-            tooltip="Opens an optional note so you can regenerate only this direction."
+            tooltip="Edit the creative direction and regenerate only this concept and its opening frame."
             tooltipSide="bottom"
             variant="outline"
           >
             {isRegenerating ? (
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
             ) : (
-              <RefreshCw className="size-4" aria-hidden="true" />
+              <PencilLine className="size-4" aria-hidden="true" />
             )}
-            Refine / Regenerate
+            Edit & regenerate
           </Button>
         </div>
       </div>
     </article>
   );
+}
+
+function parseOpeningFrameMetadata(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { productReferenceCount: 0, providerFallback: false };
+  }
+  const metadata = value as Record<string, unknown>;
+  return {
+    productReferenceCount:
+      typeof metadata.productReferenceCount === "number"
+        ? metadata.productReferenceCount
+        : 0,
+    providerFallback: typeof metadata.providerFallback === "string",
+  };
 }
 
 type MotionPlan = {
