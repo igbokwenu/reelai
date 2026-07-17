@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  defaultSceneCountForDuration,
   isStoryboardTimingValid,
   normalizeShowcaseDurations,
   normalizeShowcaseSceneCount,
   productShowcaseSceneRange,
+  requestedSceneCountFromText,
+  resolveSceneCountPreference,
   storyboardTimingIssue,
 } from "@/lib/storyboards/timing";
 
@@ -40,6 +43,42 @@ describe("storyboard timing", () => {
     expect(normalizeShowcaseSceneCount(3, 5)).toBe(1);
     expect(normalizeShowcaseSceneCount(3, 10)).toBe(2);
     expect(normalizeShowcaseSceneCount(1, 15)).toBe(2);
+  });
+
+  it("uses duration-aware defaults and honors explicit supported overrides", () => {
+    expect(defaultSceneCountForDuration(5)).toBe(1);
+    expect(defaultSceneCountForDuration(10)).toBe(2);
+    expect(defaultSceneCountForDuration(15)).toBe(3);
+    expect(defaultSceneCountForDuration(30)).toBeNull();
+
+    expect(requestedSceneCountFromText(["Make this exactly one shot."])).toBe(
+      1,
+    );
+    expect(
+      requestedSceneCountFromText(["A 10 second premium reel."]),
+    ).toBeNull();
+    expect(requestedSceneCountFromText(["Use 3+ scenes."])).toBe(3);
+
+    expect(
+      resolveSceneCountPreference({
+        outputMode: "PRODUCT_SHOWCASE",
+        targetDurationSec: 10,
+      }),
+    ).toBe(2);
+    expect(
+      resolveSceneCountPreference({
+        outputMode: "PRODUCT_SHOWCASE",
+        targetDurationSec: 10,
+        instructions: ["Keep it to one continuous scene"],
+      }),
+    ).toBe(1);
+    expect(
+      resolveSceneCountPreference({
+        outputMode: "PRODUCT_SHOWCASE",
+        targetDurationSec: 15,
+        instructions: ["Use two shots"],
+      }),
+    ).toBe(2);
   });
 
   it("explains that a five-second showcase is exactly one video clip", () => {

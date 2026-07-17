@@ -248,6 +248,19 @@ describe("Phase 4 agent schemas", () => {
       humanPresence: "NO_PERSON",
       separationTreatment: "AVOID",
     });
+
+    const fifteenSecondDefault = parseCreativeConceptsOutput(
+      { concepts: [concept(1), concept(2), concept(3)] },
+      "PRODUCT_SHOWCASE",
+      15,
+      3,
+    );
+    expect(
+      fifteenSecondDefault.concepts.every(
+        (item) =>
+          item.estimatedScenes === 3 && item.estimatedDurationSec === 15,
+      ),
+    ).toBe(true);
   });
 
   it("reports nested motion-plan paths when an alias is genuinely unknown", () => {

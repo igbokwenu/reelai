@@ -69,12 +69,88 @@ export function normalizeShowcaseSceneCount(
   return clamp(Math.round(requestedCount), min, max);
 }
 
+/**
+ * Returns Reel AI's editorial default for the short formats where scene count
+ * materially changes the shape of the concept. Longer standard reels keep the
+ * existing flexible 2-4 scene contract.
+ */
+export function defaultSceneCountForDuration(targetDurationSec: number) {
+  const target = Math.round(targetDurationSec);
+  if (target === 5) return 1;
+  if (target === 10) return 2;
+  if (target === 15) return 3;
+  return null;
+}
+
+/**
+ * Reads only explicit scene/shot/clip requests. Bare numbers and duration
+ * phrases are intentionally ignored so "10 seconds" cannot become 10 scenes.
+ */
+export function requestedSceneCountFromText(
+  values: Array<string | null | undefined>,
+) {
+  const text = values.filter(Boolean).join("\n").toLowerCase();
+  if (!text.trim()) return null;
+
+  const wordNumber =
+    "(?:one|two|three|four|five|six|seven|eight|nine|ten|single)";
+  const numeric = "(?:[1-9]|10)";
+  const match = text.match(
+    new RegExp(
+      `(?:exactly\\s+|at\\s+least\\s+|minimum\\s+of\\s+|use\\s+|with\\s+|want\\s+)?(${numeric}|${wordNumber})(?:\\s*\\+)?\\s+(?:(?:continuous|video|distinct|separate)\\s+)?(?:scene|shot|clip)s?\\b`,
+      "i",
+    ),
+  );
+  if (!match?.[1]) return null;
+
+  const numbers: Record<string, number> = {
+    single: 1,
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+  };
+  return numbers[match[1]] ?? Number(match[1]);
+}
+
+export function resolveSceneCountPreference({
+  outputMode,
+  targetDurationSec,
+  instructions = [],
+}: {
+  outputMode: StoryboardOutputMode;
+  targetDurationSec: number;
+  instructions?: Array<string | null | undefined>;
+}) {
+  const requested = requestedSceneCountFromText(instructions);
+  const defaultCount = defaultSceneCountForDuration(targetDurationSec);
+  const range =
+    outputMode === "PRODUCT_SHOWCASE"
+      ? productShowcaseSceneRange(targetDurationSec)
+      : storyboardSceneRange(outputMode);
+  const preferred = requested ?? defaultCount;
+
+  return preferred === null
+    ? null
+    : Math.min(range.max, Math.max(range.min, preferred));
+}
+
 export function normalizeShowcaseDurations(
   durations: number[],
   targetDurationSec: number,
+  preferredSceneCount?: number | null,
 ) {
   const target = clamp(Math.round(targetDurationSec), 5, 15);
-  const count = normalizeShowcaseSceneCount(durations.length || 1, target);
+  const count = normalizeShowcaseSceneCount(
+    preferredSceneCount ?? (durations.length || 1),
+    target,
+  );
   const normalized = Array.from({ length: count }, (_, index) =>
     clamp(Math.round(durations[index] ?? target / count), 5, 10),
   );

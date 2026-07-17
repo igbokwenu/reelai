@@ -26,7 +26,7 @@ import {
   type GroundingRecoverySummary,
 } from "@/lib/brand/grounding";
 import { QWEN_STRUCTURED_MODEL, sanitizeQwenError } from "@/lib/qwen/client";
-import { generateImageWithQwen } from "@/lib/qwen/image";
+import { generateImageWithQwen, QwenImageError } from "@/lib/qwen/image";
 import { generateStructuredWithQwen } from "@/lib/qwen/structured";
 import { resolveArtifactForQwen } from "@/lib/qwen/uploads";
 import { reviewGeneratedPreviewGrounding } from "@/lib/qwen/vision";
@@ -57,6 +57,7 @@ import {
 } from "@/lib/product-showcase/guardrails";
 import {
   normalizeShowcaseSceneCount,
+  resolveSceneCountPreference,
   storyboardTimingIssue,
 } from "@/lib/storyboards/timing";
 
@@ -89,6 +90,7 @@ export async function generateConceptsForProject(projectId: string) {
   if (!project.brandKit) {
     throw new Error("Generate a Brand Kit before creative concepts.");
   }
+  const sceneCountPreference = preferredSceneCount(project);
 
   const result = await generateStructuredWithQwen({
     operation: "creative_director_concepts",
@@ -107,6 +109,7 @@ export async function generateConceptsForProject(projectId: string) {
         value,
         project.outputMode,
         project.videoLengthSec,
+        sceneCountPreference,
       ),
     preserveOriginalOnRepair: true,
     system: conceptSystemPrompt,
@@ -123,7 +126,7 @@ export async function generateConceptsForProject(projectId: string) {
       );
     }
   }
-  validateConceptTiming(project, result.data.concepts);
+  validateConceptTiming(project, result.data.concepts, sceneCountPreference);
   const grounding = getGroundingCapabilities(project.sources, project.brandKit);
   const violations = findConceptGroundingViolations(
     result.data.concepts,
@@ -135,9 +138,13 @@ export async function generateConceptsForProject(projectId: string) {
     );
   }
   const previewReferences = await getPreviewReferences(project);
-  const artifacts = await Promise.all(
-    result.data.concepts.map((concept, index) =>
-      createPreviewFrameArtifact({
+  // Wan preview edits are intentionally serialized. Three concurrent requests
+  // create avoidable provider pressure and used to turn transient throttling
+  // into durable SVG placeholders with no retry.
+  const artifacts: Artifact[] = [];
+  for (const [index, concept] of result.data.concepts.entries()) {
+    artifacts.push(
+      await createPreviewFrameArtifact({
         project,
         conceptTitle: concept.title,
         prompt: concept.previewPrompt,
@@ -145,8 +152,8 @@ export async function generateConceptsForProject(projectId: string) {
         index,
         references: previewReferences,
       }),
-    ),
-  );
+    );
+  }
 
   await cleanupReplacedConceptPreviews(project);
   await prisma.creativeConcept.deleteMany({ where: { projectId } });
@@ -259,6 +266,7 @@ export async function regenerateConceptForProject({
   if (!target) {
     throw new Error("Concept not found");
   }
+  const sceneCountPreference = preferredSceneCount(project, [adjustmentNote]);
 
   const result = await generateStructuredWithQwen({
     operation: "creative_director_concept_regeneration",
@@ -277,6 +285,7 @@ export async function regenerateConceptForProject({
         value,
         project.outputMode,
         project.videoLengthSec,
+        sceneCountPreference,
       ),
     preserveOriginalOnRepair: true,
     system: conceptSystemPrompt,
@@ -297,7 +306,7 @@ export async function regenerateConceptForProject({
       );
     }
   }
-  validateConceptTiming(project, [result.data.concept]);
+  validateConceptTiming(project, [result.data.concept], sceneCountPreference);
   const grounding = getGroundingCapabilities(project.sources, project.brandKit);
   const violations = findConceptGroundingViolations(
     [result.data.concept],
@@ -543,6 +552,9 @@ export async function generateStoryboardForProject(projectId: string) {
       "Select one creative concept before generating a storyboard.",
     );
   }
+  const sceneCountPreference = preferredSceneCount(project, [
+    `${selectedConcept.estimatedScenes} scenes`,
+  ]);
   const hasProductReference = project.sources.some(
     (source) => source.type === "PRODUCT_IMAGE" && source.artifactId,
   );
@@ -599,12 +611,17 @@ export async function generateStoryboardForProject(projectId: string) {
         : storyboardJsonSchema,
     model: QWEN_STRUCTURED_MODEL,
     parse: (value) =>
-      parseStoryboardOutput(value, project.outputMode, project.videoLengthSec),
+      parseStoryboardOutput(
+        value,
+        project.outputMode,
+        project.videoLengthSec,
+        sceneCountPreference,
+      ),
     system: storyboardSystemPrompt,
     user: buildStoryboardPrompt(project, selectedConcept, preflightViolations),
   });
   let output = firstResult.data;
-  validateStoryboardTiming(project, output);
+  validateStoryboardTiming(project, output, sceneCountPreference);
   let activeResult = firstResult;
   let recoveryResult: typeof firstResult | null = null;
   let storyboardViolations = findConceptGroundingViolations(
@@ -639,6 +656,7 @@ export async function generateStoryboardForProject(projectId: string) {
           value,
           project.outputMode,
           project.videoLengthSec,
+          sceneCountPreference,
         ),
       system: storyboardSystemPrompt,
       user: buildStoryboardRecoveryPrompt({
@@ -651,7 +669,7 @@ export async function generateStoryboardForProject(projectId: string) {
       }),
     });
     output = recoveryResult.data;
-    validateStoryboardTiming(project, output);
+    validateStoryboardTiming(project, output, sceneCountPreference);
     activeResult = recoveryResult;
     recoveryMethod = "REGENERATED";
     storyboardViolations = findConceptGroundingViolations(
@@ -942,21 +960,32 @@ async function createPreviewFrameArtifact({
   const productReferences = references.filter(
     (reference) => reference.sourceType === "PRODUCT_IMAGE",
   );
-  const groundedPrompt = `${hardenImagePrompt(prompt, grounding, project.style)}
+  const groundedPrompt = `Generate one new vertical 9:16 opening-frame image now. Return an actual image, not a written description, prompt card, title card, storyboard card, or placeholder.
+
+${hardenImagePrompt(prompt, grounding, project.style)}
 
 OPENING-FRAME CONTRACT:
 - This is not a mood-board thumbnail. It is the exact Scene 1 opening frame that will be sent to image-to-video if this concept is selected.
 - Compose the immediate visual hook at the onset of the planned first shot, with enough stable negative space and clean geometry for motion.
 ${productReferences.length > 0 ? "- PRODUCT IDENTITY LOCK: treat the supplied product photograph(s) as the non-negotiable source of truth. Preserve the exact silhouette, proportions, materials, colors, packaging, label placement, surface details, and visible ingredients. Recompose that same product into the concept; never substitute a generic or look-alike product." : "- No product photograph is available. Do not invent or depict a manufactured product representation."}`;
-  const generated =
+  const previewResult: ProviderPreviewResult =
     grounding.hasProductReference && productReferences.length === 0
-      ? null
+      ? {
+          ok: false,
+          stage: "reference",
+          reason:
+            "The product reference could not be prepared for provider editing.",
+          attempts: 0,
+          providerRequestId: null,
+        }
       : await tryGenerateProviderPreview(
           groundedPrompt,
           grounding,
           references.map((reference) => reference.url),
           productReferences.map((reference) => reference.url),
         );
+  const generated = previewResult.ok ? previewResult : null;
+  const failure = previewResult.ok ? null : previewResult;
   const stored = generated
     ? await storeObject({
         projectId: project.id,
@@ -1003,6 +1032,10 @@ ${productReferences.length > 0 ? "- PRODUCT IDENTITY LOCK: treat the supplied pr
           (reference) => reference.artifactId,
         ),
         productReferenceCount: productReferences.length,
+        previewStatus: generated ? "ready" : "fallback",
+        failureStage: failure?.stage ?? null,
+        failureReason: failure?.reason ?? null,
+        generationAttempts: previewResult.attempts,
         groundingReview:
           generated?.groundingReview ??
           "Provider preview unavailable or rejected by visual grounding review.",
@@ -1011,53 +1044,182 @@ ${productReferences.length > 0 ? "- PRODUCT IDENTITY LOCK: treat the supplied pr
         providerRequestId: generated?.providerRequestId ?? null,
         providerFallback: generated
           ? null
-          : grounding.hasProductReference && productReferences.length === 0
+          : failure?.stage === "reference"
             ? "Product reference could not be resolved; generic product generation was intentionally blocked."
-            : "Local durable preview used when live image generation is unavailable or rejected.",
+            : "Image generation did not complete after bounded recovery attempts. Regenerate this concept to retry only its opening frame.",
       },
     },
   });
 }
+
+type ProviderPreviewResult =
+  | {
+      ok: true;
+      body: Buffer;
+      mimeType: string;
+      imageUrl: string;
+      providerRequestId: string | null;
+      groundingReview: string;
+      attempts: number;
+    }
+  | {
+      ok: false;
+      stage: "reference" | "generation" | "review" | "download";
+      reason: string;
+      attempts: number;
+      providerRequestId: string | null;
+    };
 
 async function tryGenerateProviderPreview(
   prompt: string,
   grounding: GroundingCapabilities,
   imageUrls: string[],
   productReferenceUrls: string[],
-) {
-  try {
-    const generated = await generateImageWithQwen({
-      operation: "concept_preview_frame",
-      model: QWEN_PREVIEW_IMAGE_MODEL,
-      prompt,
-      imageUrls,
-    });
-    const review = await reviewGeneratedPreviewGrounding({
-      imageUrl: generated.imageUrl,
-      restrictions: buildGroundingInstructions(grounding),
-      referenceImageUrls: productReferenceUrls,
-    });
+): Promise<ProviderPreviewResult> {
+  let correction = "";
+  let totalAttempts = 0;
+
+  for (let groundingAttempt = 1; groundingAttempt <= 2; groundingAttempt += 1) {
+    let generated;
+    try {
+      generated = await generateImageWithQwen({
+        operation: "concept_preview_frame",
+        model: QWEN_PREVIEW_IMAGE_MODEL,
+        prompt: `${prompt}${correction}`,
+        imageUrls,
+      });
+      totalAttempts += generated.attempts;
+    } catch (error) {
+      const failure = previewGenerationFailure(error);
+      totalAttempts += failure.attempts;
+      logPreviewFailure("generation", failure.reason, failure.requestId);
+      return {
+        ok: false,
+        stage: "generation",
+        reason: failure.reason,
+        attempts: totalAttempts,
+        providerRequestId: failure.requestId,
+      };
+    }
+
+    let review;
+    try {
+      review = await reviewGeneratedPreviewGrounding({
+        imageUrl: generated.imageUrl,
+        restrictions: buildGroundingInstructions(grounding),
+        referenceImageUrls: productReferenceUrls,
+      });
+    } catch {
+      const reason =
+        "The generated frame could not be verified against its visual references.";
+      logPreviewFailure("review", reason, generated.providerRequestId);
+      return {
+        ok: false,
+        stage: "review",
+        reason,
+        attempts: totalAttempts,
+        providerRequestId: generated.providerRequestId,
+      };
+    }
+
     if (!review.passed) {
-      return null;
+      if (groundingAttempt < 2) {
+        correction = `\n\nMANDATORY CORRECTION AFTER VISUAL REVIEW:\nThe prior image was rejected for this reason: ${review.summary.slice(0, 500)}\nGenerate a corrected image that resolves the issue while preserving the concept. Do not return text.`;
+        continue;
+      }
+      const reason =
+        "The generated frame failed product-identity review twice.";
+      logPreviewFailure("review", reason, generated.providerRequestId);
+      return {
+        ok: false,
+        stage: "review",
+        reason,
+        attempts: totalAttempts,
+        providerRequestId: generated.providerRequestId,
+      };
     }
-    const response = await fetch(generated.imageUrl);
 
-    if (!response.ok) {
-      return null;
+    const downloaded = await downloadGeneratedPreview(generated.imageUrl);
+    if (!downloaded) {
+      const reason =
+        "The generated frame URL could not be downloaded after retrying.";
+      logPreviewFailure("download", reason, generated.providerRequestId);
+      return {
+        ok: false,
+        stage: "download",
+        reason,
+        attempts: totalAttempts,
+        providerRequestId: generated.providerRequestId,
+      };
     }
-
-    const arrayBuffer = await response.arrayBuffer();
 
     return {
-      body: Buffer.from(arrayBuffer),
-      mimeType: response.headers.get("content-type") ?? "image/png",
+      ok: true,
+      body: downloaded.body,
+      mimeType: downloaded.mimeType,
       imageUrl: generated.imageUrl,
       providerRequestId: generated.providerRequestId,
       groundingReview: review.summary,
+      attempts: totalAttempts,
     };
-  } catch {
-    return null;
   }
+
+  return {
+    ok: false,
+    stage: "review",
+    reason: "The generated frame did not pass visual review.",
+    attempts: totalAttempts,
+    providerRequestId: null,
+  };
+}
+
+async function downloadGeneratedPreview(imageUrl: string) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(imageUrl);
+      if (response.ok) {
+        return {
+          body: Buffer.from(await response.arrayBuffer()),
+          mimeType: response.headers.get("content-type") ?? "image/png",
+        };
+      }
+      if (response.status !== 429 && response.status < 500) return null;
+    } catch {
+      // Retry short-lived network failures below.
+    }
+    if (attempt < 3) {
+      await new Promise((resolve) => setTimeout(resolve, 350 * attempt));
+    }
+  }
+  return null;
+}
+
+function previewGenerationFailure(error: unknown) {
+  if (error instanceof QwenImageError) {
+    return {
+      reason: error.message,
+      attempts: error.attempts,
+      requestId: error.providerRequestId ?? null,
+    };
+  }
+  return {
+    reason: "Image generation failed before an image was returned.",
+    attempts: 1,
+    requestId: null,
+  };
+}
+
+function logPreviewFailure(
+  stage: "generation" | "review" | "download",
+  reason: string,
+  providerRequestId: string | null,
+) {
+  console.info("Concept preview recovery exhausted", {
+    operation: "concept_preview_frame",
+    stage,
+    reason,
+    providerRequestId,
+  });
 }
 
 type PreviewReference = {
@@ -1188,6 +1350,7 @@ function buildConceptPrompt(project: BrandProject) {
     .filter((source) => source.type === "WEBSITE" && source.extractedText)
     .map((source) => summarizeWebsiteEvidence(source.extractedText!))
     .join("\n");
+  const userDirection = getProjectCreativeDirection(project.sources);
 
   return `Pitch exactly three genuinely different creative strategies for a short-form vertical ad.
 
@@ -1195,6 +1358,7 @@ Business: ${project.businessName}
 Project: ${project.name}
 Audience: ${project.targetAudience?.trim() || brandKit?.audience || "Not specified"}
 Offer: ${project.offer?.trim() || "Not specified"}
+User direction: ${userDirection || "Not specified"}
 Video target: ${project.videoLengthSec}s, ${project.style}
 Output mode: ${project.outputMode}
 Creative intensity: ${project.cinematicBoost ? "CINEMATIC_BOOST" : "BALANCED"}
@@ -1264,6 +1428,7 @@ function buildConceptRegenerationPrompt({
       narrativeArc: concept.narrativeArc,
       visualStyle: concept.visualStyle,
     }));
+  const userDirection = getProjectCreativeDirection(project.sources);
 
   return `Regenerate one creative strategy for a short-form vertical ad. Return an object with one "concept" only.
 
@@ -1271,6 +1436,7 @@ Business: ${project.businessName}
 Project: ${project.name}
 Audience: ${project.targetAudience?.trim() || brandKit?.audience || "Not specified"}
 Offer: ${project.offer?.trim() || "Not specified"}
+User direction: ${userDirection || "Not specified"}
 Video target: ${project.videoLengthSec}s, ${project.style}
 Output mode: ${project.outputMode}
 Creative intensity: ${project.cinematicBoost ? "CINEMATIC_BOOST" : "BALANCED"}
@@ -1316,7 +1482,11 @@ Requirements:
 - strategy must describe the ad strategy in one or two substantive sentences.
 - narrativeArc must describe the beginning, middle, and ending beat.
 - rationale must explain why this direction can work for this brand and audience.
-- ${buildSceneCountInstruction(project, "CONCEPT")}
+- ${buildSceneCountInstruction(
+    project,
+    "CONCEPT",
+    preferredSceneCount(project, [adjustmentNote]),
+  )}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Keep the uploaded product as the unmistakable hero. Use one hero product and one hero action per shot; secondary products stay static or appear sequentially. Reject morphing, melting, crowded transformations, and ungrounded product variants." : "Keep the execution grounded and visually legible."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Return a complete motionPlan with one heroAction, optional restrained supportingMotion, one cameraBehavior, NO_PERSON or ONE_PERSON, an evidence-based separationTreatment, and a concise safetyRationale." : "Keep the replacement feasible for the downstream storyboard."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Choose motion from the product's real material and use cues rather than defaulting to a generic spin: use verified garnish/temperature behavior for food, fluid or texture control for beauty, fabric response for fashion, precision parallax/light for rigid goods, and simple use-result motion for home or craft products. One restrained supporting material behavior may accompany the hero action." : "Use domain-specific action, physical metaphor, and lighting rather than a generic montage."}
@@ -1359,10 +1529,50 @@ function buildCinematicBoostInstruction(enabled: boolean) {
     : "Use premium, confident art direction with restrained motion and transitions; clarity and brand fit outrank spectacle.";
 }
 
-function buildSceneCountInstruction(
-  project: Pick<Project, "outputMode" | "videoLengthSec">,
-  stage: "CONCEPT" | "STORYBOARD",
+function getProjectCreativeDirection(sources: BrandSource[] = []) {
+  for (const source of sources) {
+    const metadata = source.metadata as { creativeDirection?: unknown } | null;
+    if (
+      typeof metadata?.creativeDirection === "string" &&
+      metadata.creativeDirection.trim()
+    ) {
+      return metadata.creativeDirection.trim();
+    }
+  }
+  return null;
+}
+
+function preferredSceneCount(
+  project: Pick<Project, "outputMode" | "videoLengthSec"> & {
+    sources?: BrandSource[];
+  },
+  priorityInstructions: Array<string | null | undefined> = [],
 ) {
+  return resolveSceneCountPreference({
+    outputMode: project.outputMode,
+    targetDurationSec: project.videoLengthSec,
+    instructions: [
+      ...priorityInstructions,
+      getProjectCreativeDirection(project.sources),
+    ],
+  });
+}
+
+function buildSceneCountInstruction(
+  project: Pick<Project, "outputMode" | "videoLengthSec"> & {
+    sources?: BrandSource[];
+  },
+  stage: "CONCEPT" | "STORYBOARD",
+  resolvedCount = preferredSceneCount(project),
+) {
+  if (resolvedCount !== null) {
+    const unit = resolvedCount === 1 ? "scene" : "scenes";
+    if (stage === "CONCEPT") {
+      return `Estimate exactly ${resolvedCount} ${unit} for this ${project.videoLengthSec}-second concept. This is the resolved format default or an explicit user scene-count instruction; do not vary it between the three concepts.`;
+    }
+    return `Create exactly ${resolvedCount} ${unit} totaling the requested ${project.videoLengthSec} seconds. Do not add an extra intro, transition-only shot, or end-card scene.`;
+  }
+
   if (project.outputMode !== "PRODUCT_SHOWCASE") {
     return stage === "CONCEPT"
       ? "Keep estimated scenes between 2 and 4 and duration between 15 and 30 seconds."
@@ -1383,22 +1593,26 @@ function buildSceneCountInstruction(
 function validateConceptTiming(
   project: Project,
   concepts: Array<{ estimatedScenes: number; estimatedDurationSec: number }>,
+  expectedSceneCount: number | null = preferredSceneCount(project),
 ) {
   const showcase = project.outputMode === "PRODUCT_SHOWCASE";
-  const invalid = concepts.some((concept) =>
-    showcase
-      ? concept.estimatedScenes < 1 ||
-        concept.estimatedScenes > 3 ||
-        concept.estimatedDurationSec !== project.videoLengthSec ||
-        concept.estimatedScenes !==
-          normalizeShowcaseSceneCount(
-            concept.estimatedScenes,
-            project.videoLengthSec,
-          )
-      : concept.estimatedScenes < 2 ||
-        concept.estimatedScenes > 4 ||
-        concept.estimatedDurationSec < 15 ||
-        concept.estimatedDurationSec > 30,
+  const invalid = concepts.some(
+    (concept) =>
+      (expectedSceneCount !== null &&
+        concept.estimatedScenes !== expectedSceneCount) ||
+      (showcase
+        ? concept.estimatedScenes < 1 ||
+          concept.estimatedScenes > 3 ||
+          concept.estimatedDurationSec !== project.videoLengthSec ||
+          concept.estimatedScenes !==
+            normalizeShowcaseSceneCount(
+              concept.estimatedScenes,
+              project.videoLengthSec,
+            )
+        : concept.estimatedScenes < 2 ||
+          concept.estimatedScenes > 4 ||
+          concept.estimatedDurationSec < 15 ||
+          concept.estimatedDurationSec > 30),
   );
   if (invalid) {
     throw new Error(
@@ -1409,7 +1623,19 @@ function validateConceptTiming(
   }
 }
 
-function validateStoryboardTiming(project: Project, output: StoryboardOutput) {
+function validateStoryboardTiming(
+  project: Project,
+  output: StoryboardOutput,
+  expectedSceneCount: number | null = preferredSceneCount(project),
+) {
+  if (
+    expectedSceneCount !== null &&
+    output.scenes.length !== expectedSceneCount
+  ) {
+    throw new Error(
+      `Reel AI couldn't align the storyboard to the requested ${expectedSceneCount}-scene format after automatic repair. Regenerate the storyboard to try again.`,
+    );
+  }
   const issue = storyboardTimingIssue({
     outputMode: project.outputMode,
     targetDurationSec: project.videoLengthSec,
@@ -1480,7 +1706,7 @@ ${buildGroundingRecoveryInstructions(preflightViolations, grounding)}
 ${project.outputMode === "PRODUCT_SHOWCASE" ? buildShowcaseMotionGuardrailBrief(project.products) : ""}
 
 Requirements:
-- ${buildSceneCountInstruction(project, "STORYBOARD")}
+- ${buildSceneCountInstruction(project, "STORYBOARD", concept.estimatedScenes)}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Total duration must exactly match the requested 5 to 15 seconds, with every scene lasting 5 to 10 seconds." : "Total duration must be 15 to 30 seconds, with every scene lasting 5 to 10 seconds. Prefer 5 to 8 seconds; use 9 to 10 only for exceptionally simple motion."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Treat the actual uploaded product photography as the source of truth for silhouette, materials, colors, proportions, surface details, packaging, and visible ingredients. The generated scene may stylize the world but must not redesign the product." : "Preserve recurring product identity whenever a product is present."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Assign exactly one hero product and one primary action to each shot. For multiple products, use sequential hero shots or a static collection composition; never ask multiple products to assemble, transform, collide, or cross paths together." : "Keep the motion hierarchy deliberately simple."}

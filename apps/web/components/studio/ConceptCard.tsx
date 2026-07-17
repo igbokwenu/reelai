@@ -3,6 +3,7 @@
 import {
   Aperture,
   CheckCircle2,
+  CircleAlert,
   ImageIcon,
   Loader2,
   LockKeyhole,
@@ -82,16 +83,22 @@ export function ConceptCard({
           <span className="rounded-full border border-white/15 bg-black/45 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur">
             Scene 01 · Opening frame
           </span>
-          {frameMetadata.productReferenceCount > 0 ? (
+          {frameMetadata.productReferenceCount > 0 &&
+          !frameMetadata.providerFallback ? (
             <span className="flex items-center gap-1 rounded-full border border-primary/30 bg-primary/90 px-2 py-1 text-[9px] font-semibold text-primary-foreground">
               <LockKeyhole className="size-3" aria-hidden="true" />
               Product locked
+            </span>
+          ) : frameMetadata.providerFallback ? (
+            <span className="flex items-center gap-1 rounded-full border border-amber-200/30 bg-amber-500/90 px-2 py-1 text-[9px] font-semibold text-white">
+              <CircleAlert className="size-3" aria-hidden="true" />
+              Retry available
             </span>
           ) : null}
         </div>
         <div className="absolute inset-x-3 bottom-3 rounded-lg border border-white/10 bg-black/65 px-3 py-2 text-[10px] leading-4 text-white/80 backdrop-blur-md">
           {frameMetadata.providerFallback
-            ? "Preview fallback · regenerate before production for a live opening frame"
+            ? openingFrameFallbackMessage(frameMetadata.failureStage)
             : "This exact image becomes the first frame of the selected reel."}
         </div>
       </div>
@@ -305,7 +312,11 @@ export function ConceptCard({
 
 function parseOpeningFrameMetadata(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return { productReferenceCount: 0, providerFallback: false };
+    return {
+      productReferenceCount: 0,
+      providerFallback: false,
+      failureStage: null,
+    };
   }
   const metadata = value as Record<string, unknown>;
   return {
@@ -314,7 +325,24 @@ function parseOpeningFrameMetadata(value: unknown) {
         ? metadata.productReferenceCount
         : 0,
     providerFallback: typeof metadata.providerFallback === "string",
+    failureStage:
+      typeof metadata.failureStage === "string" ? metadata.failureStage : null,
   };
+}
+
+function openingFrameFallbackMessage(stage: string | null) {
+  switch (stage) {
+    case "reference":
+      return "Product image could not be prepared · check the asset and retry this concept";
+    case "generation":
+      return "Image service was unavailable · retry this concept without changing its direction";
+    case "review":
+      return "Product match needs another pass · retry this concept";
+    case "download":
+      return "Image delivery was interrupted · retry this concept";
+    default:
+      return "Opening frame unavailable · retry this concept before production";
+  }
 }
 
 type MotionPlan = {

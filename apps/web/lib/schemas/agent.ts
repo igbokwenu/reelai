@@ -782,6 +782,7 @@ export function parseCreativeConceptsOutput(
   value: unknown,
   outputMode: "STANDARD" | "PRODUCT_SHOWCASE" = "STANDARD",
   targetDurationSec?: number,
+  preferredSceneCount?: number | null,
 ): CreativeConceptsOutput {
   const extracted = extractConceptArray(value);
 
@@ -792,6 +793,7 @@ export function parseCreativeConceptsOutput(
         item,
         outputMode === "PRODUCT_SHOWCASE",
         targetDurationSec,
+        preferredSceneCount,
       ),
     );
 
@@ -806,6 +808,7 @@ export function parseCreativeConceptRegenerationOutput(
   value: unknown,
   outputMode: "STANDARD" | "PRODUCT_SHOWCASE" = "STANDARD",
   targetDurationSec?: number,
+  preferredSceneCount?: number | null,
 ) {
   const record = asRecord(value);
   const directConcept = record ? asRecord(record.concept) : null;
@@ -820,6 +823,7 @@ export function parseCreativeConceptRegenerationOutput(
       extracted,
       outputMode === "PRODUCT_SHOWCASE",
       targetDurationSec,
+      preferredSceneCount,
     ),
   });
 }
@@ -828,6 +832,7 @@ export function parseStoryboardOutput(
   value: unknown,
   outputMode: "STANDARD" | "PRODUCT_SHOWCASE" = "STANDARD",
   targetDurationSec?: number,
+  preferredSceneCount?: number | null,
 ): StoryboardOutput {
   const canonical = canonicalizeStoryboardValue(value);
   const activeSchema =
@@ -835,8 +840,25 @@ export function parseStoryboardOutput(
       ? productShowcaseStoryboardSchema
       : storyboardSchema;
   const validationSchema =
-    outputMode === "PRODUCT_SHOWCASE" && targetDurationSec !== undefined
+    targetDurationSec !== undefined || preferredSceneCount !== undefined
       ? activeSchema.superRefine((storyboard, ctx) => {
+          if (
+            preferredSceneCount !== undefined &&
+            preferredSceneCount !== null &&
+            storyboard.scenes.length !== preferredSceneCount
+          ) {
+            ctx.addIssue({
+              code: "custom",
+              message: `This ${targetDurationSec ?? "requested"}-second format needs exactly ${preferredSceneCount} scenes unless the user's direction requests another supported count.`,
+              path: ["scenes"],
+            });
+          }
+          if (
+            outputMode !== "PRODUCT_SHOWCASE" ||
+            targetDurationSec === undefined
+          ) {
+            return;
+          }
           const sceneRange = productShowcaseSceneRange(targetDurationSec);
           if (
             storyboard.scenes.length < sceneRange.min ||
@@ -880,9 +902,17 @@ export function parseStoryboardOutput(
     .slice(0, outputMode === "PRODUCT_SHOWCASE" ? 3 : 4)
     .map((scene, index) => normalizeStoryboardScene(scene, index));
 
+  if (
+    preferredSceneCount !== undefined &&
+    preferredSceneCount !== null &&
+    preferredSceneCount < scenes.length
+  ) {
+    scenes = selectScenesForCount(scenes, preferredSceneCount);
+  }
+
   if (outputMode === "PRODUCT_SHOWCASE" && targetDurationSec !== undefined) {
     const desiredSceneCount = normalizeShowcaseSceneCount(
-      scenes.length || 1,
+      preferredSceneCount ?? (scenes.length || 1),
       targetDurationSec,
     );
     if (desiredSceneCount <= scenes.length) {
@@ -891,6 +921,7 @@ export function parseStoryboardOutput(
     const durations = normalizeShowcaseDurations(
       scenes.map((scene) => scene.durationSec),
       targetDurationSec,
+      desiredSceneCount,
     );
     if (durations.length === scenes.length) {
       scenes = scenes.map((scene, index) => ({
@@ -967,6 +998,7 @@ function normalizeConcept(
   value: unknown,
   productShowcase = false,
   targetDurationSec?: number,
+  preferredSceneCount?: number | null,
 ) {
   const parsed = flexibleConceptSchema.parse(asRecord(value) ?? {});
   const scenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
@@ -1073,8 +1105,11 @@ function normalizeConcept(
     narrativeArc,
     visualStyle,
     estimatedScenes: productShowcase
-      ? normalizeShowcaseSceneCount(estimatedScenes, showcaseTarget)
-      : estimatedScenes,
+      ? normalizeShowcaseSceneCount(
+          preferredSceneCount ?? estimatedScenes,
+          showcaseTarget,
+        )
+      : (preferredSceneCount ?? estimatedScenes),
     estimatedDurationSec: showcaseTarget,
     previewPrompt,
     rationale: text(
@@ -1321,6 +1356,30 @@ function selectShowcaseScenes(
   }
 
   return [first, closer].slice(0, desiredCount);
+}
+
+function selectScenesForCount(
+  scenes: ReturnType<typeof normalizeStoryboardScene>[],
+  desiredCount: number,
+) {
+  if (scenes.length <= desiredCount) return scenes;
+  if (desiredCount === 1) return selectShowcaseScenes(scenes, 1);
+
+  const selected = [scenes[0]!];
+  const interiorNeeded = desiredCount - 2;
+  for (let index = 1; index <= interiorNeeded; index += 1) {
+    const sourceIndex = Math.round(
+      (index * (scenes.length - 1)) / (interiorNeeded + 1),
+    );
+    selected.push(scenes[sourceIndex]!);
+  }
+  selected.push(scenes.at(-1)!);
+
+  return selected.map((scene, index) => ({
+    ...scene,
+    index: index + 1,
+    transitionStyle: index === 0 ? ("CUT" as const) : scene.transitionStyle,
+  }));
 }
 
 function normalizeContinuityBible(
