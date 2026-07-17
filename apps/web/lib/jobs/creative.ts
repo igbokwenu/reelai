@@ -108,6 +108,7 @@ async function runConceptJob(jobId: string) {
         providerTaskId: result.providerRequestId,
         output: {
           conceptIds: result.concepts.map((concept) => concept.id),
+          razzmatazzRecovery: result.razzmatazzRecovery,
           elapsedMs: result.elapsedMs,
           usage: toJsonValue(result.usage),
         },
@@ -158,6 +159,7 @@ async function runConceptRegenerationJob(
         providerTaskId: result.providerRequestId,
         output: {
           conceptId: result.concept.id,
+          razzmatazzRecovery: result.razzmatazzRecovery,
           invalidatedStoryboard: result.invalidatedStoryboard,
           elapsedMs: result.elapsedMs,
           usage: toJsonValue(result.usage),

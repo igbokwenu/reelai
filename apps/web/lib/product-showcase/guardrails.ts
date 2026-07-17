@@ -39,8 +39,10 @@ type ConceptWithMotion = {
 
 type StoryboardWithMotion = {
   continuityBible?: {
+    product?: string;
     characters?: string;
     cast?: { mode?: string; members?: unknown[] };
+    visualWorld?: string;
   };
   scenes: Array<{
     index?: number;
@@ -58,9 +60,9 @@ const fabricPattern =
 const visibleModularPattern =
   /\b(?:modular|stackable|detachable|removable|interlocking|large visible (?:parts|pieces|components)|outer shell|packaging layers)\b/i;
 const riskyTeardownPattern =
-  /\b(?:tear[ -]?down|tears? (?:apart|down)|exploded view|explodes? (?:apart|into)|disassembl(?:e|es|ed|y)|dismantl(?:e|es|ed)|deconstruct(?:s|ed|ion)?|internal (?:parts|components|layers)|circuit board|stitches? (?:split|unravel)|seams? (?:split|open)|unravels?|dozens of (?:parts|pieces)|floating (?:parts|components)|separates? into (?:parts|components|pieces))\b/i;
+  /\b(?:tear[ -]?down|tears? (?:apart|down)|exploded view|explodes? (?:apart|into)|disassembl(?:e|es|ed|y)|dismantl(?:e|es|ed)|deconstruct(?:s|ed|ion)?|internal (?:parts|components|layers)|circuit board|stitches? (?:split|unravel)|seams? (?:split|open)|unravels?|dozens of (?:parts|pieces)|floating (?:parts|components)|separates? into (?:parts|components|pieces|layers))\b/i;
 const anySeparationPattern =
-  /\b(?:separat(?:e|es|ed|ion)|reassembl(?:e|es|ed|y)|layers? (?:rise|lift|float|separate)|components? (?:rise|lift|float|separate))\b/i;
+  /\b(?:reassembl(?:e|es|ed|y)|layers? (?:rise|lift|float|separate)|components? (?:rise|lift|float|separate)|(?:product|package|bottle|box|case|cap|lid|ribbon|wrapper|pieces?|parts?|components?) (?:separates?|split|detach(?:es|ed)?|comes? apart)|separates? into (?:parts|components|pieces|layers))\b/i;
 const multiplePeoplePattern =
   /\b(?:two|three|several|multiple) (?:people|persons|humans|models|customers|users|shoppers|hands)|\b(?:couple|crowd|group of people|friends|family|team|models)\b/i;
 const anyPersonPattern =
@@ -75,6 +77,18 @@ const razzmatazzHeroFocusPattern =
   /\b(?:hero(?:ic)? (?:product|frame|hold|composition|focus|moment)|center(?:ed)? (?:as (?:the )?)?(?:hero|focus|composition|frame|product)|centre(?:d)? (?:as (?:the )?)?(?:hero|focus|composition|frame|product)|centered (?:in|within) (?:the )?frame|centred (?:in|within) (?:the )?frame|product (?:is|remains|lands) centered|center of attention|sole (?:visual )?(?:focus|subject)|undisputed (?:hero|focus)|dominates? the frame|spotlight(?:ed)? product|focal point)\b/i;
 const overloadedScreenPattern =
   /\b(?:rapid(?:ly)? (?:scroll|swipe|tap|type|screen|interface)|multiple (?:screens|windows|apps|panels|notifications)|cascading notifications|dashboard (?:animates|transforms|changes)|interface (?:morphs|transforms|cycles)|screen (?:cycles|flashes|fills with)|scrolls?[^.]{0,48}(?:tap|swipe|type)|(?:tap|swipe|type)[^.]{0,48}scrolls?)\b/i;
+
+const defaultRazzmatazzMotions = [
+  "makes one crisp partial turn",
+  "rises in one clean vertical glide",
+  "pivots once with precise control",
+] as const;
+
+const defaultRazzmatazzEffects = [
+  "light streaks flare into a tight particle halo behind it",
+  "a rim-light pulse blooms into a luminous ring behind it",
+  "a reflection burst ripples into a prismatic halo behind it",
+] as const;
 
 export function buildShowcaseMotionGuardrailBrief(
   products: ProductDescriptor[],
@@ -126,9 +140,10 @@ export function findShowcaseConceptViolations(
   for (const [index, concept] of concepts.entries()) {
     const label = `Concept ${index + 1}${concept.title ? ` (${concept.title})` : ""}`;
     const plan = concept.motionPlan;
-    const copy = positiveExecutionCopy(
+    const copy = productAwareExecutionCopy(
       [
         concept.hook,
+        concept.strategy,
         concept.narrativeArc,
         concept.visualStyle,
         concept.previewPrompt,
@@ -137,6 +152,7 @@ export function findShowcaseConceptViolations(
       ]
         .filter(Boolean)
         .join(" "),
+      products,
     );
 
     if (!plan) {
@@ -196,6 +212,85 @@ export function findShowcaseConceptViolations(
   return violations;
 }
 
+export function internallyRepairRazzmatazzConcepts<
+  T extends {
+    hook: string;
+    strategy: string;
+    narrativeArc: string;
+    visualStyle: string;
+    previewPrompt: string;
+    motionPlan?: ShowcaseMotionPlan;
+  },
+>(concepts: T[], products: ProductDescriptor[]): T[] {
+  const product = safeProductName(products);
+
+  return concepts.map((concept, index) => {
+    const plan: ShowcaseMotionPlan = concept.motionPlan ?? {
+      heroAction: "",
+      supportingMotion: "",
+      cameraBehavior: "FIXED",
+      humanPresence: "NO_PERSON",
+      separationTreatment: "AVOID",
+      safetyRationale: "",
+    };
+    const motion =
+      defaultRazzmatazzMotions[index % defaultRazzmatazzMotions.length]!;
+    const effect =
+      defaultRazzmatazzEffects[index % defaultRazzmatazzEffects.length]!;
+    const existingHeroAction = positiveExecutionCopy(plan.heroAction);
+    const existingSupportingMotion = positiveExecutionCopy(
+      plan.supportingMotion,
+    );
+    const heroAction =
+      !hasRazzmatazzExecutionRisk(existingHeroAction) &&
+      razzmatazzProductMotionPattern.test(existingHeroAction)
+        ? ensureHeroFocus(existingHeroAction)
+        : `The intact ${product} ${motion} and lands centered as the sole visual focus.`;
+    const supportingMotion =
+      !hasRazzmatazzExecutionRisk(existingSupportingMotion) &&
+      razzmatazzEnergyEffectPattern.test(existingSupportingMotion)
+        ? existingSupportingMotion
+        : capitalize(effect);
+
+    return {
+      ...concept,
+      hook: safeRazzmatazzField(
+        concept.hook,
+        `${product} becomes impossible to ignore.`,
+      ),
+      strategy: safeRazzmatazzField(
+        concept.strategy,
+        `Make the intact ${product} the sole visual focus through one precise product motion and one surrounding energy effect.`,
+      ),
+      narrativeArc: safeRazzmatazzField(
+        concept.narrativeArc,
+        `The intact ${product} begins ${motion}, ${effect}, and the product lands centered as the hero for the final call to action.`,
+      ),
+      visualStyle: safeRazzmatazzField(
+        concept.visualStyle,
+        `Premium high-contrast studio polish with a clean silhouette, controlled luminous energy, and centered hero framing.`,
+      ),
+      previewPrompt: safeRazzmatazzField(
+        hasRazzmatazzTriad(concept.previewPrompt) ? concept.previewPrompt : "",
+        `Vertical 9:16 opening frame of the exact intact ${product}, centered as the sole visual focus at the onset of a precise motion while ${effect}, with stable geometry, premium commercial lighting, and no readable text.`,
+      ),
+      motionPlan: {
+        ...plan,
+        heroAction,
+        supportingMotion,
+        cameraBehavior:
+          plan.cameraBehavior === "GENTLE_ORBIT"
+            ? "FIXED"
+            : plan.cameraBehavior,
+        humanPresence: "NO_PERSON",
+        separationTreatment: "AVOID",
+        safetyRationale:
+          "The product remains intact and unobscured while one controlled motion and one surrounding energy effect create the spectacle.",
+      },
+    } as T;
+  });
+}
+
 export function findShowcaseStoryboardViolations(
   storyboard: StoryboardWithMotion,
   products: ProductDescriptor[],
@@ -227,8 +322,9 @@ export function findShowcaseStoryboardViolations(
     violations.push("Razzmatazz mode requires exactly one scene.");
   }
 
-  const fullCharacterPlan = positiveExecutionCopy(
+  const fullCharacterPlan = productAwareExecutionCopy(
     storyboard.continuityBible?.characters ?? "",
+    products,
   );
   if (razzmatazzMode && anyPersonPattern.test(fullCharacterPlan)) {
     violations.push(
@@ -243,8 +339,9 @@ export function findShowcaseStoryboardViolations(
 
   for (const [index, scene] of storyboard.scenes.entries()) {
     const label = `Scene ${scene.index ?? index + 1}`;
-    const copy = positiveExecutionCopy(
+    const copy = productAwareExecutionCopy(
       `${scene.shotPrompt} ${scene.continuityNotes ?? ""}`,
+      products,
     );
     if (multiplePeoplePattern.test(copy)) {
       violations.push(`${label} introduces more than one person.`);
@@ -320,6 +417,34 @@ export function findShowcaseShotViolations(
   );
 }
 
+export function internallyRepairRazzmatazzStoryboard<
+  T extends StoryboardWithMotion,
+>(storyboard: T, products: ProductDescriptor[]): T {
+  const product = safeProductName(products);
+  const firstScene = storyboard.scenes[0];
+  if (!firstScene) return storyboard;
+
+  return {
+    ...storyboard,
+    continuityBible: {
+      ...storyboard.continuityBible,
+      product: `Preserve the exact intact ${product} silhouette, materials, colors, proportions, packaging, label, and surface details.`,
+      characters:
+        "No people appear; the intact supplied product is the only visual subject throughout.",
+      cast: { mode: "NO_PEOPLE", members: [] },
+      visualWorld:
+        "Premium high-contrast studio space with a clean silhouette, controlled luminous energy behind the product, and uncluttered CTA space.",
+    },
+    scenes: [
+      {
+        ...firstScene,
+        shotPrompt: `Electric focus: the intact ${product} makes one crisp partial turn while luminous light streaks flare into a tight particle halo behind it as a fixed camera holds the product centered as the sole visual focus.`,
+        continuityNotes: `Keep the exact intact ${product} centered at a stable scale with unchanged silhouette, materials, colors, label, lighting direction, and clean CTA space.`,
+      },
+    ],
+  } as T;
+}
+
 function validateSeparationDecision(
   label: string,
   copy: string,
@@ -370,4 +495,66 @@ function positiveExecutionCopy(value: string) {
     /\b(?:avoid(?:s|ed|ing)?|without|never|no|not|rather than|instead of|does not|do not|must not|cannot)\b[^.;!?]{0,120}[.;!?]?/gi,
     " ",
   );
+}
+
+function productAwareExecutionCopy(
+  value: string,
+  products: ProductDescriptor[],
+) {
+  let copy = positiveExecutionCopy(value);
+  for (const product of products) {
+    const name = product.name.trim();
+    if (!name) continue;
+    copy = copy.replace(new RegExp(escapeRegExp(name), "gi"), "featured item");
+  }
+  return copy;
+}
+
+function hasRazzmatazzExecutionRisk(value: string) {
+  const copy = positiveExecutionCopy(value);
+  return (
+    anyPersonPattern.test(copy) ||
+    multiplePeoplePattern.test(copy) ||
+    anySeparationPattern.test(copy) ||
+    riskyTeardownPattern.test(copy) ||
+    razzmatazzProductAlterationPattern.test(copy) ||
+    overloadedScreenPattern.test(copy)
+  );
+}
+
+function hasRazzmatazzTriad(value: string) {
+  const copy = positiveExecutionCopy(value);
+  return (
+    !hasRazzmatazzExecutionRisk(copy) &&
+    razzmatazzProductMotionPattern.test(copy) &&
+    razzmatazzEnergyEffectPattern.test(copy) &&
+    razzmatazzHeroFocusPattern.test(copy)
+  );
+}
+
+function safeRazzmatazzField(value: string, fallback: string) {
+  return !value.trim() || hasRazzmatazzExecutionRisk(value) ? fallback : value;
+}
+
+function ensureHeroFocus(value: string) {
+  const trimmed = value.trim().replace(/[.!?]+$/, "");
+  return razzmatazzHeroFocusPattern.test(trimmed)
+    ? `${trimmed}.`
+    : `${trimmed} and lands centered as the sole visual focus.`;
+}
+
+function safeProductName(products: ProductDescriptor[]) {
+  const name = products[0]?.name
+    ?.replace(/[.!?]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return name || "hero product";
+}
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

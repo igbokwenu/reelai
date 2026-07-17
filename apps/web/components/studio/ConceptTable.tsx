@@ -73,6 +73,7 @@ export function ConceptTable({
   businessName,
   websiteUrl,
   outputMode,
+  razzmatazzMode,
 }: {
   projectId: string;
   hasBrandKit: boolean;
@@ -86,6 +87,7 @@ export function ConceptTable({
   businessName: string;
   websiteUrl: string | null;
   outputMode: "STANDARD" | "PRODUCT_SHOWCASE";
+  razzmatazzMode: boolean;
 }) {
   const router = useRouter();
   const [job, setJob] = useState<Job | null>(latestConceptJob);
@@ -322,7 +324,13 @@ export function ConceptTable({
           ) : (
             <Sparkles className="size-4" aria-hidden="true" />
           )}
-          {concepts.length === 3 ? "Replace all 3" : "Generate 3 Concepts"}
+          {isStarting || isRunning
+            ? razzmatazzMode
+              ? "Crafting & polishing…"
+              : "Generating concepts…"
+            : concepts.length === 3
+              ? "Replace all 3"
+              : "Generate 3 Concepts"}
         </Button>
       </div>
 

@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { productShowcaseStoryboardSchema } from "@/lib/schemas/agent";
+
 import {
   buildShowcaseMotionGuardrailBrief,
   findShowcaseConceptViolations,
   findShowcaseStoryboardViolations,
+  internallyRepairRazzmatazzConcepts,
+  internallyRepairRazzmatazzStoryboard,
   type ShowcaseMotionPlan,
 } from "./guardrails";
 
@@ -211,5 +215,144 @@ describe("Product Showcase motion guardrails", () => {
 
     expect(violations.join(" ")).toMatch(/person|hands/i);
     expect(violations.join(" ")).toMatch(/opens|intact|transform/i);
+  });
+
+  it("repairs repeated model compliance misses internally", () => {
+    const repaired = internallyRepairRazzmatazzConcepts(
+      [
+        {
+          title: "Ruby Pivot",
+          hook: "A sharp visual interruption.",
+          strategy: "Use premium studio energy.",
+          narrativeArc: "The bottle pivots as light streaks flare behind it.",
+          visualStyle: "High-contrast commercial polish.",
+          previewPrompt: "A static bottle against soft bokeh.",
+          motionPlan: {
+            ...safePlan,
+            heroAction: "The bottle pivots once.",
+            supportingMotion: "Light streaks flare behind it.",
+          },
+        },
+        {
+          title: "Elevated Hero Glide",
+          hook: "A human hand creates the reveal.",
+          strategy: "The package separates from its lid before rising.",
+          narrativeArc: "The package separates and a model lifts it.",
+          visualStyle: "Tactile editorial styling.",
+          previewPrompt: "A hand holds the open package.",
+          motionPlan: {
+            ...safePlan,
+            heroAction: "The package separates before it glides forward.",
+            supportingMotion: "A passive glow surrounds it.",
+            humanPresence: "ONE_PERSON",
+            separationTreatment: "VISIBLE_COMPONENT_SEPARATION",
+          },
+        },
+        {
+          title: "Glint Spin",
+          hook: "One compact product beat.",
+          strategy: "Use one controlled product spin.",
+          narrativeArc: "The bottle spins and settles in a hero frame.",
+          visualStyle: "Minimal studio lighting.",
+          previewPrompt: "A centered bottle in a dark studio.",
+          motionPlan: {
+            ...safePlan,
+            heroAction:
+              "The bottle spins and settles centered in the hero frame.",
+            supportingMotion: "The background remains softly lit.",
+          },
+        },
+      ],
+      [{ name: "Northstar Bottle" }],
+    );
+
+    expect(
+      findShowcaseConceptViolations(
+        repaired,
+        [{ name: "Northstar Bottle" }],
+        true,
+      ),
+    ).toEqual([]);
+    expect(repaired[1]?.motionPlan).toMatchObject({
+      humanPresence: "NO_PERSON",
+      separationTreatment: "AVOID",
+    });
+    expect(repaired[0]?.previewPrompt).toMatch(
+      /motion|halo|sole visual focus/i,
+    );
+  });
+
+  it("repairs a rejected Razzmatazz storyboard without user intervention", () => {
+    const repaired = internallyRepairRazzmatazzStoryboard(
+      {
+        continuityBible: {
+          product: "The package opens during the reveal.",
+          characters: "A model presents the product.",
+          cast: { mode: "SINGLE_PERSON", members: [{}] },
+          visualWorld: "Soft bokeh.",
+        },
+        scenes: [
+          {
+            index: 1,
+            durationSec: 5,
+            captionText: "Taste the moment",
+            voiceoverText: "Taste the moment.",
+            shotPrompt:
+              "Tense pressure: a dreamy soft-focus strawberry ice cream scoop highlights real fruit texture against a creamy bokeh background while a fixed camera holds the composition.",
+            continuityNotes: "A hand keeps the package open.",
+            continuityMode: "CONTINUOUS" as const,
+            transitionStyle: "CUT" as const,
+          },
+        ],
+      },
+      [{ name: "Strawberry Ice Cream" }],
+    );
+
+    expect(
+      findShowcaseStoryboardViolations(
+        repaired,
+        [{ name: "Strawberry Ice Cream" }],
+        true,
+      ),
+    ).toEqual([]);
+    expect(repaired.continuityBible?.cast).toEqual({
+      mode: "NO_PEOPLE",
+      members: [],
+    });
+    expect(repaired.scenes[0]?.shotPrompt).toMatch(
+      /partial turn.*light streaks.*particle halo.*sole visual focus/i,
+    );
+    expect(
+      productShowcaseStoryboardSchema.safeParse({
+        title: "Five-second product spark",
+        script: "Taste the moment with one unmistakable product hero beat.",
+        bgm: {
+          enabled: true,
+          preset: "bold-kinetic",
+          prompt: "An immediate premium hit with a clean final accent.",
+        },
+        continuityBible: repaired.continuityBible,
+        scenes: repaired.scenes,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("does not confuse visual separation from the background with teardown", () => {
+    expect(
+      findShowcaseConceptViolations(
+        [
+          {
+            title: "Grounded pivot",
+            strategy:
+              "Use tonal separation from the background to strengthen the silhouette.",
+            narrativeArc:
+              "The bottle pivots as light streaks flare behind it and lands in a centered hero frame.",
+            motionPlan: razzmatazzPlan,
+          },
+        ],
+        [{ name: "Studio bottle" }],
+        true,
+      ),
+    ).toEqual([]);
   });
 });

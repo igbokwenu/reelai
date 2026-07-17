@@ -54,6 +54,8 @@ import {
   buildShowcaseMotionGuardrailBrief,
   findShowcaseConceptViolations,
   findShowcaseStoryboardViolations,
+  internallyRepairRazzmatazzConcepts,
+  internallyRepairRazzmatazzStoryboard,
 } from "@/lib/product-showcase/guardrails";
 import {
   normalizeShowcaseSceneCount,
@@ -91,6 +93,7 @@ export async function generateConceptsForProject(projectId: string) {
     throw new Error("Generate a Brand Kit before creative concepts.");
   }
   const sceneCountPreference = preferredSceneCount(project);
+  let razzmatazzRecovery: "NONE" | "MODEL" | "DETERMINISTIC" = "NONE";
 
   let result = await generateStructuredWithQwen({
     operation: "creative_director_concepts",
@@ -122,6 +125,7 @@ export async function generateConceptsForProject(projectId: string) {
       project.razzmatazzMode,
     );
     if (project.razzmatazzMode && motionViolations.length > 0) {
+      razzmatazzRecovery = "MODEL";
       const rejectedConcepts = result.data.concepts;
       result = await generateStructuredWithQwen({
         operation: "creative_director_razzmatazz_recovery",
@@ -149,6 +153,24 @@ export async function generateConceptsForProject(projectId: string) {
         project.products,
         true,
       );
+      if (motionViolations.length > 0) {
+        result = {
+          ...result,
+          data: {
+            ...result.data,
+            concepts: internallyRepairRazzmatazzConcepts(
+              result.data.concepts,
+              project.products,
+            ),
+          },
+        };
+        razzmatazzRecovery = "DETERMINISTIC";
+        motionViolations = findShowcaseConceptViolations(
+          result.data.concepts,
+          project.products,
+          true,
+        );
+      }
     }
     if (motionViolations.length > 0) {
       throw new Error(
@@ -253,6 +275,7 @@ export async function generateConceptsForProject(projectId: string) {
 
   return {
     concepts,
+    razzmatazzRecovery,
     model: result.model,
     providerRequestId: result.providerRequestId,
     elapsedMs: result.elapsedMs,
@@ -297,6 +320,7 @@ export async function regenerateConceptForProject({
     throw new Error("Concept not found");
   }
   const sceneCountPreference = preferredSceneCount(project, [adjustmentNote]);
+  let razzmatazzRecovery: "NONE" | "MODEL" | "DETERMINISTIC" = "NONE";
 
   let result = await generateStructuredWithQwen({
     operation: "creative_director_concept_regeneration",
@@ -332,6 +356,7 @@ export async function regenerateConceptForProject({
       project.razzmatazzMode,
     );
     if (project.razzmatazzMode && motionViolations.length > 0) {
+      razzmatazzRecovery = "MODEL";
       const rejectedConcept = result.data.concept;
       result = await generateStructuredWithQwen({
         operation: "creative_director_razzmatazz_concept_recovery",
@@ -364,6 +389,24 @@ export async function regenerateConceptForProject({
         project.products,
         true,
       );
+      if (motionViolations.length > 0) {
+        result = {
+          ...result,
+          data: {
+            ...result.data,
+            concept: internallyRepairRazzmatazzConcepts(
+              [result.data.concept],
+              project.products,
+            )[0]!,
+          },
+        };
+        razzmatazzRecovery = "DETERMINISTIC";
+        motionViolations = findShowcaseConceptViolations(
+          [result.data.concept],
+          project.products,
+          true,
+        );
+      }
     }
     if (motionViolations.length > 0) {
       throw new Error(
@@ -480,6 +523,7 @@ export async function regenerateConceptForProject({
 
   return {
     concept,
+    razzmatazzRecovery,
     invalidatedStoryboard: invalidatesStoryboard,
     model: result.model,
     providerRequestId: result.providerRequestId,
@@ -702,7 +746,11 @@ export async function generateStoryboardForProject(projectId: string) {
         )
       : [];
   const initialViolations = [
-    ...new Set([...preflightViolations, ...storyboardViolations]),
+    ...new Set([
+      ...preflightViolations,
+      ...storyboardViolations,
+      ...showcaseMotionViolations,
+    ]),
   ];
   let recoveryMethod: GroundingRecoverySummary["method"] =
     preflightViolations.length > 0 ? "PREFLIGHT_ADAPTATION" : null;
@@ -761,6 +809,21 @@ export async function generateStoryboardForProject(projectId: string) {
     storyboardViolations = findConceptGroundingViolations(
       [output],
       storyboardGrounding,
+    );
+  }
+
+  if (project.razzmatazzMode && showcaseMotionViolations.length > 0) {
+    output = internallyRepairRazzmatazzStoryboard(output, project.products);
+    validateStoryboardTiming(project, output, sceneCountPreference);
+    recoveryMethod = "SAFE_TEXT_FALLBACK";
+    storyboardViolations = findConceptGroundingViolations(
+      [output],
+      storyboardGrounding,
+    );
+    showcaseMotionViolations = findShowcaseStoryboardViolations(
+      output,
+      project.products,
+      true,
     );
   }
 
@@ -837,7 +900,8 @@ export function getCreativeGenerationError(error: unknown) {
       error.message,
     )
   ) {
-    return error.message;
+    console.warn(`[creative_quality_recovery_exhausted] ${error.message}`);
+    return "Reel AI couldn't finish the internal creative polish for this pass. Your existing work is unchanged; retry the stage to start a clean generation.";
   }
   if (
     error instanceof Error &&

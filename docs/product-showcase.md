@@ -80,6 +80,8 @@ During an active showcase run, the studio becomes a focused Auto production room
 
 Razzmatazz checks run at concept validation, storyboard validation and repair, manual storyboard save, production preflight, and final timing validation. Auto and step-by-step therefore cannot diverge or bypass the intact-product contract.
 
+Concept and storyboard compliance is an internal generation concern, not a user correction step. Reel AI first asks the creative model for a focused replacement when a candidate misses the Razzmatazz contract. If the replacement still misses a required phrase or introduces unsafe motion, a deterministic identity-safe repair normalizes people/separation settings, product motion, surrounding energy, hero framing, and the opening prompt before the result is saved. Generation-job metadata records whether model or deterministic recovery was used, while raw self-authored validation details stay out of the user-facing workflow.
+
 ## Local update
 
 The current implementation includes Prisma migrations for Product Showcase intake, scene transitions, and the concept motion plan, plus the official `@remotion/transitions` package. After pulling it into another checkout, run `pnpm install` only if dependencies are not already installed. Stop the current dev process, then run:
