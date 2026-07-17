@@ -1,0 +1,2 @@
+ALTER TABLE "Project"
+ADD COLUMN "razzmatazzMode" BOOLEAN NOT NULL DEFAULT false;

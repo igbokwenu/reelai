@@ -45,6 +45,18 @@ describe("buildVideoSubmissionBody", () => {
       parameters: { duration: 10, prompt_extend: false, audio: false },
     });
   });
+
+  it("uses a provider-compatible 5-second source for a 3-second mini edit", () => {
+    const request = buildVideoSubmissionBody({
+      model: "wan2.7-i2v",
+      prompt:
+        "Electric focus: the intact bottle turns while a fixed camera holds.",
+      imageUrl: "https://example.test/open.png",
+      durationSec: 3,
+    });
+
+    expect(request.parameters.duration).toBe(5);
+  });
 });
 
 describe("video submission retry policy", () => {

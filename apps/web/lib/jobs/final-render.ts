@@ -146,8 +146,10 @@ export async function createAndRunFinalRenderJob({
           : "TEXT_ONLY",
         showcaseFormat:
           projectAudioPolicy.outputMode === "PRODUCT_SHOWCASE" &&
-          projectAudioPolicy.videoLengthSec === 5
-            ? "SINGLE_CLIP_HERO_WITH_BRAND_CLOSER"
+          projectAudioPolicy.videoLengthSec <= 5
+            ? projectAudioPolicy.videoLengthSec === 3
+              ? "RAZZMATAZZ_3S_SINGLE_CLIP_WITH_BRAND_CLOSER"
+              : "SINGLE_CLIP_HERO_WITH_BRAND_CLOSER"
             : null,
         captionOverlaySceneCount: input.scenes.length > 0 ? 1 : 0,
         transitionStyles: input.scenes.map(

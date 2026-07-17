@@ -23,6 +23,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           select: {
             outputMode: true,
             videoLengthSec: true,
+            razzmatazzMode: true,
             products: { select: { name: true, details: true } },
           },
         },
@@ -80,6 +81,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         }),
         body.characterContinuity ?? storyboard.characterContinuity,
         storyboard.project.products,
+        storyboard.project.razzmatazzMode,
       );
       if (motionViolations.length > 0) {
         throw new PublicError(

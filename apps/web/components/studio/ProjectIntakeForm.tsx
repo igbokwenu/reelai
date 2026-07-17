@@ -7,6 +7,7 @@ import {
   Clapperboard,
   FileImage,
   ImagePlus,
+  Zap,
   Loader2,
   PackageOpen,
   Sparkles,
@@ -29,6 +30,7 @@ export function ProjectIntakeForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [outputMode, setOutputMode] = useState<OutputMode>("STANDARD");
+  const [razzmatazzMode, setRazzmatazzMode] = useState(false);
   const [product, setProduct] = useState<ProductDraft>({
     name: "",
     details: "",
@@ -63,8 +65,10 @@ export function ProjectIntakeForm() {
     const payload = {
       ...basePayload,
       outputMode,
-      videoLengthSec:
-        outputMode === "PRODUCT_SHOWCASE"
+      razzmatazzMode,
+      videoLengthSec: razzmatazzMode
+        ? 3
+        : outputMode === "PRODUCT_SHOWCASE"
           ? basePayload.showcaseLengthSec
           : basePayload.videoLengthSec,
       products:
@@ -166,7 +170,10 @@ export function ProjectIntakeForm() {
             description="A story-led short-form ad with flexible pacing and brand research."
             icon={Clapperboard}
             label="Brand reel"
-            onClick={() => setOutputMode("STANDARD")}
+            onClick={() => {
+              setOutputMode("STANDARD");
+              setRazzmatazzMode(false);
+            }}
           />
           <ModeCard
             active={outputMode === "PRODUCT_SHOWCASE"}
@@ -220,7 +227,13 @@ export function ProjectIntakeForm() {
       />
 
       {outputMode === "PRODUCT_SHOWCASE" ? (
-        <ProductShowcaseFields product={product} setProduct={setProduct} />
+        <>
+          <RazzmatazzToggle
+            enabled={razzmatazzMode}
+            onChange={setRazzmatazzMode}
+          />
+          <ProductShowcaseFields product={product} setProduct={setProduct} />
+        </>
       ) : null}
 
       <details className="group rounded-lg border border-border bg-background/40">
@@ -267,7 +280,7 @@ export function ProjectIntakeForm() {
                 ["THREE_D_ANIMATION", "3D animation"],
               ]}
             />
-            {outputMode === "PRODUCT_SHOWCASE" ? (
+            {outputMode === "PRODUCT_SHOWCASE" && !razzmatazzMode ? (
               <Select
                 key="product-showcase-length"
                 label="Showcase length"
@@ -279,7 +292,7 @@ export function ProjectIntakeForm() {
                 ]}
                 defaultValue="10"
               />
-            ) : (
+            ) : outputMode === "STANDARD" ? (
               <Select
                 key="standard-reel-length"
                 label="Video length"
@@ -292,6 +305,16 @@ export function ProjectIntakeForm() {
                 ]}
                 defaultValue="30"
               />
+            ) : (
+              <div className="grid gap-1.5 text-sm">
+                <span className="text-muted-foreground">Showcase length</span>
+                <div className="flex h-10 items-center justify-between rounded-md border border-primary/25 bg-primary/[0.07] px-3">
+                  <span className="font-medium text-primary">3 seconds</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary/75">
+                    Locked by Razzmatazz
+                  </span>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -325,6 +348,90 @@ export function ProjectIntakeForm() {
         </Button>
       </div>
     </form>
+  );
+}
+
+function RazzmatazzToggle({
+  enabled,
+  onChange,
+}: {
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+}) {
+  return (
+    <label
+      className={`group relative cursor-pointer overflow-hidden rounded-2xl border p-4 transition-all sm:p-5 ${
+        enabled
+          ? "border-fuchsia-300/35 bg-[radial-gradient(circle_at_12%_0%,rgba(236,72,153,0.2),transparent_38%),radial-gradient(circle_at_92%_110%,rgba(183,255,60,0.15),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.01))] shadow-[0_24px_70px_rgba(0,0,0,0.28)]"
+          : "border-border/80 bg-background/45 hover:border-fuchsia-300/25"
+      }`}
+    >
+      <span className="flex items-start justify-between gap-4">
+        <span className="flex min-w-0 gap-3.5">
+          <span
+            className={`flex size-11 shrink-0 items-center justify-center rounded-xl transition ${
+              enabled
+                ? "bg-gradient-to-br from-fuchsia-300 to-primary text-black shadow-lg shadow-fuchsia-500/15"
+                : "bg-muted text-muted-foreground"
+            }`}
+          >
+            <Zap className="size-5" aria-hidden="true" />
+          </span>
+          <span>
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold">Razzmatazz mode</span>
+              <span className="rounded-full border border-fuchsia-300/25 bg-fuchsia-300/[0.08] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-fuchsia-200">
+                3-second mini ad
+              </span>
+            </span>
+            <span className="mt-1.5 block max-w-2xl text-xs leading-5 text-muted-foreground">
+              One exhilarating hero shot: the intact product makes one bold,
+              identity-safe move while light, particles, and atmosphere build a
+              premium burst around it. A sharp tagline lands in the second half.
+            </span>
+            <span className="mt-3 flex flex-wrap gap-1.5 text-[10px] font-medium text-muted-foreground">
+              {[
+                "1 scene",
+                "3 seconds",
+                "No teardown",
+                "Product-centered",
+                "CTA included",
+              ].map((item) => (
+                <span
+                  className="rounded-full border border-white/10 bg-black/15 px-2 py-1"
+                  key={item}
+                >
+                  {item}
+                </span>
+              ))}
+            </span>
+          </span>
+        </span>
+        <span className="relative mt-1 shrink-0">
+          <input
+            aria-label="Enable Razzmatazz mode"
+            checked={enabled}
+            className="peer absolute inset-0 z-10 size-full cursor-pointer opacity-0"
+            onChange={(event) => onChange(event.target.checked)}
+            type="checkbox"
+          />
+          <span className="pointer-events-none block h-7 w-12 rounded-full bg-muted ring-1 ring-border transition-colors peer-checked:bg-gradient-to-r peer-checked:from-fuchsia-400 peer-checked:to-primary" />
+          <span className="pointer-events-none absolute left-1 top-1 size-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 peer-checked:bg-black" />
+        </span>
+      </span>
+      {enabled ? (
+        <span className="mt-4 grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
+          <span className="text-[10px] font-semibold text-fuchsia-200">
+            0:00
+          </span>
+          <span className="relative h-1.5 overflow-hidden rounded-full bg-white/10">
+            <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-fuchsia-400 to-primary" />
+            <span className="absolute left-1/2 top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-4 ring-white/10" />
+          </span>
+          <span className="text-[10px] font-semibold text-primary">0:03</span>
+        </span>
+      ) : null}
+    </label>
   );
 }
 

@@ -37,6 +37,7 @@ export async function POST(request: Request) {
           videoLengthSec: input.videoLengthSec,
           style: input.style,
           outputMode: input.outputMode,
+          razzmatazzMode: input.razzmatazzMode,
           products:
             input.outputMode === "PRODUCT_SHOWCASE"
               ? {

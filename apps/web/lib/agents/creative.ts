@@ -119,6 +119,7 @@ export async function generateConceptsForProject(projectId: string) {
     const motionViolations = findShowcaseConceptViolations(
       result.data.concepts,
       project.products,
+      project.razzmatazzMode,
     );
     if (motionViolations.length > 0) {
       throw new Error(
@@ -299,6 +300,7 @@ export async function regenerateConceptForProject({
     const motionViolations = findShowcaseConceptViolations(
       [result.data.concept],
       project.products,
+      project.razzmatazzMode,
     );
     if (motionViolations.length > 0) {
       throw new Error(
@@ -630,7 +632,11 @@ export async function generateStoryboardForProject(projectId: string) {
   );
   let showcaseMotionViolations =
     project.outputMode === "PRODUCT_SHOWCASE"
-      ? findShowcaseStoryboardViolations(output, project.products)
+      ? findShowcaseStoryboardViolations(
+          output,
+          project.products,
+          project.razzmatazzMode,
+        )
       : [];
   const initialViolations = [
     ...new Set([...preflightViolations, ...storyboardViolations]),
@@ -678,7 +684,11 @@ export async function generateStoryboardForProject(projectId: string) {
     );
     showcaseMotionViolations =
       project.outputMode === "PRODUCT_SHOWCASE"
-        ? findShowcaseStoryboardViolations(output, project.products)
+        ? findShowcaseStoryboardViolations(
+            output,
+            project.products,
+            project.razzmatazzMode,
+          )
         : [];
   }
 
@@ -1361,6 +1371,7 @@ Offer: ${project.offer?.trim() || "Not specified"}
 User direction: ${userDirection || "Not specified"}
 Video target: ${project.videoLengthSec}s, ${project.style}
 Output mode: ${project.outputMode}
+Showcase format: ${project.razzmatazzMode ? "RAZZMATAZZ_MINI (fixed 3 seconds, one intact-product scene)" : "STANDARD_LENGTH"}
 Creative intensity: ${project.cinematicBoost ? "CINEMATIC_BOOST" : "BALANCED"}
 ${buildProductContext(project)}
 
@@ -1377,7 +1388,7 @@ Visual motifs: ${JSON.stringify(safeVisualMotifs(brandKit?.visualMotifs, groundi
 Verified website evidence:
 ${websiteEvidence || "No clean website text was retained. Do not infer additional service or product details."}
 
-${project.outputMode === "PRODUCT_SHOWCASE" ? buildShowcaseMotionGuardrailBrief(project.products) : ""}
+${project.outputMode === "PRODUCT_SHOWCASE" ? buildShowcaseMotionGuardrailBrief(project.products, project.razzmatazzMode) : ""}
 
 Requirements:
 - Return exactly three concepts.
@@ -1396,6 +1407,7 @@ Requirements:
 - Plan transitions as editorial punctuation, never decoration. A true compositional match uses a clean cut; gentle continuity may use a short fade; directional movement or packaging reveals may use a slide or wipe; circular hero forms, food plating, lenses, cosmetics, and centered reveals may justify an iris or clock wipe. Use no effect when the cut is stronger.
 - ${buildCinematicBoostInstruction(project.cinematicBoost)}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "End with a concise, source-safe caption and spoken call to action that fits naturally inside the requested duration." : "Resolve with a clear, source-safe audience action."}
+- ${project.razzmatazzMode ? "Design every direction as a premium split-second commercial bumper: motion starts on frame one, one surrounding effect peaks quickly, and the intact product settles as the undisputed hero. Keep the tagline/CTA to roughly 2-6 punchy words and the spoken line to at most 7 words." : "Match the creative density to the selected duration."}
 - Preview prompts must describe the exact 9:16 opening frame of Scene 1, suitable for ${QWEN_PREVIEW_IMAGE_MODEL}; this frame is a production input, not a mood-board thumbnail.
 - When a product image is supplied, the opening frame must visibly preserve that exact product identity and must never request a generic substitute.
 - Use the brand palette colors and visual motifs in your visual direction.
@@ -1439,6 +1451,7 @@ Offer: ${project.offer?.trim() || "Not specified"}
 User direction: ${userDirection || "Not specified"}
 Video target: ${project.videoLengthSec}s, ${project.style}
 Output mode: ${project.outputMode}
+Showcase format: ${project.razzmatazzMode ? "RAZZMATAZZ_MINI (fixed 3 seconds, one intact-product scene)" : "STANDARD_LENGTH"}
 Creative intensity: ${project.cinematicBoost ? "CINEMATIC_BOOST" : "BALANCED"}
 ${buildProductContext(project)}
 
@@ -1455,7 +1468,7 @@ Visual motifs: ${JSON.stringify(safeVisualMotifs(brandKit?.visualMotifs, groundi
 Verified website evidence:
 ${websiteEvidence || "No clean website text was retained. Do not infer additional service or product details."}
 
-${project.outputMode === "PRODUCT_SHOWCASE" ? buildShowcaseMotionGuardrailBrief(project.products) : ""}
+${project.outputMode === "PRODUCT_SHOWCASE" ? buildShowcaseMotionGuardrailBrief(project.products, project.razzmatazzMode) : ""}
 
 Concept being replaced:
 ${JSON.stringify({
@@ -1489,6 +1502,7 @@ Requirements:
   )}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Keep the uploaded product as the unmistakable hero. Use one hero product and one hero action per shot; secondary products stay static or appear sequentially. Reject morphing, melting, crowded transformations, and ungrounded product variants." : "Keep the execution grounded and visually legible."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Return a complete motionPlan with one heroAction, optional restrained supportingMotion, one cameraBehavior, NO_PERSON or ONE_PERSON, an evidence-based separationTreatment, and a concise safetyRationale." : "Keep the replacement feasible for the downstream storyboard."}
+- ${project.razzmatazzMode ? "Razzmatazz requires motionPlan.humanPresence NO_PERSON and separationTreatment AVOID. Use one bold intact-product motion plus at most one surrounding background-energy effect, then land on a clean hero hold with a 2-6 word tagline/CTA." : "Preserve the selected format's motion policy."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Choose motion from the product's real material and use cues rather than defaulting to a generic spin: use verified garnish/temperature behavior for food, fluid or texture control for beauty, fabric response for fashion, precision parallax/light for rigid goods, and simple use-result motion for home or craft products. One restrained supporting material behavior may accompany the hero action." : "Use domain-specific action, physical metaphor, and lighting rather than a generic montage."}
 - Plan only purposeful scene transitions: clean cut for match cuts; short fade for gentle continuity; slide or wipe for directional movement; iris or clock wipe only when circular geometry or a centered hero reveal motivates it.
 - ${buildCinematicBoostInstruction(project.cinematicBoost)}
@@ -1565,6 +1579,24 @@ function buildSceneCountInstruction(
   stage: "CONCEPT" | "STORYBOARD",
   resolvedCount = preferredSceneCount(project),
 ) {
+  if (
+    project.outputMode === "PRODUCT_SHOWCASE" &&
+    project.videoLengthSec === 3
+  ) {
+    return stage === "CONCEPT"
+      ? "This is Razzmatazz mode: every concept must estimate exactly one scene and exactly 3 seconds. Plan one uninterrupted, product-centered visual burst with immediate motion, one surrounding background-energy effect, no person, no product separation or transformation, and a 2-6 word tagline/CTA."
+      : "This is Razzmatazz mode: create exactly one 3-second scene with CUT. Begin the intact product motion on frame one, peak one surrounding background effect quickly, and settle on a clean hero hold for the composited 2-6 word tagline/CTA. Use NO_PEOPLE, no teardown, no separation, no morphing, and no separate intro, outro, or end card.";
+  }
+
+  if (
+    project.outputMode === "PRODUCT_SHOWCASE" &&
+    project.videoLengthSec === 5
+  ) {
+    return stage === "CONCEPT"
+      ? "This is a 5-second Product Showcase: every concept must use exactly one continuous hero shot and estimate exactly one scene. The single clip needs an immediate first-frame product hook, one signature category-native action, and a concise spoken/caption CTA; do not plan a separate intro, transition, or end card. Reel AI composites the verified logo over this clip."
+      : "This 5-second showcase must contain exactly one 5-second scene, producing exactly one video clip. It must open on the hero product in action from frame one, deliver one bold category-native visual idea, and carry the concise final CTA plus verified logo overlay in that same shot. Use CUT for transitionStyle; do not create a separate intro, outro, end card, or transition.";
+  }
+
   if (resolvedCount !== null) {
     const unit = resolvedCount === 1 ? "scene" : "scenes";
     if (stage === "CONCEPT") {
@@ -1577,12 +1609,6 @@ function buildSceneCountInstruction(
     return stage === "CONCEPT"
       ? "Keep estimated scenes between 2 and 4 and duration between 15 and 30 seconds."
       : "Use 2 to 4 scenes total.";
-  }
-
-  if (project.videoLengthSec === 5) {
-    return stage === "CONCEPT"
-      ? "This is a 5-second Product Showcase: every concept must use exactly one continuous hero shot and estimate exactly one scene. The single clip needs an immediate first-frame product hook, one signature category-native action, and a concise spoken/caption CTA; do not plan a separate intro, transition, or end card. Reel AI composites the verified logo over this clip."
-      : "This 5-second showcase must contain exactly one 5-second scene, producing exactly one video clip. It must open on the hero product in action from frame one, deliver one bold category-native visual idea, and carry the concise final CTA plus verified logo overlay in that same shot. Use CUT for transitionStyle; do not create a separate intro, outro, end card, or transition.";
   }
 
   return stage === "CONCEPT"
@@ -1668,6 +1694,7 @@ Offer: ${project.offer?.trim() || "Not specified"}
 Target length: ${project.videoLengthSec}s
 Style: ${project.style}
 Output mode: ${project.outputMode}
+Showcase format: ${project.razzmatazzMode ? "RAZZMATAZZ_MINI (fixed 3 seconds, one intact-product scene)" : "STANDARD_LENGTH"}
 Creative intensity: ${project.cinematicBoost ? "CINEMATIC_BOOST" : "BALANCED"}
 ${buildProductContext(project)}
 
@@ -1703,20 +1730,21 @@ ${buildGroundingRecoveryInstructions(preflightViolations, grounding)}
     : ""
 }
 
-${project.outputMode === "PRODUCT_SHOWCASE" ? buildShowcaseMotionGuardrailBrief(project.products) : ""}
+${project.outputMode === "PRODUCT_SHOWCASE" ? buildShowcaseMotionGuardrailBrief(project.products, project.razzmatazzMode) : ""}
 
 Requirements:
 - ${buildSceneCountInstruction(project, "STORYBOARD", concept.estimatedScenes)}
-- ${project.outputMode === "PRODUCT_SHOWCASE" ? "Total duration must exactly match the requested 5 to 15 seconds, with every scene lasting 5 to 10 seconds." : "Total duration must be 15 to 30 seconds, with every scene lasting 5 to 10 seconds. Prefer 5 to 8 seconds; use 9 to 10 only for exceptionally simple motion."}
+- ${project.razzmatazzMode ? "Total duration must be exactly 3 seconds in exactly one scene. The provider may generate a longer source clip for model compatibility, but Reel AI trims the final composition to the exact 3-second editorial window." : project.outputMode === "PRODUCT_SHOWCASE" ? "Total duration must exactly match the requested 5 to 15 seconds, with every scene lasting 5 to 10 seconds." : "Total duration must be 15 to 30 seconds, with every scene lasting 5 to 10 seconds. Prefer 5 to 8 seconds; use 9 to 10 only for exceptionally simple motion."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Treat the actual uploaded product photography as the source of truth for silhouette, materials, colors, proportions, surface details, packaging, and visible ingredients. The generated scene may stylize the world but must not redesign the product." : "Preserve recurring product identity whenever a product is present."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Assign exactly one hero product and one primary action to each shot. For multiple products, use sequential hero shots or a static collection composition; never ask multiple products to assemble, transform, collide, or cross paths together." : "Keep the motion hierarchy deliberately simple."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Honor the selected motionPlan's separationTreatment. FOOD_LAYER_SEPARATION is only for clearly layered food with verified visible ingredients. VISIBLE_COMPONENT_SEPARATION is only for a few large, externally visible, reference-backed modular pieces. Electronics, screens, fabrics, garments, and uncertain products must use AVOID—never show internals, exploded views, disassembly, unraveling, or reassembly." : "Avoid physically ambiguous transformations."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Choose a category-native product performance rather than a generic spin: food/drink may use supported garnish, condensation, steam, pouring, crumbs, or temperature contrast; beauty may use one droplet, texture ribbon, cap reveal, or light sweep; fashion may use fabric response, one silhouette turn, or one step; rigid goods/electronics may use a brief precision rotation, parallax, surface light, or functional reveal; home/craft objects may use material detail and one use-result. A simple supporting material behavior may accompany the hero action when it is grounded—for example a brief ice-cream rotation with verified toppings falling in one clean arc." : "Derive each scene's visual device from the offer's real behavior."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "For clothing or wearable products, a model may wear the exact referenced item, but use one simple pose, step, turn, or fabric movement and no outfit transformation. For apps/websites, only depict supplied interface references; otherwise showcase a physical device silhouette with the screen reserved for compositing or show the real-world outcome." : "Match the execution lane to available references."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "The final scene's caption and voiceover must include one concise, brand-appropriate call to action. Keep it source-safe and inside the scene's spoken-word budget; do not add pricing, availability, or guarantees without evidence." : "Keep the final audience action clear and source-safe."}
+- ${project.razzmatazzMode ? "For this split-second bumper, captionText must be a premium 2-6 word tagline or CTA and voiceoverText must contain at most 7 words. Make both instantly comprehensible; do not repeat a long sentence in both channels." : "Keep copy proportionate to the available screen and narration time."}
 - The storyboard must clearly execute the selected concept's strategy, narrative arc, and visual style.
 - Do not drift into a different concept, a generic ad, or a list of disconnected scenes.
-- Write voiceover for natural spoken timing, not just the 600-character API ceiling: target at most 2.5 words per second of scene duration (about 12 words for 5 seconds, 15 for 6, 20 for 8, or 25 for 10). Keep each line self-contained inside its scene; never let a sentence depend on audio continuing into the next scene.
+- Write voiceover for natural spoken timing, not just the 600-character API ceiling: target at most 2.5 words per second of scene duration (at most 7 words for 3 seconds, about 12 words for 5 seconds, 15 for 6, 20 for 8, or 25 for 10). Keep each line self-contained inside its scene; never let a sentence depend on audio continuing into the next scene.
 - script is the unified narration plan and must never be empty. If the concept does not need separate copy, join the scene voiceoverText lines in scene order.
 - Each scene needs a caption, a concise voiceover, one shotPrompt, and engine-only continuity metadata.
 - Build a continuityBible before the scenes. Separately lock recurring product attributes, a structured cast plan, and the shared visual world. If a category is absent, explicitly say so rather than inventing a product or token people.

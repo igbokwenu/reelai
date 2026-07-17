@@ -47,6 +47,9 @@ export function SceneInspector({
   onRegenerateAnchor,
   isRegeneratingAnchor,
   canRegenerateAnchor,
+  durationMin = 5,
+  durationMax = 10,
+  durationLocked = false,
 }: {
   scene: EditableScene | null;
   isLastScene: boolean;
@@ -54,6 +57,9 @@ export function SceneInspector({
   onRegenerateAnchor: (sceneId: string) => Promise<void>;
   isRegeneratingAnchor: boolean;
   canRegenerateAnchor: boolean;
+  durationMin?: number;
+  durationMax?: number;
+  durationLocked?: boolean;
 }) {
   if (!scene) {
     return (
@@ -106,8 +112,9 @@ export function SceneInspector({
               <input
                 aria-label="Scene duration in seconds"
                 className="w-10 bg-transparent text-right text-sm font-semibold outline-none"
-                max={10}
-                min={5}
+                disabled={durationLocked}
+                max={durationMax}
+                min={durationMin}
                 type="number"
                 value={scene.durationSec}
                 onChange={(event) =>
@@ -118,6 +125,11 @@ export function SceneInspector({
                 }
               />
               <span className="text-xs text-muted-foreground">sec</span>
+              {durationLocked ? (
+                <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-primary">
+                  Mini
+                </span>
+              ) : null}
             </label>
           </div>
         </div>

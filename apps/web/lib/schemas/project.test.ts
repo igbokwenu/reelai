@@ -72,6 +72,34 @@ describe("URL-first project intake", () => {
     });
   });
 
+  it("accepts Razzmatazz only as a fixed 3-second Product Showcase", () => {
+    const input = createProjectSchema.parse({
+      outputMode: "PRODUCT_SHOWCASE",
+      razzmatazzMode: true,
+      videoLengthSec: 3,
+      products: [{ name: "Studio Lamp", imageCount: 1 }],
+    });
+
+    expect(input.razzmatazzMode).toBe(true);
+    expect(input.videoLengthSec).toBe(3);
+    expect(
+      createProjectSchema.safeParse({
+        outputMode: "PRODUCT_SHOWCASE",
+        razzmatazzMode: true,
+        videoLengthSec: 5,
+        products: [{ name: "Studio Lamp", imageCount: 1 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      createProjectSchema.safeParse({
+        websiteUrl: "https://example.com",
+        outputMode: "STANDARD",
+        razzmatazzMode: true,
+        videoLengthSec: 3,
+      }).success,
+    ).toBe(false);
+  });
+
   it("requires exactly one product with exactly one image", () => {
     const base = {
       name: "Collection",

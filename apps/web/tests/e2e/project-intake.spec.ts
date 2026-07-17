@@ -149,7 +149,7 @@ test("persists Cinematic Boost in project settings", async ({ request }) => {
   expect(reloadedPayload.project.cinematicBoost).toBe(true);
 });
 
-test("creates a product showcase with a required product image", async ({
+test("creates a Razzmatazz product showcase with a required product image", async ({
   page,
 }) => {
   const projectName = `${E2E_PROJECT_PREFIX} Product showcase ${Date.now()}`;
@@ -169,6 +169,8 @@ test("creates a product showcase with a required product image", async ({
 
   await page.goto("/");
   await page.getByRole("button", { name: /Product showcase/ }).click();
+  await page.getByLabel("Enable Razzmatazz mode").check();
+  await expect(page.getByText("Locked by Razzmatazz")).toBeVisible();
   await page.getByLabel("Product 1 name").fill("Midnight Burger");
   await page
     .getByLabel("Product 1 details")
@@ -193,12 +195,11 @@ test("creates a product showcase with a required product image", async ({
     page.getByRole("heading", { level: 1, name: projectName }),
   ).toBeVisible();
   await expect(
-    page.getByText("Identity-locked product direction"),
+    page.getByText("Three seconds. One unforgettable hero moment."),
   ).toBeVisible();
   await expect(
     page.getByText("Midnight Burger", { exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByText("Product Showcase", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("Razzmatazz", { exact: true })).toBeVisible();
+  await expect(page.getByText("1 scene · 3 seconds")).toBeVisible();
 });

@@ -57,8 +57,11 @@ export const createProjectSchema = z
       .preprocess((value) => value === true || value === "true", z.boolean())
       .default(false),
     outputMode: z.enum(["STANDARD", "PRODUCT_SHOWCASE"]).default("STANDARD"),
+    razzmatazzMode: z
+      .preprocess((value) => value === true || value === "true", z.boolean())
+      .default(false),
     products: z.array(projectProductSchema).max(1).default([]),
-    videoLengthSec: z.coerce.number().int().min(5).max(60).default(30),
+    videoLengthSec: z.coerce.number().int().min(3).max(60).default(30),
     style: z.enum(["REALISTIC", "THREE_D_ANIMATION"]).default("REALISTIC"),
   })
   .superRefine((input, context) => {
@@ -70,13 +73,28 @@ export const createProjectSchema = z
           path: ["products"],
         });
       }
-      if (input.videoLengthSec > 15) {
+      if (input.razzmatazzMode && input.videoLengthSec !== 3) {
+        context.addIssue({
+          code: "custom",
+          message: "Razzmatazz mode is a fixed 3-second format.",
+          path: ["videoLengthSec"],
+        });
+      } else if (
+        !input.razzmatazzMode &&
+        (input.videoLengthSec < 5 || input.videoLengthSec > 15)
+      ) {
         context.addIssue({
           code: "custom",
           message: "Product Showcase videos must be 5 to 15 seconds.",
           path: ["videoLengthSec"],
         });
       }
+    } else if (input.razzmatazzMode) {
+      context.addIssue({
+        code: "custom",
+        message: "Razzmatazz mode is available only for Product Showcase.",
+        path: ["razzmatazzMode"],
+      });
     } else if (input.videoLengthSec < 15) {
       context.addIssue({
         code: "custom",

@@ -1,4 +1,4 @@
-import { ArrowLeft, Boxes, ChevronDown, Film, Globe2 } from "lucide-react";
+import { ArrowLeft, Boxes, ChevronDown, Film, Globe2, Zap } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -159,7 +159,14 @@ export default async function ProjectPage({ params }: PageProps) {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Metric label="Style" value={formatEnum(project.style)} />
-                <Metric label="Mode" value={formatEnum(project.outputMode)} />
+                <Metric
+                  label="Mode"
+                  value={
+                    project.razzmatazzMode
+                      ? "Razzmatazz"
+                      : formatEnum(project.outputMode)
+                  }
+                />
                 <Metric label="Length" value={`${project.videoLengthSec}s`} />
                 <Metric
                   label="Sources"
@@ -176,15 +183,32 @@ export default async function ProjectPage({ params }: PageProps) {
               <section className="mt-4 overflow-hidden rounded-2xl border border-primary/20 bg-[radial-gradient(circle_at_top_right,rgba(183,255,60,0.09),transparent_35%),rgba(18,21,18,0.72)] p-4 sm:p-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-                      Product showcase
+                    <p
+                      className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${project.razzmatazzMode ? "text-fuchsia-200" : "text-primary"}`}
+                    >
+                      {project.razzmatazzMode ? (
+                        <Zap className="size-3" aria-hidden="true" />
+                      ) : null}
+                      {project.razzmatazzMode
+                        ? "Razzmatazz mini ad"
+                        : "Product showcase"}
                     </p>
                     <h2 className="mt-1 text-lg font-semibold">
-                      Identity-locked product direction
+                      {project.razzmatazzMode
+                        ? "Three seconds. One unforgettable hero moment."
+                        : "Identity-locked product direction"}
                     </h2>
                     <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
                       Your uploaded product photography is the source of truth.
-                      {project.videoLengthSec === 5 ? (
+                      {project.razzmatazzMode ? (
+                        <>
+                          {" "}
+                          Reel AI will build one exhilarating, uninterrupted
+                          shot around the intact product—no teardown, no
+                          morphing, and no people—then land a concise tagline
+                          and verified brand lockup in the second half.
+                        </>
+                      ) : project.videoLengthSec === 5 ? (
                         <>
                           {" "}
                           This five-second format is one continuous hero clip:
@@ -202,9 +226,12 @@ export default async function ProjectPage({ params }: PageProps) {
                       )}
                     </p>
                   </div>
-                  <span className="w-fit rounded-full border border-primary/20 bg-primary/[0.07] px-3 py-1.5 text-xs font-medium text-primary">
-                    {project.products.length} product
-                    {project.products.length === 1 ? "" : "s"}
+                  <span
+                    className={`w-fit rounded-full border px-3 py-1.5 text-xs font-medium ${project.razzmatazzMode ? "border-fuchsia-300/25 bg-fuchsia-300/[0.08] text-fuchsia-200" : "border-primary/20 bg-primary/[0.07] text-primary"}`}
+                  >
+                    {project.razzmatazzMode
+                      ? "1 scene · 3 seconds"
+                      : `${project.products.length} product${project.products.length === 1 ? "" : "s"}`}
                   </span>
                 </div>
                 <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">

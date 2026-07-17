@@ -684,6 +684,19 @@ export function StoryboardTimeline({
               }
               isRegeneratingAnchor={regeneratingSceneId === selectedScene?.id}
               onRegenerateAnchor={regenerateSceneAnchor}
+              durationLocked={
+                outputMode === "PRODUCT_SHOWCASE" && targetDurationSec === 3
+              }
+              durationMax={
+                outputMode === "PRODUCT_SHOWCASE" && targetDurationSec === 3
+                  ? 3
+                  : 10
+              }
+              durationMin={
+                outputMode === "PRODUCT_SHOWCASE" && targetDurationSec === 3
+                  ? 3
+                  : 5
+              }
               scene={selectedScene}
               onChange={updateScene}
             />

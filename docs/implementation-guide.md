@@ -17,8 +17,9 @@ Build only this before stretch work:
 - No committed secrets. `.env` must stay ignored.
 - QwenCloud client code visibly includes `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`.
 - User can create a project from a website URL plus optional uploads.
-- User can choose Product Showcase, which requires exactly one product and one product image and creates a 5–15 second realistic or 3D showcase from three proposed creative directions. Both output modes support one optional logo and one project website; Brand Reel also keeps its one product-image slot optional.
+- User can choose Product Showcase, which requires exactly one product and one product image and creates a 5–15 second realistic or 3D showcase from three proposed creative directions. Its optional persisted Razzmatazz toggle instead fixes the output to one 3-second intact-product hero scene with no people, no separation, one surrounding background-energy effect, and a short CTA. Both output modes support one optional logo and one project website; Brand Reel also keeps its one product-image slot optional.
 - Each Product Showcase direction stores a structured `showcaseMotionPlan` and presents it in the concept UI: one hero action, optional supporting motion, one safe camera behavior, no person or one person total, an evidence-based separation treatment, and a feasibility rationale. Storyboard generation, manual saves, and production enforce the same one-person, simple-screen, and category-aware teardown rules so Auto mode and step-by-step mode cannot diverge.
+- Razzmatazz overrides the normal Product Showcase feasibility range: exactly one 3-second scene, `NO_PERSON`, `AVOID` separation, at most 7 narration words, and a 2–6 word final tagline/CTA. Wan may generate a 5-second minimum source, but Remotion must export exactly 90 frames at 30 fps.
 - App generates a Brand Kit.
 - App generates exactly three creative concepts with one preview frame each.
 - User selects one concept.
@@ -192,6 +193,10 @@ model Project {
   offer           String?
   videoLengthSec  Int      @default(30)
   style           VideoStyle
+  outputMode      VideoOutputMode @default(STANDARD)
+  razzmatazzMode  Boolean  @default(false)
+  autoMode        Boolean  @default(true)
+  cinematicBoost  Boolean  @default(false)
   status          ProjectStatus @default(DRAFT)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -249,6 +254,7 @@ model CreativeConcept {
   estimatedDuration  Int
   previewPrompt      String
   previewArtifactId  String?
+  showcaseMotionPlan Json?
   selected           Boolean @default(false)
   rationale          String
   createdAt          DateTime @default(now())

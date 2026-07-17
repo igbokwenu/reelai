@@ -41,7 +41,10 @@ type ProductionScene = Scene & {
     | "productContinuity"
     | "characterContinuity"
     | "visualContinuity"
-  > & { outputMode: "STANDARD" | "PRODUCT_SHOWCASE" };
+  > & {
+    outputMode: "STANDARD" | "PRODUCT_SHOWCASE";
+    razzmatazzMode: boolean;
+  };
 };
 const ACTIVE_PRODUCTION_JOB_STATUSES = [
   "QUEUED",
@@ -977,6 +980,7 @@ async function getProductionScenes(projectId: string) {
         select: {
           outputMode: true,
           videoLengthSec: true,
+          razzmatazzMode: true,
           products: { select: { name: true, details: true } },
         },
       },
@@ -1011,6 +1015,7 @@ async function getProductionScenes(projectId: string) {
       storyboard.scenes,
       storyboard.characterContinuity,
       storyboard.project.products,
+      storyboard.project.razzmatazzMode,
     );
     if (motionViolations.length > 0) {
       throw new PublicError(
@@ -1029,6 +1034,7 @@ async function getProductionScenes(projectId: string) {
       characterContinuity: storyboard.characterContinuity,
       visualContinuity: storyboard.visualContinuity,
       outputMode: storyboard.project.outputMode,
+      razzmatazzMode: storyboard.project.razzmatazzMode,
     },
   }));
 }
@@ -1133,6 +1139,7 @@ Cast identity rule: treat every role in the cast ledger as a separate person. Pr
 ${previousScene ? `Prior shot context for the handoff: ${previousScene.shotPrompt}` : "This is the story's establishing anchor and immediate hook."}
 ${scene.continuityMode === "INTENTIONAL_CHANGE" ? "Honor only the explicitly planned change; preserve every other locked identity and style attribute." : "Use supplied prior-scene imagery only to preserve identity, lighting, spatial logic, and screen direction; compose a distinct next shot rather than copying it."}
 ${scene.storyboard.outputMode === "PRODUCT_SHOWCASE" ? "PRODUCT SHOWCASE LOCK: the uploaded product references outrank all inferred styling. Preserve exact product silhouette, proportions, materials, colors, packaging, surface details, and visible ingredients. Compose one hero product and one clearly readable action only; secondary products remain static or absent. If a human is planned, show that single person only—no crowds, second model, background people, or extra hands. Keep screens to one readable state or one simple interaction. No melting, morphing, spawning, invented internals, exploded views, fabric/electronic teardown, crowded assembly, or simultaneous transformations." : ""}
+${scene.storyboard.razzmatazzMode ? "RAZZMATAZZ LOCK: the intact product is the only subject and already fills the visual hierarchy. Use no person, detached hand, opened package, separated component, or product transformation. Reserve clean negative space for the renderer's brief tagline while surrounding light, particles, reflections, or atmosphere imply immediate premium energy." : ""}
 Vertical 9:16, clean silhouette, stable anatomy and product geometry, commercial polish, no readable text or logos.`;
 }
 

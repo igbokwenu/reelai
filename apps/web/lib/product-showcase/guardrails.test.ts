@@ -120,4 +120,57 @@ describe("Product Showcase motion guardrails", () => {
     expect(brief).toContain("FABRIC_OR_WEARABLE");
     expect(brief).toContain("Set separationTreatment to AVOID");
   });
+
+  it("locks Razzmatazz to an intact product with no people", () => {
+    expect(
+      findShowcaseConceptViolations(
+        [{ title: "Flash hero", motionPlan: safePlan }],
+        [{ name: "Studio bottle" }],
+        true,
+      ),
+    ).toEqual([]);
+
+    const violations = findShowcaseConceptViolations(
+      [
+        {
+          title: "Too busy",
+          motionPlan: {
+            ...safePlan,
+            humanPresence: "ONE_PERSON",
+            separationTreatment: "VISIBLE_COMPONENT_SEPARATION",
+          },
+        },
+      ],
+      [{ name: "Modular lamp", details: "large visible modular pieces" }],
+      true,
+    );
+    expect(violations.join(" ")).toMatch(/sole subject/i);
+    expect(violations.join(" ")).toMatch(/intact|separation/i);
+    expect(
+      buildShowcaseMotionGuardrailBrief([{ name: "Studio bottle" }], true),
+    ).toContain("RAZZMATAZZ MODE IS ACTIVE");
+  });
+
+  it("rejects people and package changes in a manually edited Razzmatazz shot", () => {
+    const violations = findShowcaseStoryboardViolations(
+      {
+        continuityBible: {
+          characters: "A single model holds the product.",
+          cast: { mode: "SINGLE_PERSON", members: [{}] },
+        },
+        scenes: [
+          {
+            index: 1,
+            shotPrompt:
+              "Electric reveal: one hand lifts the cap while a fixed camera holds the bottle against a bright particle burst.",
+          },
+        ],
+      },
+      [{ name: "Studio bottle" }],
+      true,
+    );
+
+    expect(violations.join(" ")).toMatch(/person|hands/i);
+    expect(violations.join(" ")).toMatch(/opens|intact|transform/i);
+  });
 });

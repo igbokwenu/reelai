@@ -709,6 +709,52 @@ describe("Phase 4 agent schemas", () => {
     });
   });
 
+  it("repairs a Razzmatazz storyboard into one exact 3-second hero burst", () => {
+    const parsed = parseStoryboardOutput(
+      {
+        title: "Three second product spark",
+        script: "Own the moment with one unmistakable product hero beat.",
+        bgm: {
+          enabled: true,
+          preset: "bold-kinetic",
+          prompt: "An immediate premium hit with a clean final accent.",
+        },
+        continuityBible: {
+          product:
+            "Preserve the exact bottle silhouette, label, finish, colors, and proportions.",
+          characters:
+            "No people appear; the intact supplied product is the only subject.",
+          cast: { mode: "NO_PEOPLE", members: [] },
+          visualWorld:
+            "Electric magenta and pearl light surround a deep studio background.",
+        },
+        scenes: [
+          {
+            index: 1,
+            durationSec: 5,
+            captionText: "Own the moment",
+            voiceoverText: "Own the moment with Northstar.",
+            shotPrompt:
+              "Electric confidence: the intact bottle makes one precise turn as a fixed camera holds while magenta light streaks flare behind it.",
+            continuityNotes:
+              "Keep the exact intact bottle, centered scale, label, pearl edge light, and clean CTA space.",
+            continuityMode: "CONTINUOUS",
+            transitionStyle: "CUT",
+          },
+        ],
+      },
+      "PRODUCT_SHOWCASE",
+      3,
+      1,
+    );
+
+    expect(parsed.scenes).toHaveLength(1);
+    expect(parsed.scenes[0]?.durationSec).toBe(3);
+    expect(
+      parsed.scenes[0]?.voiceoverText.split(/\s+/).filter(Boolean).length,
+    ).toBeLessThanOrEqual(7);
+  });
+
   it.each([
     {
       label: "caption",

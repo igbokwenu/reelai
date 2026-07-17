@@ -16,6 +16,7 @@ model Project {
   videoLengthSec      Int             @default(30)
   style               VideoStyle
   outputMode          VideoOutputMode @default(STANDARD)
+  razzmatazzMode      Boolean         @default(false)
   status              ProjectStatus   @default(DRAFT)
   autoMode            Boolean         @default(true)
   cinematicBoost      Boolean         @default(false)

@@ -75,6 +75,31 @@ describe("brand watermark timing", () => {
       durationInFrames: 150,
     });
   });
+
+  it("trims a Razzmatazz source to an exact 3-second branded edit", () => {
+    const miniInput: ReelCompositionInput = {
+      ...baseInput,
+      scenes: [
+        {
+          captionText: "Own the moment",
+          durationSec: 3,
+          startTimeSec: 0,
+          transitionStyle: "CUT",
+          videoUrl: "https://assets.example/provider-five-second-source.mp4",
+        },
+      ],
+    };
+
+    expect(getReelDurationFrames(miniInput)).toBe(90);
+    expect(getBrandWatermarkWindow(miniInput, 30)).toEqual({
+      from: 0,
+      durationInFrames: 90,
+    });
+    expect(getFinalCaptionWindow(miniInput.scenes[0], 30)).toEqual({
+      from: 45,
+      durationInFrames: 45,
+    });
+  });
 });
 
 describe("final closer timing", () => {

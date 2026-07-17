@@ -2,16 +2,25 @@
 
 Updated: July 17, 2026
 
-Product Showcase is a first-class output mode for short, product-led films. It reuses Reel AI's Brand Kit, three-concept selection, editable storyboard, Auto mode, step-by-step mode, scene generation, narration, and Remotion export. The difference is a stricter input and motion contract designed around product identity.
+Product Showcase is a first-class output mode for short, product-led films. It reuses Reel AI's Brand Kit, three-concept selection, editable storyboard, Auto mode, step-by-step mode, scene generation, narration, and Remotion export. The difference is a stricter input and motion contract designed around product identity. Its optional Razzmatazz mini mode compresses that same pipeline into a fixed 3-second commercial bumper.
 
 ## Experience
 
 1. Choose **Product showcase** during project creation.
 2. Add exactly one product name and one PNG, JPG, or WebP hero image. A logo, product details, and one project website are optional.
-3. Choose realistic or premium 3D and a 5, 10, or 15 second target.
+3. Choose realistic or premium 3D and a 5, 10, or 15 second target. Or enable **Razzmatazz mode** to lock the project to one 3-second scene.
 4. Reel AI stores and links the logo/product image before Brand Kit research begins. The one project website is researched as evidence when available, and an uploaded logo's analyzed dominant color leads the Working palette.
 5. The Creative Director pitches exactly three product-first concepts. Each concept card shows its actual Scene 1 opening frame, generated in product-reference edit mode and reviewed against the uploaded hero image. The user can edit/regenerate one direction without replacing the other two, then continues in Auto mode or step-by-step mode.
 6. The storyboard reuses the selected concept frame as Scene 1's selected anchor and generates images only for Scene 2 onward. It uses a feasible one to three scenes totaling the exact requested duration. The editorial defaults are one scene at 5 seconds, two scenes at 10 seconds, and three scenes at 15 seconds. An explicit scene/shot/clip count in the project creative direction or a concept-regeneration adjustment overrides that default when the requested count can still satisfy the provider's 5–10 second clip contract. Five seconds remains a strict single-clip format. Final output remains vertical 9:16 with scene-timed voiceover, default-on curated BGM, one final closer/CTA overlay, purposeful Remotion transitions where multiple scenes exist, and the verified brand lockup. Generated source-clip audio remains excluded.
+
+### Razzmatazz mini format
+
+- Exactly one 3-second scene and one final clip. Scene count and timeline duration are locked in the manual editor as well as Auto mode.
+- The intact product is the only subject. `humanPresence` must be `NO_PERSON` and `separationTreatment` must be `AVOID`, even for food or modular products that could otherwise qualify for controlled separation.
+- Motion begins on frame one and uses one identity-safe hero action: a brief precision turn/spin, scale-forward move, or fast-feeling push-in. The camera and product cannot perform competing rotations.
+- One restrained environmental effect may surround the product—light streaks, particles, reflections, color bloom, shadow pulses, or atmosphere—but cannot alter, occlude, duplicate, open, or break apart the product.
+- The shot settles into a clean hero hold. A source-safe 2–6 word tagline/CTA is composited at the midpoint, while narration is capped at 7 words and the verified logo stays visible.
+- Wan receives its provider-compatible minimum 5-second source request. Remotion uses only the first exact 3 seconds, producing a 90-frame export at 30 fps. The longer provider source is an implementation detail, not a longer customer-facing reel.
 
 ## Input policy
 
@@ -57,6 +66,7 @@ During an active showcase run, the studio becomes a focused Auto production room
 ## Data and API contract
 
 - `Project.outputMode`: `STANDARD | PRODUCT_SHOWCASE`.
+- `Project.razzmatazzMode`: persisted boolean; valid only with `PRODUCT_SHOWCASE` and a fixed `videoLengthSec = 3`.
 - `Project.cinematicBoost`: persists balanced versus heightened creative direction.
 - `CreativeConcept.showcaseMotionPlan`: optional JSON for standard reels and required for newly generated Product Showcase concepts; stores the structured motion treatment shown in the concept UI and passed downstream.
 - `Scene.transitionStyle`: `CUT | FADE | SLIDE | WIPE | IRIS | CLOCK_WIPE`.
@@ -66,6 +76,8 @@ During an active showcase run, the studio becomes a focused Auto production room
 - `POST /api/projects/:id/sources` accepts multipart `productId` for the product image and enforces type, size, ownership, and the one-logo/one-product-image limits.
 - URL registration permits one URL-bearing source per project.
 - Background Brand Kit start validates exactly one saved product and one linked product image before queueing model work.
+
+Razzmatazz checks run at concept validation, storyboard validation and repair, manual storyboard save, production preflight, and final timing validation. Auto and step-by-step therefore cannot diverge or bypass the intact-product contract.
 
 ## Local update
 
@@ -87,3 +99,5 @@ The July 17 streamlined intake and source-slot update is application-only. Resta
 The granular generation and opening-frame reuse update is also application-only. Restart `pnpm dev`; do not run `pnpm db:migrate`, `pnpm db:seed`, or `pnpm install`. Existing projects remain readable. Regenerate a concept once to opt it into product-locked Scene 1 reuse; legacy storyboards continue to generate Scene 1 normally until they are regenerated from an updated concept.
 
 The opening-frame reliability and duration-aware scene-default update is application-only. Restart `pnpm dev`; do not run `pnpm db:migrate`, `pnpm db:generate`, `pnpm db:seed`, or `pnpm install`. Existing concepts and storyboards remain readable. Regenerate concepts to apply the new 5s/10s/15s defaults to an existing project.
+
+Razzmatazz mode adds `Project.razzmatazzMode` and migration `20260717170000_razzmatazz_mode`. Stop the development server, run `pnpm db:migrate`, and restart `pnpm dev`. No install or seed is required. Existing projects default to Razzmatazz off and continue unchanged. Because the toggle is an intake decision that fixes timing and creative constraints before concepts exist, create a new Product Showcase to test the Razzmatazz pipeline; use existing projects for regression checks of normal Product Showcase, Auto mode, and step-by-step mode.

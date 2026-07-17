@@ -63,33 +63,56 @@ const anySeparationPattern =
   /\b(?:separat(?:e|es|ed|ion)|reassembl(?:e|es|ed|y)|layers? (?:rise|lift|float|separate)|components? (?:rise|lift|float|separate))\b/i;
 const multiplePeoplePattern =
   /\b(?:two|three|several|multiple) (?:people|persons|humans|models|customers|users|shoppers|hands)|\b(?:couple|crowd|group of people|friends|family|team|models)\b/i;
+const anyPersonPattern =
+  /\b(?:person|people|human|model|customer|user|shopper|founder|wearer|woman|man|hands?|face)\b/i;
+const razzmatazzProductAlterationPattern =
+  /\b(?:(?:product|package|bottle|box|case) opens?|unfolds?|unboxes?|unwraps?|uncaps?|(?:cap|lid) (?:lifts?|rises?|opens?)|(?:lifts?|raises?|removes?) (?:the )?(?:cap|lid)|peels? (?:away|open)|transforms?|multiplies?|duplicates?)\b/i;
 const overloadedScreenPattern =
   /\b(?:rapid(?:ly)? (?:scroll|swipe|tap|type|screen|interface)|multiple (?:screens|windows|apps|panels|notifications)|cascading notifications|dashboard (?:animates|transforms|changes)|interface (?:morphs|transforms|cycles)|screen (?:cycles|flashes|fills with)|scrolls?[^.]{0,48}(?:tap|swipe|type)|(?:tap|swipe|type)[^.]{0,48}scrolls?)\b/i;
 
 export function buildShowcaseMotionGuardrailBrief(
   products: ProductDescriptor[],
+  razzmatazzMode = false,
 ) {
   const profile = classifyProductMotion(products);
   const separationRule =
-    profile === "LAYERED_FOOD"
+    razzmatazzMode
+      ? "Set separationTreatment to AVOID. Razzmatazz never opens, separates, disassembles, or reassembles the product, regardless of category."
+      : profile === "LAYERED_FOOD"
       ? "A restrained ingredient-layer separation is eligible only when every layer is visible or verified: move a few large layers on one axis, hold their order and proportions, then settle once. It is one optional route, not the default for all three concepts."
       : profile === "VISIBLE_MODULAR_GOOD"
         ? "A restrained visible-component separation is eligible only for large, externally visible, reference-backed modular pieces: move them on one axis and settle once. Never expose or invent internal construction."
         : "Set separationTreatment to AVOID. Do not pitch teardown, exploded views, disassembly, floating parts, internal reveals, or reassembly for this product.";
 
+  const razzmatazzRule = razzmatazzMode
+    ? `RAZZMATAZZ MODE IS ACTIVE:
+- Produce exactly one intact-product scene lasting 3 seconds.
+- The product is the sole center of attention: use NO_PERSON and separationTreatment AVOID.
+- Use one identity-safe hero motion such as a brief precision turn, controlled spin, scale-forward move, or fast-feeling push-in. Do not combine object spin with an orbiting camera.
+- Background energy must surround rather than alter the product: light streaks, restrained particles, color bloom, shadow pulses, reflections, or atmospheric bursts may provide one low-amplitude supporting effect.
+- Never separate, unfold, open, disassemble, reassemble, melt, morph, multiply, or expose any product part. Keep silhouette, label, materials, proportions, and packaging exact throughout.
+- Land on a clean hero hold with negative space for one short tagline or call to action composed by Reel AI.`
+    : "";
+
+  const separationDecision = razzmatazzMode
+    ? "Separation is disabled for this format; build excitement with intact-product motion, lighting, and surrounding atmosphere."
+    : "Use teardown/separation only when the category and visible reference geometry make it clearly safer than a rotation, light, texture, or use-context treatment. When uncertain, choose AVOID.";
+
   return `PRODUCT SHOWCASE MOTION DECISION
 - Inferred execution profile: ${profile} (use the verified intake and uploaded images as the final authority).
-- Prefer premium low-complexity motion that still has a visible payoff: slow product rotation, a gentle partial orbit, slow push-in or pull-back, controlled zoom-like framing, parallax, light sweep, package/cap reveal, one material response, or one simple use-result.
+- ${razzmatazzMode ? "Prefer immediate intact-product motion with a visible payoff: one brief precision turn/spin, scale-forward move, fixed-camera product move, or fast-feeling push-in, plus one restrained surrounding light or atmospheric effect." : "Prefer premium low-complexity motion that still has a visible payoff: slow product rotation, a gentle partial orbit, slow push-in or pull-back, controlled zoom-like framing, parallax, light sweep, package/cap reveal, one material response, or one simple use-result."}
 - Every shot has exactly one hero action. At most one low-amplitude supporting material behavior may run behind it; never stack camera, product, hands, particles, and screen activity into competing actions.
-- If a person appears anywhere in the concept, use exactly one person total and let only that person interact with the product. No couples, crowds, extra hands, background people, handoffs, or a second model.
+- ${razzmatazzMode ? "Use no people, models, faces, wearers, or detached hands. The intact product is the only subject." : "If a person appears anywhere in the concept, use exactly one person total and let only that person interact with the product. No couples, crowds, extra hands, background people, handoffs, or a second model."}
 - Screens get one readable state or one simple interaction. No rapid scrolling, typing plus tapping, notification cascades, multi-panel animation, or interface morphing.
 - ${separationRule}
-- Use teardown/separation only when the category and visible reference geometry make it clearly safer than a rotation, light, texture, or use-context treatment. When uncertain, choose AVOID.`;
+- ${separationDecision}
+${razzmatazzRule}`;
 }
 
 export function findShowcaseConceptViolations(
   concepts: ConceptWithMotion[],
   products: ProductDescriptor[],
+  razzmatazzMode = false,
 ) {
   const profile = classifyProductMotion(products);
   const violations: string[] = [];
@@ -120,6 +143,29 @@ export function findShowcaseConceptViolations(
     if (overloadedScreenPattern.test(copy)) {
       violations.push(`${label} overloads a generated screen interaction.`);
     }
+    if (razzmatazzMode && plan.humanPresence !== "NO_PERSON") {
+      violations.push(
+        `${label} must keep the product as the sole subject in Razzmatazz mode.`,
+      );
+    }
+    if (razzmatazzMode && anyPersonPattern.test(copy)) {
+      violations.push(
+        `${label} introduces a person or detached hands in Razzmatazz mode.`,
+      );
+    }
+    if (
+      razzmatazzMode &&
+      (plan.separationTreatment !== "AVOID" || anySeparationPattern.test(copy))
+    ) {
+      violations.push(
+        `${label} must keep the product intact with no separation in Razzmatazz mode.`,
+      );
+    }
+    if (razzmatazzMode && razzmatazzProductAlterationPattern.test(copy)) {
+      violations.push(
+        `${label} opens or transforms the product in Razzmatazz mode; keep it intact.`,
+      );
+    }
     validateSeparationDecision(label, copy, plan, profile, violations);
   }
 
@@ -129,6 +175,7 @@ export function findShowcaseConceptViolations(
 export function findShowcaseStoryboardViolations(
   storyboard: StoryboardWithMotion,
   products: ProductDescriptor[],
+  razzmatazzMode = false,
 ) {
   const profile = classifyProductMotion(products);
   const violations: string[] = [];
@@ -142,10 +189,28 @@ export function findShowcaseStoryboardViolations(
       "Product Showcase allows no people or one person total; the cast plan contains multiple people.",
     );
   }
+  if (
+    razzmatazzMode &&
+    cast &&
+    (cast.mode !== "NO_PEOPLE" ||
+      (Array.isArray(cast.members) && cast.members.length > 0))
+  ) {
+    violations.push(
+      "Razzmatazz mode keeps the product as the sole subject and cannot include people.",
+    );
+  }
+  if (razzmatazzMode && storyboard.scenes.length !== 1) {
+    violations.push("Razzmatazz mode requires exactly one scene.");
+  }
 
   const fullCharacterPlan = positiveExecutionCopy(
     storyboard.continuityBible?.characters ?? "",
   );
+  if (razzmatazzMode && anyPersonPattern.test(fullCharacterPlan)) {
+    violations.push(
+      "Razzmatazz mode keeps the product as the sole subject and cannot include a person or detached hands.",
+    );
+  }
   if (multiplePeoplePattern.test(fullCharacterPlan)) {
     violations.push(
       "Product Showcase character continuity describes multiple people.",
@@ -178,6 +243,21 @@ export function findShowcaseStoryboardViolations(
         `${label} separates a product whose category is not safe for visible-layer motion.`,
       );
     }
+    if (razzmatazzMode && anySeparationPattern.test(copy)) {
+      violations.push(
+        `${label} must keep the product intact with no separation in Razzmatazz mode.`,
+      );
+    }
+    if (razzmatazzMode && anyPersonPattern.test(copy)) {
+      violations.push(
+        `${label} introduces a person or detached hands in Razzmatazz mode.`,
+      );
+    }
+    if (razzmatazzMode && razzmatazzProductAlterationPattern.test(copy)) {
+      violations.push(
+        `${label} opens or transforms the product in Razzmatazz mode; keep it intact.`,
+      );
+    }
   }
 
   return [...new Set(violations)];
@@ -187,6 +267,7 @@ export function findShowcaseShotViolations(
   shots: Array<{ index: number; shotPrompt: string; continuityNotes?: string }>,
   characterContinuity: string,
   products: ProductDescriptor[],
+  razzmatazzMode = false,
 ) {
   return findShowcaseStoryboardViolations(
     {
@@ -196,6 +277,7 @@ export function findShowcaseShotViolations(
       scenes: shots,
     },
     products,
+    razzmatazzMode,
   );
 }
 
