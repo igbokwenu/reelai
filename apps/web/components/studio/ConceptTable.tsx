@@ -327,7 +327,7 @@ export function ConceptTable({
           {isStarting || isRunning
             ? razzmatazzMode
               ? "Crafting & polishing…"
-              : "Generating concepts…"
+              : "Developing & polishing…"
             : concepts.length === 3
               ? "Replace all 3"
               : "Generate 3 Concepts"}

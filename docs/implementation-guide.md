@@ -1,6 +1,6 @@
 # Reel AI Implementation Guide
 
-Updated: July 15, 2026
+Updated: July 18, 2026
 
 This is the build contract for Reel AI. When implementation agents need to choose between options, follow this guide first, then `docs/reel-ai-blueprint.md`, then the QwenCloud docs in `docs/qwencloud-reference-links.md`.
 
@@ -445,8 +445,8 @@ Rules:
 - Log model, operation, elapsed time, provider task id, and sanitized errors.
 - Do not log prompts containing uploaded private content unless `NODE_ENV !== "production"` and the log is explicitly redacted.
 - For structured JSON, always use Zod schemas and validate the model output before saving.
-- Normalize only policy-derived or safely reconstructable structured fields before requesting a paid repair. Storyboard script may be derived from validated scene narration; caption and narration may recover from one another; disabled BGM must use explicit non-empty sentinel metadata; an unambiguously product-only showcase may receive a no-people cast plan. A five-second showcase must collapse excess segmentation into one hero visual carrying the closing CTA. Never invent a missing shot direction, product fact, claim, or ambiguous cast identity.
-- A structured creative call gets one bounded schema-repair pass. If validation still fails, Auto mode gets one fresh creative reroll (two full attempts total), then pauses with plain-language recovery copy. Persist only safe validation issue codes, paths, and messages in the failed job output so local diagnosis does not depend on exposing provider content or schema internals to the user.
+- Normalize only policy-derived or safely reconstructable structured fields before requesting a paid repair. Storyboard script may be derived from validated scene narration; caption and narration may recover from one another; disabled BGM must use explicit non-empty sentinel metadata; an unambiguously product-only showcase may receive a no-people cast plan. A five-second showcase must collapse excess segmentation into one hero visual carrying the closing CTA. Never invent a product fact or claim. The final Brand Reel rescue may supply a source-safe editorial shot, copy line, or fictional cast ledger from project/Brand Kit context when the model has exhausted its repair, but it must remain generic about unverified offer performance and pass grounding validation before persistence.
+- A structured creative call gets one bounded model schema-repair pass. Brand Reel concept, single-concept, and storyboard calls then have a bounded deterministic recovery callback: preserve substantive model fields, complete only missing contract fields from project/Brand Kit context, normalize exact concept count and scene timing, fit narration, repair cast/continuity metadata, and validate the result again before persistence. Never loop the model or show self-authored schema failures as the normal UX. Auto mode may still rerun a phase for an actual provider/transient failure; if every internal boundary fails, persist only safe validation issue codes, paths, and messages so diagnosis never depends on exposing provider content or schema internals to the user.
 - For async video tasks, save the provider `task_id` to `GenerationJob.providerTaskId`.
 
 ## Agent Output Schemas

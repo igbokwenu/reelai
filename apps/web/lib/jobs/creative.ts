@@ -109,6 +109,8 @@ async function runConceptJob(jobId: string) {
         output: {
           conceptIds: result.concepts.map((concept) => concept.id),
           razzmatazzRecovery: result.razzmatazzRecovery,
+          conceptGroundingRecovery: result.conceptGroundingRecovery,
+          structuredRecovery: result.structuredRecovery,
           elapsedMs: result.elapsedMs,
           usage: toJsonValue(result.usage),
         },
@@ -160,6 +162,8 @@ async function runConceptRegenerationJob(
         output: {
           conceptId: result.concept.id,
           razzmatazzRecovery: result.razzmatazzRecovery,
+          conceptGroundingRecovery: result.conceptGroundingRecovery,
+          structuredRecovery: result.structuredRecovery,
           invalidatedStoryboard: result.invalidatedStoryboard,
           elapsedMs: result.elapsedMs,
           usage: toJsonValue(result.usage),
@@ -206,6 +210,7 @@ async function runStoryboardJob(jobId: string) {
           sceneCount: result.storyboard.scenes.length,
           warnings: result.warnings,
           groundingRecovery: result.groundingRecovery,
+          structuredRecovery: result.structuredRecovery,
           elapsedMs: result.elapsedMs,
           usage: toJsonValue(result.usage),
         },

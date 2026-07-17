@@ -25,6 +25,12 @@ import {
   type GroundingCapabilities,
   type GroundingRecoverySummary,
 } from "@/lib/brand/grounding";
+import {
+  recoverBrandReelConcept,
+  recoverBrandReelConcepts,
+  recoverBrandReelStoryboard,
+  type BrandReelRecoveryContext,
+} from "@/lib/brand/creative-recovery";
 import { QWEN_STRUCTURED_MODEL, sanitizeQwenError } from "@/lib/qwen/client";
 import { generateImageWithQwen, QwenImageError } from "@/lib/qwen/image";
 import { generateStructuredWithQwen } from "@/lib/qwen/structured";
@@ -94,6 +100,7 @@ export async function generateConceptsForProject(projectId: string) {
   }
   const sceneCountPreference = preferredSceneCount(project);
   let razzmatazzRecovery: "NONE" | "MODEL" | "DETERMINISTIC" = "NONE";
+  let conceptGroundingRecovery: "NONE" | "SAFE_TEXT" | "DETERMINISTIC" = "NONE";
 
   let result = await generateStructuredWithQwen({
     operation: "creative_director_concepts",
@@ -115,6 +122,14 @@ export async function generateConceptsForProject(projectId: string) {
         sceneCountPreference,
       ),
     preserveOriginalOnRepair: true,
+    recoverAfterRepair:
+      project.outputMode === "STANDARD"
+        ? ({ original, repaired }) =>
+            recoverBrandReelConcepts(
+              { original, repaired },
+              brandReelRecoveryContext(project, sceneCountPreference),
+            )
+        : undefined,
     system: conceptSystemPrompt,
     user: buildConceptPrompt(project),
   });
@@ -180,10 +195,40 @@ export async function generateConceptsForProject(projectId: string) {
   }
   validateConceptTiming(project, result.data.concepts, sceneCountPreference);
   const grounding = getGroundingCapabilities(project.sources, project.brandKit);
-  const violations = findConceptGroundingViolations(
+  let violations = findConceptGroundingViolations(
     result.data.concepts,
     grounding,
   );
+  if (project.outputMode === "STANDARD" && violations.length > 0) {
+    result = {
+      ...result,
+      data: parseCreativeConceptsOutput(
+        recoverGroundedCreativeOutput(result.data, grounding),
+        "STANDARD",
+        project.videoLengthSec,
+        sceneCountPreference,
+      ),
+    };
+    conceptGroundingRecovery = "SAFE_TEXT";
+    violations = findConceptGroundingViolations(
+      result.data.concepts,
+      grounding,
+    );
+  }
+  if (project.outputMode === "STANDARD" && violations.length > 0) {
+    result = {
+      ...result,
+      data: recoverBrandReelConcepts(
+        { original: { concepts: [] }, repaired: { concepts: [] } },
+        brandReelRecoveryContext(project, sceneCountPreference),
+      ),
+    };
+    conceptGroundingRecovery = "DETERMINISTIC";
+    violations = findConceptGroundingViolations(
+      result.data.concepts,
+      grounding,
+    );
+  }
   if (violations.length > 0) {
     throw new Error(
       `Creative grounding check failed: ${violations.slice(0, 3).join(" ")} Regenerate with grounded directions or upload the referenced brand materials.`,
@@ -276,6 +321,8 @@ export async function generateConceptsForProject(projectId: string) {
   return {
     concepts,
     razzmatazzRecovery,
+    conceptGroundingRecovery,
+    structuredRecovery: result.structuredRecovery,
     model: result.model,
     providerRequestId: result.providerRequestId,
     elapsedMs: result.elapsedMs,
@@ -321,6 +368,7 @@ export async function regenerateConceptForProject({
   }
   const sceneCountPreference = preferredSceneCount(project, [adjustmentNote]);
   let razzmatazzRecovery: "NONE" | "MODEL" | "DETERMINISTIC" = "NONE";
+  let conceptGroundingRecovery: "NONE" | "SAFE_TEXT" | "DETERMINISTIC" = "NONE";
 
   let result = await generateStructuredWithQwen({
     operation: "creative_director_concept_regeneration",
@@ -342,6 +390,14 @@ export async function regenerateConceptForProject({
         sceneCountPreference,
       ),
     preserveOriginalOnRepair: true,
+    recoverAfterRepair:
+      project.outputMode === "STANDARD"
+        ? ({ original, repaired }) =>
+            recoverBrandReelConcept(
+              { original, repaired },
+              brandReelRecoveryContext(project, sceneCountPreference),
+            )
+        : undefined,
     system: conceptSystemPrompt,
     user: buildConceptRegenerationPrompt({
       project,
@@ -416,10 +472,40 @@ export async function regenerateConceptForProject({
   }
   validateConceptTiming(project, [result.data.concept], sceneCountPreference);
   const grounding = getGroundingCapabilities(project.sources, project.brandKit);
-  const violations = findConceptGroundingViolations(
+  let violations = findConceptGroundingViolations(
     [result.data.concept],
     grounding,
   );
+  if (project.outputMode === "STANDARD" && violations.length > 0) {
+    result = {
+      ...result,
+      data: parseCreativeConceptRegenerationOutput(
+        recoverGroundedCreativeOutput(result.data, grounding),
+        "STANDARD",
+        project.videoLengthSec,
+        sceneCountPreference,
+      ),
+    };
+    conceptGroundingRecovery = "SAFE_TEXT";
+    violations = findConceptGroundingViolations(
+      [result.data.concept],
+      grounding,
+    );
+  }
+  if (project.outputMode === "STANDARD" && violations.length > 0) {
+    result = {
+      ...result,
+      data: recoverBrandReelConcept(
+        { original: { concept: {} }, repaired: { concept: {} } },
+        brandReelRecoveryContext(project, sceneCountPreference),
+      ),
+    };
+    conceptGroundingRecovery = "DETERMINISTIC";
+    violations = findConceptGroundingViolations(
+      [result.data.concept],
+      grounding,
+    );
+  }
   if (violations.length > 0) {
     throw new Error(
       `Creative grounding check failed: ${violations.slice(0, 3).join(" ")} Regenerate with a grounded direction or upload the referenced brand materials.`,
@@ -524,6 +610,8 @@ export async function regenerateConceptForProject({
   return {
     concept,
     razzmatazzRecovery,
+    conceptGroundingRecovery,
+    structuredRecovery: result.structuredRecovery,
     invalidatedStoryboard: invalidatesStoryboard,
     model: result.model,
     providerRequestId: result.providerRequestId,
@@ -726,6 +814,14 @@ export async function generateStoryboardForProject(projectId: string) {
         project.videoLengthSec,
         sceneCountPreference,
       ),
+    recoverAfterRepair:
+      project.outputMode === "STANDARD"
+        ? ({ original, repaired }) =>
+            recoverBrandReelStoryboard(
+              { original, repaired },
+              brandReelRecoveryContext(project, sceneCountPreference),
+            )
+        : undefined,
     system: storyboardSystemPrompt,
     user: buildStoryboardPrompt(project, selectedConcept, preflightViolations),
   });
@@ -775,6 +871,14 @@ export async function generateStoryboardForProject(projectId: string) {
           project.videoLengthSec,
           sceneCountPreference,
         ),
+      recoverAfterRepair:
+        project.outputMode === "STANDARD"
+          ? ({ original, repaired }) =>
+              recoverBrandReelStoryboard(
+                { original, repaired },
+                brandReelRecoveryContext(project, sceneCountPreference),
+              )
+          : undefined,
       system: storyboardSystemPrompt,
       user: buildStoryboardRecoveryPrompt({
         project,
@@ -883,6 +987,27 @@ export async function generateStoryboardForProject(projectId: string) {
       initial: firstResult.usage,
       recovery: recoveryResult?.usage ?? null,
     },
+    structuredRecovery: {
+      initial: firstResult.structuredRecovery,
+      qualityRecovery: recoveryResult?.structuredRecovery ?? null,
+    },
+  };
+}
+
+function brandReelRecoveryContext(
+  project: Project & { brandKit: BrandKit | null },
+  sceneCountPreference: number | null,
+): BrandReelRecoveryContext {
+  return {
+    businessName: project.businessName,
+    projectName: project.name,
+    audience: project.targetAudience ?? project.brandKit?.audience,
+    offer: project.offer,
+    durationSec: project.videoLengthSec,
+    preferredSceneCount: sceneCountPreference,
+    tone: project.brandKit?.tone,
+    lockedStyle: project.brandKit?.lockedStyle,
+    palette: project.brandKit?.palette,
   };
 }
 
@@ -1520,6 +1645,7 @@ ${project.outputMode === "PRODUCT_SHOWCASE" ? buildShowcaseMotionGuardrailBrief(
 Requirements:
 - Return exactly three concepts.
 - Make them different strategies, not three hook variants.
+- ${project.outputMode === "STANDARD" ? "Give the three Brand Reel directions different editorial engines: one attention-to-purpose cause-and-effect story, one proof-through-process story, and one signature brand-world story. Adapt those engines to the verified offer instead of repeating these labels literally." : "Keep every direction centered on the supplied product."}
 - Each concept must be a complete creative direction, not a storyboard scene.
 - strategy must describe the ad strategy in one or two substantive sentences.
 - narrativeArc must describe the beginning, middle, and ending beat.
@@ -1765,6 +1891,17 @@ function buildSceneCountInstruction(
     : "Use 1 to 3 scenes total. Ten seconds should normally use one or two shots; 15 seconds may use two or three.";
 }
 
+function buildBrandReelArcInstruction(estimatedScenes: number) {
+  const count = Math.min(4, Math.max(2, Math.round(estimatedScenes)));
+  if (count === 2) {
+    return "Use a two-scene professional arc: Scene 1 starts the brand-relevant pattern interrupt on frame one and makes the offer's mechanism tangible; Scene 2 converts that motion into a credible payoff plus one source-safe audience action. Both scenes need different visual-interest devices.";
+  }
+  if (count === 4) {
+    return "Use a four-scene professional arc with distinct editorial jobs: immediate pattern interrupt, tangible mechanism, visible proof or consequence, then a premium brand-value payoff with one source-safe audience action. Escalate energy across the first three scenes and give the closer calm negative space; never repeat the same action or camera device in adjacent scenes.";
+  }
+  return "Use a three-scene professional arc with distinct editorial jobs: immediate pattern interrupt, tangible proof or transformation, then a premium brand-value payoff with one source-safe audience action. Each scene must advance a new cause-and-effect beat and use a different visual-interest device.";
+}
+
 function validateConceptTiming(
   project: Project,
   concepts: Array<{ estimatedScenes: number; estimatedDurationSec: number }>,
@@ -1883,6 +2020,7 @@ ${project.outputMode === "PRODUCT_SHOWCASE" ? buildShowcaseMotionGuardrailBrief(
 
 Requirements:
 - ${buildSceneCountInstruction(project, "STORYBOARD", concept.estimatedScenes)}
+- ${project.outputMode === "STANDARD" ? buildBrandReelArcInstruction(concept.estimatedScenes) : "Keep the showcase progression product-first and immediately legible."}
 - ${project.razzmatazzMode ? "Total duration must be exactly 5 seconds in exactly one scene." : project.outputMode === "PRODUCT_SHOWCASE" ? "Total duration must exactly match the requested 5 to 15 seconds, with every scene lasting 5 to 10 seconds." : "Total duration must be 15 to 30 seconds, with every scene lasting 5 to 10 seconds. Prefer 5 to 8 seconds; use 9 to 10 only for exceptionally simple motion."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Treat the actual uploaded product photography as the source of truth for silhouette, materials, colors, proportions, surface details, packaging, and visible ingredients. The generated scene may stylize the world but must not redesign the product." : "Preserve recurring product identity whenever a product is present."}
 - ${project.outputMode === "PRODUCT_SHOWCASE" ? "Assign exactly one hero product and one primary action to each shot. For multiple products, use sequential hero shots or a static collection composition; never ask multiple products to assemble, transform, collide, or cross paths together." : "Keep the motion hierarchy deliberately simple."}

@@ -380,7 +380,11 @@ export function StoryboardTimeline({
             ) : (
               <Sparkles className="size-4" aria-hidden="true" />
             )}
-            {draft ? "Regenerate plan" : "Generate storyboard"}
+            {isStarting || isRunning
+              ? "Building & polishing…"
+              : draft
+                ? "Regenerate plan"
+                : "Generate storyboard"}
           </Button>
           {draft ? (
             <Button

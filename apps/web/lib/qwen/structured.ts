@@ -20,6 +20,7 @@ export async function generateStructuredWithQwen<T>({
   model = QWEN_STRUCTURED_MODEL,
   parse = (value) => schema.parse(value),
   preserveOriginalOnRepair = false,
+  recoverAfterRepair,
 }: {
   operation: string;
   schema: ZodType<T>;
@@ -30,6 +31,11 @@ export async function generateStructuredWithQwen<T>({
   model?: string;
   parse?: (value: unknown) => T;
   preserveOriginalOnRepair?: boolean;
+  recoverAfterRepair?: (input: {
+    original: unknown;
+    repaired: unknown;
+    error: ZodError;
+  }) => T | Promise<T>;
 }) {
   const messages = [
     { role: "system" as const, content: system },
@@ -79,6 +85,7 @@ export async function generateStructuredWithQwen<T>({
 
   const parsed = parseQwenJson(result.content);
   let data: T;
+  let structuredRecovery: "NONE" | "MODEL" | "DETERMINISTIC" = "NONE";
 
   try {
     data = parse(parsed);
@@ -111,11 +118,29 @@ export async function generateStructuredWithQwen<T>({
     );
 
     const repairedJson = parseQwenJson(repaired.content);
-    data = parse(
-      preserveOriginalOnRepair
-        ? preserveOriginalValues(parsed, repairedJson)
-        : repairedJson,
-    );
+    const candidate = preserveOriginalOnRepair
+      ? preserveOriginalValues(parsed, repairedJson)
+      : repairedJson;
+    try {
+      data = parse(candidate);
+      structuredRecovery = "MODEL";
+    } catch (repairError) {
+      if (!(repairError instanceof ZodError) || !recoverAfterRepair) {
+        throw repairError;
+      }
+
+      console.warn(
+        `[${operation}] Model schema repair remained invalid; applying bounded deterministic recovery: ${formatZodIssues(repairError)}`,
+      );
+      data = parse(
+        await recoverAfterRepair({
+          original: parsed,
+          repaired: candidate,
+          error: repairError,
+        }),
+      );
+      structuredRecovery = "DETERMINISTIC";
+    }
     result = repaired;
   }
 
@@ -125,6 +150,7 @@ export async function generateStructuredWithQwen<T>({
     providerRequestId: result.providerRequestId,
     elapsedMs: result.elapsedMs,
     usage: result.usage,
+    structuredRecovery,
   };
 }
 
