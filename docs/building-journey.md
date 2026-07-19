@@ -46,6 +46,10 @@ The multimodal stack uses specialized QwenCloud models for specialized productio
 | Scene motion | `wan2.7-i2v` | First-frame image-to-video with the approved shot sentence and dedicated negative prompt |
 | Narration | `qwen3-tts-flash` | Scene-timed speech synthesis stored as durable audio artifacts |
 
+The build was guided by a project-local suite of nine installed skills from `qwencloud/qwencloud-ai`: model selection, text, vision, image generation, video generation, TTS, authentication, usage, and update checks. They became practical implementation playbooks rather than passive reference material. The model-selector skill helped match each production role to the right modality; the generation skills clarified native endpoint contracts, asynchronous task behavior, supported inputs, prompt controls, and retry boundaries; the authentication guidance kept the application API key separate from the CLI session; and the usage skill made quota awareness part of development rather than an unpleasant surprise at the end.
+
+The **QwenCloud CLI v1.3.0** was installed alongside those skills and used as the live source of truth when static documentation could drift. Commands such as `qwencloud models list --all --format json`, `qwencloud models search`, and `qwencloud models info` helped verify availability and capabilities before model IDs entered the application. `qwencloud usage free-tier --format json` helped track the remaining allowance while expensive image and video experiments were underway. This CLI-first workflow was especially valuable for a multimodal build: model discovery, implementation guidance, authentication, and budget monitoring stayed connected to the same production decisions.
+
 The AI layer is intentionally modular. Text, vision, image, video, upload, retry, structured-repair, and TTS concerns live behind separate server modules. Model responses must pass Zod schemas and deterministic production rules before they can trigger expensive downstream work. Near-valid structured output is normalized conservatively; incomplete output receives a bounded model repair; and Brand Reel planning has a final deterministic creative-rescue layer that preserves usable decisions instead of throwing away an entire generation.
 
 Auto mode is a persisted production state machine, not a long-running browser promise. A PostgreSQL-backed `AutoGenerationRun` advances through **Storyboard → Scene Anchors → Video Clips → Narration → Remotion Render**. Each phase verifies its prerequisites and durable outputs, uses a short database lease to prevent competing workers, and can resume after a refresh or server restart. Provider task IDs are retained, exponential retries are bounded, and a partial video failure regenerates only the missing scenes. Manual mutation endpoints return a conflict while Auto mode owns the run, preventing stale browser tabs from corrupting the production graph.
@@ -58,9 +62,9 @@ The production deployment runs on **Alibaba Cloud ECS** using Docker Compose, wi
 
 ### Making ambitious video generation fit a very small credit budget
 
-Video generation is the most expensive and least forgiving stage of the pipeline. Working within free-tier allowances and roughly **$40 of additional credits** forced us to treat every generation as a production decision. A naive retry loop could consume the entire budget without producing a coherent reel.
+Video generation is the most expensive and least forgiving stage of the pipeline. Working within free-tier allowances and roughly **$40 of additional credits** made every generation a production decision. A naive retry loop could consume the entire budget without producing a coherent reel.
 
-We designed the spend profile around reuse and selective recovery:
+The spend profile was therefore designed around reuse and selective recovery:
 
 $$
 C_{\text{run}} \approx C_{\text{planning}} + 3C_{\text{preview}} + \sum_{i \in M_a} C_{\text{anchor},i} + \sum_{j \in M_v} C_{\text{video},j} + C_{\text{TTS}},
@@ -72,35 +76,35 @@ where $M_a$ and $M_v$ contain only the **missing or invalid** anchors and clips.
 
 Beautiful single images are much easier than coherent multi-shot advertising. Product geometry can drift, extra people can appear, screens can mutate, narration can overrun a scene, and an innocent prompt rewrite can turn one clear action into impossible choreography.
 
-We addressed this with a continuity bible, recent-anchor references, one-action shot grammar, explicit product-motion plans, category-aware teardown rules, evidence-capability checks, negative prompts, visual grounding review, exact timing validation, and the decision to disable provider prompt expansion for approved video shots. The system does not merely ask the model to “be consistent”; it carries continuity as structured state and rechecks it at each production boundary.
+The answer was a continuity bible, recent-anchor references, one-action shot grammar, explicit product-motion plans, category-aware teardown rules, evidence-capability checks, negative prompts, visual grounding review, exact timing validation, and the decision to disable provider prompt expansion for approved video shots. The system does not merely ask the model to “be consistent”; it carries continuity as structured state and rechecks it at each production boundary.
 
 ### Learning Alibaba Cloud from scratch
 
-This was our first time deploying on Alibaba Cloud. Provisioning ECS, configuring security groups and Docker, creating and scoping a RAM user, signing OSS requests, setting bucket and region configuration, managing server-only environment variables, and persisting generated artifacts took substantial iteration. The payoff was learning how to move from a local creative prototype to a real cloud-hosted production system with durable media and visible deployment proof.
+Alibaba Cloud was entirely new territory. Provisioning ECS, configuring security groups and Docker, creating and scoping a RAM user, signing OSS requests, setting bucket and region configuration, managing server-only environment variables, and persisting generated artifacts took substantial iteration. The payoff was learning how to move from a local creative prototype to a real cloud-hosted production system with durable media and visible deployment proof.
 
 ### Making long-running AI work reliable in a web application
 
-Image and video APIs are asynchronous, provider URLs expire, media downloads fail transiently, and a browser refresh should not restart expensive work. We had to design for failure as a normal state. PostgreSQL-backed jobs, durable artifact records, leases, idempotent phase verification, bounded backoff, partial-scene recovery, local render staging, and clear manual resume paths turned an unpredictable media pipeline into something a user can trust.
+Image and video APIs are asynchronous, provider URLs expire, media downloads fail transiently, and a browser refresh should not restart expensive work. Failure had to become a normal, recoverable state. PostgreSQL-backed jobs, durable artifact records, leases, idempotent phase verification, bounded backoff, partial-scene recovery, local render staging, and clear manual resume paths turned an unpredictable media pipeline into something a user can trust.
 
-## Accomplishments that we're proud of
+## Accomplishments that I'm proud of
 
-- **We built a production workflow, not a prompt demo.** Reel AI spans brand research, creative direction, storyboarding, image generation, video generation, voice, editing, storage, history, and export in one coherent product.
+- **A production workflow emerged, not a prompt demo.** Reel AI spans brand research, creative direction, storyboarding, image generation, video generation, voice, editing, storage, history, and export in one coherent product.
 - **Creative autonomy and human control coexist.** Auto mode can finish a reel end to end, while every major decision remains inspectable and the exact same pipeline supports modular editing and regeneration.
 - **The product is meaningfully original.** Brand Reel, Product Showcase, Razzmatazz, Cinematic Boost, three-way pitching, product motion plans, evidence-capability guardrails, Take Compare, and the continuity-first production graph are Reel AI’s own product mechanics—not renamed sample code.
-- **We made failures economical.** Successful scenes survive partial failures, selected opening frames are reused, retries are bounded, and edits invalidate only the dependencies that truly changed.
-- **We treated post-production as engineering.** Exact frame counts, scene-timed narration, transition-overlap compensation, byte-range media staging, soundtrack ducking, verified-logo compositing, thumbnail generation, and deterministic MP4 export turn generated fragments into a finished film.
-- **We deployed the complete system on Alibaba Cloud.** The public studio runs on ECS, uses server-side QwenCloud APIs, persists production state in PostgreSQL, and stores durable generated artifacts in OSS—with deployment and bucket proof included in the repository.
-- **We designed for reuse beyond one demo brand.** A new business can enter its own website and assets and receive a new Brand Kit, concepts, storyboard, and film without code changes.
+- **Failures became economical.** Successful scenes survive partial failures, selected opening frames are reused, retries are bounded, and edits invalidate only the dependencies that truly changed.
+- **Post-production became an engineering discipline.** Exact frame counts, scene-timed narration, transition-overlap compensation, byte-range media staging, soundtrack ducking, verified-logo compositing, thumbnail generation, and deterministic MP4 export turn generated fragments into a finished film.
+- **The complete system reached Alibaba Cloud.** The public studio runs on ECS, uses server-side QwenCloud APIs, persists production state in PostgreSQL, and stores durable generated artifacts in OSS—with deployment and bucket proof included in the repository.
+- **The workflow extends beyond one demo brand.** A new business can enter its own website and assets and receive a new Brand Kit, concepts, storyboard, and film without code changes.
 
 ## What we learned
 
-We had already used Qwen text models extensively—from Qwen 3.6 and 3.6 Plus through Qwen 3.7 and 3.7 Max—and especially valued their web-search capabilities. What surprised us was the breadth of the wider QwenCloud creative stack. Discovering and working with dedicated image, vision, image-to-video, and speech models changed our view of Qwen from “a strong language model” into a multimodal production platform.
+Before Reel AI, hands-on experience with Qwen text models already stretched from Qwen 3.6 and Qwen 3.6 Plus through Qwen 3.7 and Qwen 3.7 Max, with their web-search capabilities standing out in particular. The breadth of the wider QwenCloud creative stack was the surprise. Discovering and working with dedicated image, vision, image-to-video, and speech models changed Qwen from “a strong language model” into a complete multimodal production platform.
 
-We learned that the best results do not come from asking one model to do everything. Strong AI products assign each model a bounded role, preserve state between roles, and place deterministic software around the probabilistic core. Qwen is excellent at developing a creative direction; Zod and domain validators make that direction safe to execute; Wan turns a grounded frame into motion; Qwen TTS gives it a voice; and Remotion guarantees that the final timeline is exactly what the user approved.
+One of the clearest lessons was that the best results do not come from asking one model to do everything. Strong AI products assign each model a bounded role, preserve state between roles, and place deterministic software around the probabilistic core. Qwen is excellent at developing a creative direction; Zod and domain validators make that direction safe to execute; Wan turns a grounded frame into motion; Qwen TTS gives it a voice; and Remotion guarantees that the final timeline is exactly what the user approved.
 
-We also learned that constraints can improve creativity. One product, one hero action, one reliable camera behavior, and one short closer may sound restrictive, but those limits produced cleaner and more intentional advertisements. Likewise, the credit constraint encouraged an architecture that is more efficient, resumable, and production-ready than an unlimited retry loop would have been.
+Another lesson was that constraints can improve creativity. One product, one hero action, one reliable camera behavior, and one short closer may sound restrictive, but those limits produced cleaner and more intentional advertisements. Likewise, the credit constraint encouraged an architecture that is more efficient, resumable, and production-ready than an unlimited retry loop would have been.
 
-Finally, we learned the operational side of Alibaba Cloud: how ECS, Docker Compose, RAM permissions, OSS signing and storage, server-side secrets, and a persistent database fit together. Shipping publicly made security, reproducibility, documentation, and recovery just as important as model quality.
+The project also taught the operational side of Alibaba Cloud: how ECS, Docker Compose, RAM permissions, OSS signing and storage, server-side secrets, and a persistent database fit together. Shipping publicly made security, reproducibility, documentation, and recovery just as important as model quality.
 
 ## What's next for Reel AI
 
@@ -117,4 +121,4 @@ The next step is to turn Reel AI from a powerful single-user studio into a scala
 
 ## Built with
 
-QwenCloud, Qwen 3.6 Plus, Wan 2.7 Image Pro, Wan 2.7 I2V, Qwen TTS, Alibaba Cloud, ECS, OSS, RAM, Next.js, TypeScript, React, Tailwind CSS, Prisma, PostgreSQL, Remotion, Docker, Docker Compose, Zod, Vitest, Playwright, AI Agents, Computer Vision, Video Generation, Text-to-Speech
+QwenCloud, QwenCloud CLI, Qwen Skills, Qwen 3.6 Plus, Wan 2.7 Image Pro, Wan 2.7 I2V, Qwen TTS, Alibaba Cloud, ECS, OSS, RAM, Next.js, TypeScript, Tailwind CSS, Prisma, PostgreSQL, Remotion, Docker, Docker Compose, Zod, Vitest, Playwright, AI Agents, Video Generation, Text-to-Speech
