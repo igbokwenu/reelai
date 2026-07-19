@@ -36,15 +36,17 @@ Reel AI also includes granular regeneration, non-destructive take history, downs
 
 Reel AI is a full-stack **Next.js and TypeScript** application rather than a thin API wrapper. The browser studio talks to server-side route handlers; **Prisma and PostgreSQL** store the complete production graph—projects, sources, Brand Kits, concepts, storyboards, scenes, jobs, takes, artifacts, narration, Auto runs, and final renders.
 
-The multimodal stack uses specialized QwenCloud models for specialized production jobs:
+The multimodal stack uses specialized QwenCloud models for specialized production jobs. Those choices were not arbitrary: they were anchored in the installed Qwen skills, then checked against the QwenCloud CLI and current model documentation before being locked into the application.
 
-| Production role | Model | How Reel AI uses it |
-| --- | --- | --- |
-| Brand strategist, scriptwriter, creative director, storyboard planner, and structured repair | `qwen3.6-plus` | Evidence-grounded analysis and schema-validated creative JSON |
-| Visual reviewer | `qwen3.6-plus` multimodal vision | Logo/product analysis and post-generation grounding review |
-| Concept previews and scene anchors | `wan2.7-image-pro` | Reference-aware 9:16 opening frames and continuity anchors |
-| Scene motion | `wan2.7-i2v` | First-frame image-to-video with the approved shot sentence and dedicated negative prompt |
-| Narration | `qwen3-tts-flash` | Scene-timed speech synthesis stored as durable audio artifacts |
+| Production role | Model | How Reel AI uses it | Selection basis |
+| --- | --- | --- | --- |
+| Brand strategist, scriptwriter, creative director, storyboard planner, and structured repair | `qwen3.6-plus` | Evidence-grounded analysis and schema-validated creative JSON | Default text recommendation in the installed model-selector skill |
+| Visual reviewer | `qwen3.6-plus` multimodal vision | Logo/product analysis and post-generation grounding review | Default vision recommendation in the installed model-selector and vision skills |
+| Concept previews and scene anchors | `wan2.7-image-pro` | Reference-aware 9:16 opening frames and continuity anchors | Image skill recommendation for reference editing, subject consistency, and high-quality output |
+| Scene motion | `wan2.7-i2v` | First-frame image-to-video with the approved shot sentence and dedicated negative prompt | Explicit selection from the video skill’s supported models for the newer unified Wan 2.7 protocol |
+| Narration | `qwen3-tts-flash` | Scene-timed speech synthesis stored as durable audio artifacts | Recommended standard/default model in the installed TTS skill |
+
+There is an important version detail behind that table. At submission time, an authenticated QwenCloud CLI check and the current model documentation confirm [`qwen3.7-plus`](https://docs.qwencloud.com/developer-guides/getting-started/text-generation-models) as the current multimodal Plus-family model, while `qwen3.7-max` is the larger text-focused model in the same generation. The installed [`qwencloud-model-selector`](../.agents/skills/qwencloud-model-selector/SKILL.md), however, is a point-in-time implementation guide that explicitly recommends `qwen3.6-plus` as its default for both text chat and vision analysis. Reel AI therefore uses `qwen3.6-plus` because it was the installed skill’s deliberate, stable recommendation when the model architecture was locked—not because it was assumed to be the newest model. This also demonstrates why the CLI and current documentation remained a second verification layer instead of silently rewriting a working production stack whenever a newer model appeared.
 
 The build was guided by a project-local suite of nine installed skills from `qwencloud/qwencloud-ai`: model selection, text, vision, image generation, video generation, TTS, authentication, usage, and update checks. They became practical implementation playbooks rather than passive reference material. The model-selector skill helped match each production role to the right modality; the generation skills clarified native endpoint contracts, asynchronous task behavior, supported inputs, prompt controls, and retry boundaries; the authentication guidance kept the application API key separate from the CLI session; and the usage skill made quota awareness part of development rather than an unpleasant surprise at the end.
 
