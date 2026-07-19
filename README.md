@@ -6,7 +6,7 @@ The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The rep
 
 ## Demo
 
-[![Watch the demo](https://img.youtube.com/vi/tl69m80pK7k/maxresdefault.jpg)](https://youtu.be/tl69m80pK7k)
+[![Watch the Reel AI demo](docs/demo-thumbnail.png)](https://youtu.be/tl69m80pK7k)
 
 ## Features
 
