@@ -4,6 +4,10 @@ Reel AI is an AI showrunner studio for short-form business ads and story-led soc
 
 The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The repo is intentionally public-submission friendly: no committed secrets, visible server-side QwenCloud usage, reproducible Docker deployment, and a judging checklist.
 
+## Demo
+
+[![Watch the demo](https://img.youtube.com/vi/tl69m80pK7k/maxresdefault.jpg)](https://youtu.be/tl69m80pK7k)
+
 ## Features
 
 - Next.js App Router studio in `apps/web`.
