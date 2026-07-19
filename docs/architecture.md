@@ -6,6 +6,10 @@ This document describes the target MVP architecture. The implementation source o
 
 ## System Diagram
 
+![Reel AI multimodal production architecture](reel-ai-architecture.png)
+
+The diagram highlights the production boundaries, multimodal model plane, durable state and artifacts, deterministic render path, and the safeguards that make Auto mode resumable. The source-level Mermaid view remains below for maintainers.
+
 ```mermaid
 flowchart TB
   User["User / Judge"] --> Web["Next.js Studio UI"]
