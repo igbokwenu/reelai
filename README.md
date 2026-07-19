@@ -4,6 +4,8 @@ Reel AI is an AI showrunner studio for short-form business ads and story-led soc
 
 The project is built for the QwenCloud hackathon Track 2, AI Showrunner. The repo is intentionally public-submission friendly: no committed secrets, visible server-side QwenCloud usage, reproducible Docker deployment, and a judging checklist.
 
+> **Project status:** Reel AI is a preliminary, functional hackathon build intended for evaluation, learning, and further development.
+
 ## Demo
 
 <a href="https://youtu.be/tl69m80pK7k" target="_blank" rel="noopener noreferrer">
@@ -65,20 +67,32 @@ Key runtime services:
 Prerequisites:
 
 - Node.js 20 or newer.
-- pnpm 11.
+- pnpm 11 (the repository pins `pnpm@11.7.0`).
 - PostgreSQL, either local/RDS or Docker Compose.
 
-Install and run:
+For a fresh fork, clone it and run:
 
 ```bash
-pnpm install
+git clone https://github.com/YOUR-USER/reelai.git
+cd reelai
+corepack enable
+pnpm install --frozen-lockfile
 cp .env.example .env
+docker compose up -d postgres
 pnpm db:migrate
 pnpm db:seed
 pnpm dev
 ```
 
 Open `http://localhost:3000`.
+
+Before `pnpm db:migrate`, edit `.env`:
+
+- For the bundled local PostgreSQL service, set `DATABASE_URL=postgresql://reelai:reelai@localhost:5432/reelai`.
+- Replace `DASHSCOPE_API_KEY` with your Alibaba Cloud Model Studio/QwenCloud API key before using AI generation. The UI and unit tests can start with the placeholder, but model-backed actions cannot.
+- Leave the OSS values as placeholders to use the local artifact fallback at `apps/web/.data/artifacts`. Configure OSS only when you want cloud-backed demo artifacts.
+
+`pnpm db:seed` is optional. It creates the two public demo fixtures described below.
 
 Application-only updates that do not add a Prisma migration require only a restart of `pnpm dev`. Web development, typecheck, and build commands regenerate Prisma Client automatically so editor types stay aligned with `prisma/schema.prisma`. After switching to a branch with schema changes, run `pnpm db:generate` immediately if an already-open editor still shows missing Prisma fields, then restart its TypeScript server. The continuity-first anchor and single-shot-direction updates include migrations that preserve prior takes/artifacts, migrate the former motion brief into `shotPrompt`, and retire obsolete scene prompt columns. Existing local checkouts must stop `pnpm dev`, run `pnpm db:migrate` once, and then restart `pnpm dev`.
 
@@ -125,17 +139,22 @@ The seed creates:
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` for local development or create a server-only env file such as `/opt/reelai/.env` for ECS. Keep real values out of git.
+Copy `.env.example` to `.env` for local development or create a server-only env file such as `/opt/reelai/.env` for ECS. Keep real values out of git. Model Studio API keys and API endpoints are regional and must match.
 
-Required:
+Required for the complete AI workflow:
 
 - `DASHSCOPE_API_KEY`: QwenCloud API key, server-side only.
 - `DATABASE_URL`: PostgreSQL connection string.
-- `OSS_REGION`: Alibaba Cloud OSS region.
-- `OSS_BUCKET`: OSS bucket for generated artifacts.
-- `OSS_ACCESS_KEY_ID`: OSS access key id.
-- `OSS_ACCESS_KEY_SECRET`: OSS access key secret.
 - `PUBLIC_APP_URL`: public app origin used for artifact/render callbacks and local URLs.
+
+Required only when using Alibaba Cloud OSS:
+
+- `OSS_REGION`: OSS endpoint prefix such as `oss-ap-southeast-1`.
+- `OSS_BUCKET`: OSS bucket for generated artifacts.
+- `OSS_ACCESS_KEY_ID`: access key ID for a dedicated RAM user.
+- `OSS_ACCESS_KEY_SECRET`: access key secret for that RAM user.
+
+The current preliminary OSS implementation stores the bucket URL as the artifact URL and expects generated demo objects to be readable from that URL. Use a dedicated demo bucket and do not upload confidential material. Private-bucket proxying or signed download URLs are future hardening work.
 
 Optional:
 
@@ -199,9 +218,13 @@ Run the local Docker Compose stack:
 
 ```bash
 cp .env.example .env
+pnpm docker:build
+docker compose up -d postgres
 pnpm compose:migrate
-pnpm compose:up
+docker compose up -d web
 ```
+
+Add a real `DASHSCOPE_API_KEY` to `.env` before exercising generation. The migration profile applies migrations and runs the demo seed. A first Docker build downloads several hundred npm packages and may need to be retried if the registry connection times out.
 
 `docker-compose.yml` includes:
 
@@ -222,10 +245,12 @@ Deployment guide:
 Minimum deployment flow:
 
 ```bash
-docker compose --env-file /opt/reelai/.env build web
-docker compose --env-file /opt/reelai/.env --profile setup run --rm migrate
-docker compose --env-file /opt/reelai/.env up -d web
+REELAI_ENV_FILE=/opt/reelai/.env docker compose --env-file /opt/reelai/.env build web
+REELAI_ENV_FILE=/opt/reelai/.env docker compose --env-file /opt/reelai/.env --profile setup run --rm migrate
+REELAI_ENV_FILE=/opt/reelai/.env docker compose --env-file /opt/reelai/.env up -d web
 ```
+
+Both settings are intentional with the current Compose file: `--env-file` supplies Compose substitutions, while `REELAI_ENV_FILE` selects the file loaded into the containers.
 
 Security group guidance:
 
