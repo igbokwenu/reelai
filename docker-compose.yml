@@ -17,6 +17,9 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
 
   web:
+    # The web server and migration job must run from the same image. Otherwise
+    # `docker compose build web` can leave `migrate` on an older schema.
+    image: reelai-web:latest
     build:
       context: .
     restart: unless-stopped
@@ -46,6 +49,7 @@ services:
 
   migrate:
     profiles: ["setup"]
+    image: reelai-web:latest
     build:
       context: .
     depends_on:
