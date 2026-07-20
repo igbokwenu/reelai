@@ -1,0 +1,21 @@
+{$REELAI_SITE_ADDRESS} {
+	encode zstd gzip
+
+	# Remotion and Qwen's upload preparation fetch stored media through these
+	# read-only endpoints. Keeping only these reads outside Basic Auth preserves
+	# rendering without exposing any route that can start billable generation.
+	@artifactFiles {
+		method GET HEAD OPTIONS
+		path /api/artifacts/*/file /api/artifacts/by-key/*
+	}
+	handle @artifactFiles {
+		reverse_proxy web:3000
+	}
+
+	handle {
+		basic_auth {
+			{$REELAI_BASIC_AUTH_USER} {$REELAI_BASIC_AUTH_HASH}
+		}
+		reverse_proxy web:3000
+	}
+}

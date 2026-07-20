@@ -20,7 +20,7 @@
     "db:seed": "prisma db seed",
     "docker:build": "docker build -t reelai-web .",
     "compose:migrate": "docker compose --profile setup run --rm migrate",
-    "compose:up": "docker compose up --build web"
+    "compose:up": "docker compose up --build gateway"
   },
   "devDependencies": {
     "@prisma/client": "^7.8.0",

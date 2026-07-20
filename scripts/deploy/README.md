@@ -59,6 +59,12 @@ Set these values:
 DASHSCOPE_API_KEY=your-model-studio-api-key
 PUBLIC_APP_URL=https://your-demo-domain.example
 
+# Caddy gateway. Use http://PUBLIC_IP when no domain is available, or use an
+# HTTPS hostname to let Caddy obtain and renew its certificate automatically.
+REELAI_SITE_ADDRESS=https://your-demo-domain.example
+REELAI_BASIC_AUTH_USER=your-private-judge-username
+REELAI_BASIC_AUTH_HASH='$2a$14$replace-with-a-caddy-generated-hash'
+
 OSS_REGION=oss-ap-southeast-1
 OSS_BUCKET=your-demo-bucket
 OSS_ACCESS_KEY_ID=your-dedicated-ram-access-key-id
@@ -78,6 +84,19 @@ For RDS, set both database variables to the RDS private endpoint URL. The curren
 
 Do not paste the environment file into chat, issues, logs, or screenshots.
 
+Generate the password hash interactively so the plaintext password does not
+enter shell history:
+
+```bash
+docker run --rm -it caddy:2.11.4-alpine caddy hash-password
+```
+
+Store only the resulting hash in `REELAI_BASIC_AUTH_HASH`. Send the plaintext
+username and password to judges privately. Caddy protects the UI and every
+generation endpoint. Only read-only artifact file endpoints bypass the prompt
+because the render pipeline must fetch them; those endpoints cannot spend
+QwenCloud credits.
+
 ## 4. Build and Start
 
 The existing Compose file uses `REELAI_ENV_FILE` to select the file loaded into containers. `--env-file` separately supplies values used while Compose evaluates the file, so use both:
@@ -86,7 +105,7 @@ The existing Compose file uses `REELAI_ENV_FILE` to select the file loaded into 
 REELAI_ENV_FILE=/opt/reelai/.env docker compose --env-file /opt/reelai/.env build web
 REELAI_ENV_FILE=/opt/reelai/.env docker compose --env-file /opt/reelai/.env up -d postgres
 REELAI_ENV_FILE=/opt/reelai/.env docker compose --env-file /opt/reelai/.env --profile setup run --rm migrate
-REELAI_ENV_FILE=/opt/reelai/.env docker compose --env-file /opt/reelai/.env up -d web
+REELAI_ENV_FILE=/opt/reelai/.env docker compose --env-file /opt/reelai/.env up -d gateway
 ```
 
 The migration service applies production migrations and seeds the two demo projects. It is explicit and is not run automatically when the web container starts.
@@ -96,10 +115,19 @@ The migration service applies production migrations and seeds the two demo proje
 ```bash
 REELAI_ENV_FILE=/opt/reelai/.env docker compose --env-file /opt/reelai/.env ps
 REELAI_ENV_FILE=/opt/reelai/.env docker compose --env-file /opt/reelai/.env logs --tail=100 web
-curl --fail --silent --show-error http://127.0.0.1:3000
 ```
 
-After the direct check, put a TLS reverse proxy in front of port `3000`, add access control, set `PUBLIC_APP_URL` to the final HTTPS origin, and remove public security-group access to `3000`.
+The gateway should reject an unauthenticated request and accept the private
+judge credentials:
+
+```bash
+curl --head "${PUBLIC_APP_URL}"
+curl --fail --silent --show-error --user "${REELAI_BASIC_AUTH_USER}" "${PUBLIC_APP_URL}"
+```
+
+The first command should return `401`; the second should return the app HTML.
+Keep only ports `80` and `443` open for the gateway, restrict SSH to your IP,
+and do not expose ports `3000` or `5432` in the ECS security group.
 
 The Playwright smoke suite modifies data. Run it only against a disposable demo database:
 

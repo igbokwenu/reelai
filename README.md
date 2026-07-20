@@ -221,16 +221,24 @@ cp .env.example .env
 pnpm docker:build
 docker compose up -d postgres
 pnpm compose:migrate
-docker compose up -d web
+docker compose up -d gateway
 ```
 
 Add a real `DASHSCOPE_API_KEY` to `.env` before exercising generation. The migration profile applies migrations and runs the demo seed. A first Docker build downloads several hundred npm packages and may need to be retried if the registry connection times out.
 
 `docker-compose.yml` includes:
 
+- `gateway`: Caddy reverse proxy with submission-time HTTP Basic Authentication.
 - `web`: production Next.js app.
 - `postgres`: local/hackathon PostgreSQL service.
 - `migrate`: explicit migration and seed profile.
+
+The Docker gateway is the only publicly published application service. Add
+`REELAI_SITE_ADDRESS`, `REELAI_BASIC_AUTH_USER`, and a Caddy-generated
+`REELAI_BASIC_AUTH_HASH` to the selected environment file before starting it.
+The read-only artifact file routes remain unauthenticated because Remotion and
+Qwen upload preparation fetch those URLs during generation; no unauthenticated
+route can create a project or start model work.
 
 Migrations and seeds are explicit commands, not hidden app startup side effects.
 
@@ -247,7 +255,7 @@ Minimum deployment flow:
 ```bash
 REELAI_ENV_FILE=/opt/reelai/.env docker compose --env-file /opt/reelai/.env build web
 REELAI_ENV_FILE=/opt/reelai/.env docker compose --env-file /opt/reelai/.env --profile setup run --rm migrate
-REELAI_ENV_FILE=/opt/reelai/.env docker compose --env-file /opt/reelai/.env up -d web
+REELAI_ENV_FILE=/opt/reelai/.env docker compose --env-file /opt/reelai/.env up -d gateway
 ```
 
 Both settings are intentional with the current Compose file: `--env-file` supplies Compose substitutions, while `REELAI_ENV_FILE` selects the file loaded into the containers.
