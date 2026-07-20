@@ -1,8 +1,3 @@
-# Reel AI — Your AI Showrunner for Scroll-Stopping Brand Films
-
-> **Track 2: AI Showrunner**  
-> Reel AI turns a website and a few brand assets into a directed, editable, production-ready vertical video—combining Qwen-powered strategy, visual generation, motion, narration, and deterministic post-production in one resilient workflow.
-
 ## Inspiration
 
 Creating a polished short-form ad is deceptively difficult. A business may know its product, audience, and message, but turning that knowledge into a compelling reel still requires a strategist, copywriter, art director, storyboard artist, motion designer, voice artist, editor, and a surprising amount of production coordination. For small brands and independent creators, that process is often too slow, too expensive, or fragmented across a dozen disconnected tools.
@@ -15,18 +10,17 @@ The project was also inspired by a question: **What would an AI video tool look 
 
 Reel AI converts a business website, an optional logo, and an optional product image into a finished **9:16 brand film**. It offers three distinct production formats:
 
-- **Brand Reel** creates a story-led 15–30 second social ad. It grounds its strategy in website research and uploaded assets, then builds a reusable Brand Kit containing the brand’s positioning, value propositions, audience, tone, palette, visual motifs, supported claims, policy risks, citations, and locked visual language.
+- **Brand Reel** creates a story-led 15–60 second social ad. It grounds its strategy in website research and uploaded assets, then builds a reusable Brand Kit containing the brand’s positioning, value propositions, audience, tone, palette, visual motifs, supported claims, policy risks, citations, and locked visual language.
 - **Product Showcase** creates a focused 5–15 second realistic or premium-3D product film from one named product and one hero image. Each proposed concept includes a visible motion-feasibility plan—not just a pretty prompt—with one hero action, safe camera behavior, human-presence limits, product-separation rules, and a rationale.
-- **Razzmatazz Mode** compresses Product Showcase into a precise five-second commercial bumper: one intact product, one identity-safe hero motion, one surrounding energy effect, no people, no teardown, and a sharp 2–6 word closer. The output is locked to exactly $5 \times 30 = 150$ frames.
+- **Razzmatazz Mode** compresses Product Showcase into a precise five-second commercial bumper: one intact product, one identity-safe hero motion, one surrounding energy effect, and a sharp 2–6 word closer.
 
 From there, Reel AI runs an end-to-end production pipeline:
 
 1. **Research and ground the brand.** It performs bounded multi-page website research, analyzes supplied visual assets, extracts an evidence-backed palette, and separates what the brand says from what the generator is actually allowed to depict.
-2. **Pitch exactly three creative directions.** The AI Creative Director produces three differentiated concepts and a real Scene 1 opening frame for each—not throwaway mood-board art. A user can replace one direction without destroying the other two.
+2. **Pitch exactly three creative directions.** The AI Creative Director produces three differentiated concepts and a real Scene 1 opening frame for each. A user can replace one direction without destroying the other two.
 3. **Create an editable storyboard.** Every scene receives a narrative purpose, one generation-safe directed shot, exact timing, narration, continuity locks, and a deliberate transition. **Cinematic Boost** can raise the scale, lighting contrast, depth, and reveal design without relaxing product-safety constraints.
 4. **Generate continuity-aware media.** Scene 1 reuses the selected concept frame, while later keyframes can reference recent anchors to preserve recurring products, people, lighting, screen direction, and visual-world logic. Wan image-to-video then animates the approved shot from its selected anchor.
-5. **Direct the soundtrack.** Qwen TTS creates scene-local narration. Reel AI measures the actual WAV duration, adds natural lead-in and tail room, applies no more than a $1.20\times$ timing correction, and rejects copy that cannot fit cleanly instead of clipping speech. An AI-selected curated music bed is looped, faded, and automatically ducked beneath narration.
-6. **Finish the film.** Remotion assembles the clips, narration, music, transition grammar, safe zones, verified logo, optional AI disclosure, final CTA, thumbnail, and H.264 MP4. Early scenes stay text-free; the closing copy enters midway through the final shot so the visuals still have room to breathe.
+5. **Direct the soundtrack.** Qwen TTS creates scene-local narration. Reel AI measures the actual WAV duration, and adds natural lead-in and tail room. An AI-selected curated music bed is looped, faded, and automatically ducked beneath narration.
 
 Two operating styles make the system useful to different creators. **Auto mode** can carry a selected concept through storyboard, anchors, video clips, narration, and final render. **Step-by-step mode** exposes the same pipeline for users who want hands-on control. Because both modes share the same jobs, validators, artifacts, and guardrails, automation never becomes a lower-quality hidden path.
 
@@ -38,13 +32,13 @@ Reel AI is a full-stack **Next.js and TypeScript** application rather than a thi
 
 The multimodal stack uses specialized QwenCloud models for specialized production jobs. Those choices were not arbitrary: they were anchored in the installed Qwen skills, then checked against the QwenCloud CLI and current model documentation before being locked into the application.
 
-| Production role | Model | How Reel AI uses it | Selection basis |
-| --- | --- | --- | --- |
-| Brand strategist, scriptwriter, creative director, storyboard planner, and structured repair | `qwen3.6-plus` | Evidence-grounded analysis and schema-validated creative JSON | Default text recommendation in the installed model-selector skill |
-| Visual reviewer | `qwen3.6-plus` multimodal vision | Logo/product analysis and post-generation grounding review | Default vision recommendation in the installed model-selector and vision skills |
-| Concept previews and scene anchors | `wan2.7-image-pro` | Reference-aware 9:16 opening frames and continuity anchors | Image skill recommendation for reference editing, subject consistency, and high-quality output |
-| Scene motion | `wan2.7-i2v` | First-frame image-to-video with the approved shot sentence and dedicated negative prompt | Explicit selection from the video skill’s supported models for the newer unified Wan 2.7 protocol |
-| Narration | `qwen3-tts-flash` | Scene-timed speech synthesis stored as durable audio artifacts | Recommended standard/default model in the installed TTS skill |
+| Production role                                                                              | Model                            | How Reel AI uses it                                                                      | Selection basis                                                                                   |
+| -------------------------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Brand strategist, scriptwriter, creative director, storyboard planner, and structured repair | `qwen3.6-plus`                   | Evidence-grounded analysis and schema-validated creative JSON                            | Default text recommendation in the installed model-selector skill                                 |
+| Visual reviewer                                                                              | `qwen3.6-plus` multimodal vision | Logo/product analysis and post-generation grounding review                               | Default vision recommendation in the installed model-selector and vision skills                   |
+| Concept previews and scene anchors                                                           | `wan2.7-image-pro`               | Reference-aware 9:16 opening frames and continuity anchors                               | Image skill recommendation for reference editing, subject consistency, and high-quality output    |
+| Scene motion                                                                                 | `wan2.7-i2v`                     | First-frame image-to-video with the approved shot sentence and dedicated negative prompt | Explicit selection from the video skill’s supported models for the newer unified Wan 2.7 protocol |
+| Narration                                                                                    | `qwen3-tts-flash`                | Scene-timed speech synthesis stored as durable audio artifacts                           | Recommended standard/default model in the installed TTS skill                                     |
 
 There is an important version detail behind that table. At submission time, an authenticated QwenCloud CLI check and the current model documentation confirm [`qwen3.7-plus`](https://docs.qwencloud.com/developer-guides/getting-started/text-generation-models) as the current multimodal Plus-family model, while `qwen3.7-max` is the larger text-focused model in the same generation. The installed [`qwencloud-model-selector`](../.agents/skills/qwencloud-model-selector/SKILL.md), however, is a point-in-time implementation guide that explicitly recommends `qwen3.6-plus` as its default for both text chat and vision analysis. Reel AI therefore uses `qwen3.6-plus` because it was the installed skill’s deliberate, stable recommendation when the model architecture was locked—not because it was assumed to be the newest model. This also demonstrates why the CLI and current documentation remained a second verification layer instead of silently rewriting a working production stack whenever a newer model appeared.
 
@@ -82,7 +76,7 @@ The answer was a continuity bible, recent-anchor references, one-action shot gra
 
 ### Learning Alibaba Cloud from scratch
 
-Alibaba Cloud was entirely new territory. Provisioning ECS, configuring security groups and Docker, creating and scoping a RAM user, signing OSS requests, setting bucket and region configuration, managing server-only environment variables, and persisting generated artifacts took substantial iteration. The payoff was learning how to move from a local creative prototype to a real cloud-hosted production system with durable media and visible deployment proof.
+Alibaba Cloud was entirely new territory. Provisioning ECS, configuring security groups and Docker, creating and scoping a RAM user, signing OSS requests, setting bucket and region configuration, managing server-only environment variables, and persisting generated artifacts took substantial iteration. The payoff was learning how to move from a local creative prototype to a cloud-hosted production system with durable media and visible deployment proof.
 
 ### Making long-running AI work reliable in a web application
 
@@ -121,6 +115,11 @@ The next step is to turn Reel AI from a powerful single-user studio into a scala
 - Explore Alibaba Model Studio’s music-generation options when international availability and licensing make them suitable, while keeping Reel AI’s current curated soundtrack path dependable.
 - Add publishing and performance feedback so Reel AI can learn which hooks, visual devices, and calls to action work best for each brand—closing the loop from **brand brief to finished reel to measurable result**.
 
-## Built with
+---
 
-QwenCloud, QwenCloud CLI, Qwen Skills, Qwen 3.6 Plus, Wan 2.7 Image Pro, Wan 2.7 I2V, Qwen TTS, Alibaba Cloud, ECS, OSS, RAM, Next.js, TypeScript, Tailwind CSS, Prisma, PostgreSQL, Remotion, Docker, Docker Compose, Zod, Vitest, Playwright, AI Agents, Video Generation, Text-to-Speech
+_Access note:_ The live studio is available at
+[`https://reelai.skylinefuturistic.com`](https://reelai.skylinefuturistic.com)
+behind a temporary username-and-password lock to protect the submission's
+limited QwenCloud API credits. The complete project is public on
+[GitHub](https://github.com/igbokwenu/reelai); anyone can fork it, rebuild the
+deployment, and configure their own QwenCloud API key to create reels.
